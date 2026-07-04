@@ -3,3 +3,5 @@ dist
 .env
 .env.local
 *.local
+docs/
+scripts/generate_docs_pdf.py

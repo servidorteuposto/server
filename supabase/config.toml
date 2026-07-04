@@ -1,0 +1,5 @@
+[functions.secure-auth]
+verify_jwt = false
+
+[functions.send-security-alert]
+verify_jwt = true

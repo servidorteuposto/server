@@ -1,6 +1,23 @@
-import { FormEvent, useState, type ReactNode } from 'react'
-import { supabase } from '../lib/supabase'
+import { FormEvent, useCallback, useEffect, useState, type ReactNode } from 'react'
+import PaymentForm from '../components/PaymentForm'
+import { requestPasswordResetByCnpj } from '../lib/auth'
+import { formatCnpj, isValidCnpj, isValidCnpjLength, CNPJ_INVALID_MESSAGE } from '../lib/cnpj'
+import type { PaymentActivation, PaymentMethod } from '../lib/payment'
+import { getPaymentActivation } from '../lib/payment'
 import { isValidPassword, PASSWORD_RULE_MESSAGE } from '../lib/password'
+import {
+  clearPreRegistration,
+  getPreRegistration,
+  savePreRegistration,
+} from '../lib/pre-register'
+import {
+  activateSubscription,
+  getAccountAccessByIdentifier,
+  getRegistrationConflictMessage,
+  type AccountAccess,
+} from '../lib/subscription'
+import { getRememberedIdentifier, setRememberedIdentifier } from '../lib/session'
+import { secureLogin, secureRegister } from '../lib/secure-auth'
 import './LoginPage.css'
 
 function FeatureIcon({ color, children }: { color: string; children: ReactNode }) {
@@ -170,15 +187,6 @@ function PhoneIcon() {
   )
 }
 
-function formatCnpj(value: string) {
-  const digits = value.replace(/\D/g, '').slice(0, 14)
-  return digits
-    .replace(/^(\d{2})(\d)/, '$1.$2')
-    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
-    .replace(/\.(\d{3})(\d)/, '.$1/$2')
-    .replace(/(\d{4})(\d)/, '$1-$2')
-}
-
 function formatPhone(value: string) {
   const digits = value.replace(/\D/g, '').slice(0, 11)
   if (digits.length <= 10) {
@@ -187,41 +195,200 @@ function formatPhone(value: string) {
   return digits.replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2')
 }
 
-type AuthView = 'login' | 'register'
+type AuthView = 'login' | 'register' | 'forgot-password' | 'payment'
 
 export default function LoginPage() {
   const [view, setView] = useState<AuthView>('login')
+  const [identifier, setIdentifier] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [postoName, setPostoName] = useState('')
   const [cnpj, setCnpj] = useState('')
+  const [forgotCnpj, setForgotCnpj] = useState('')
   const [phone, setPhone] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [paymentError, setPaymentError] = useState<string | null>(null)
+  const [paymentSuccess, setPaymentSuccess] = useState(false)
+  const [paymentActivation, setPaymentActivation] = useState<PaymentActivation | null>(null)
+  const [preRegisterHint, setPreRegisterHint] = useState(false)
+  const [pendingPaymentAlert, setPendingPaymentAlert] = useState(false)
+  const [honeypot, setHoneypot] = useState('')
+
+  useEffect(() => {
+    const savedIdentifier = getRememberedIdentifier()
+    if (savedIdentifier) {
+      setIdentifier(savedIdentifier)
+      setRememberMe(true)
+    }
+  }, [])
 
   function switchView(nextView: AuthView) {
     setView(nextView)
     setError(null)
     setSuccess(null)
+    setPaymentError(null)
+    setPaymentSuccess(false)
+    setPaymentActivation(null)
+    setPreRegisterHint(false)
+    setPendingPaymentAlert(false)
   }
 
-  async function handleEmailLogin(event: FormEvent) {
+  function fillRegistrationFromAccess(access: AccountAccess) {
+    setPostoName(access.nome ?? '')
+    setCnpj(access.cnpj ?? '')
+    setEmail(access.email ?? '')
+    setPhone(access.telefone ?? '')
+    setPassword('')
+
+    if (access.cnpj) {
+      savePreRegistration(access.cnpj, {
+        postoName: access.nome ?? '',
+        email: access.email ?? '',
+        phone: access.telefone ?? '',
+        reachedPayment: true,
+      })
+    }
+  }
+
+  function goToPendingPayment(access: AccountAccess) {
+    fillRegistrationFromAccess(access)
+    setPreRegisterHint(true)
+    setPendingPaymentAlert(true)
+    setView('register')
+  }
+
+  function goToPaymentFromRegister() {
+    setError(null)
+
+    if (!isValidCnpjLength(cnpj)) {
+      setError('Informe um CNPJ válido para continuar o pagamento.')
+      return
+    }
+
+    if (!isValidCnpj(cnpj)) {
+      setError(CNPJ_INVALID_MESSAGE)
+      return
+    }
+
+    persistPreRegistration(true)
+    setPendingPaymentAlert(false)
+    switchView('payment')
+  }
+
+  function persistPreRegistration(reachedPayment = true) {
+    if (!isValidCnpjLength(cnpj)) return
+
+    savePreRegistration(cnpj, {
+      postoName,
+      email,
+      phone,
+      reachedPayment,
+    })
+  }
+
+  function handleRegisterCnpjChange(value: string) {
+    const formatted = formatCnpj(value)
+    setCnpj(formatted)
+
+    if (!isValidCnpjLength(formatted)) {
+      setPreRegisterHint(false)
+      return
+    }
+
+    const saved = getPreRegistration(formatted)
+    if (!saved) {
+      setPreRegisterHint(false)
+      return
+    }
+
+    setPostoName(saved.postoName)
+    setEmail(saved.email)
+    setPhone(saved.phone)
+    setPassword('')
+    setPreRegisterHint(true)
+  }
+
+  function completePayment() {
+    clearPreRegistration(cnpj)
+    setPaymentSuccess(true)
+  }
+
+  useEffect(() => {
+    if (view === 'payment' && isValidCnpjLength(cnpj)) {
+      savePreRegistration(cnpj, { postoName, email, phone, reachedPayment: true })
+    }
+  }, [view, cnpj, postoName, email, phone])
+
+  async function handleLogin(event: FormEvent) {
     event.preventDefault()
     setLoading(true)
     setError(null)
+    setPendingPaymentAlert(false)
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const result = await secureLogin(identifier, password)
 
-    setLoading(false)
+      if (!result.ok) {
+        if (result.code === 'pending_payment' && result.posto) {
+          goToPendingPayment({
+            found: true,
+            subscription_status: 'pending_payment',
+            nome: result.posto.nome,
+            cnpj: result.posto.cnpj,
+            telefone: result.posto.telefone,
+            email: result.posto.email,
+          })
+          return
+        }
 
-    if (signInError) {
-      setError(signInError.message)
+        setError(result.message)
+        return
+      }
+
+      setRememberedIdentifier(rememberMe ? identifier.trim() : null)
+    } catch {
+      setError('Não foi possível realizar o login. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleForgotPassword(event: FormEvent) {
+    event.preventDefault()
+    setLoading(true)
+    setError(null)
+    setSuccess(null)
+
+    if (!isValidCnpjLength(forgotCnpj)) {
+      setLoading(false)
+      setError('Informe um CNPJ válido com 14 dígitos.')
+      return
+    }
+
+    if (!isValidCnpj(forgotCnpj)) {
+      setLoading(false)
+      setError(CNPJ_INVALID_MESSAGE)
+      return
+    }
+
+    try {
+      const result = await requestPasswordResetByCnpj(forgotCnpj)
+
+      if (!result.sent) {
+        setError('CNPJ não encontrado.')
+        return
+      }
+
+      setSuccess('E-mail de recuperação enviado! Verifique sua caixa de entrada.')
+    } catch {
+      setError('Não foi possível enviar o e-mail de recuperação. Tente novamente.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -231,9 +398,15 @@ export default function LoginPage() {
     setError(null)
     setSuccess(null)
 
-    if (cnpj.replace(/\D/g, '').length !== 14) {
+    if (!isValidCnpjLength(cnpj)) {
       setLoading(false)
       setError('Informe um CNPJ válido com 14 dígitos.')
+      return
+    }
+
+    if (!isValidCnpj(cnpj)) {
+      setLoading(false)
+      setError(CNPJ_INVALID_MESSAGE)
       return
     }
 
@@ -243,27 +416,74 @@ export default function LoginPage() {
       return
     }
 
-    const { error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          nome_posto: postoName,
-          cnpj,
-          telefone: phone,
-        },
-      },
-    })
+    try {
+      const registerResult = await secureRegister({
+        email,
+        password,
+        postoName,
+        cnpj,
+        phone,
+        website: honeypot,
+      })
 
-    setLoading(false)
+      if (!registerResult.ok) {
+        if (registerResult.code === 'pending_payment') {
+          const access = await getAccountAccessByIdentifier(cnpj)
+          if (access.found) {
+            persistPreRegistration(true)
+            setPendingPaymentAlert(false)
+            switchView('payment')
+            return
+          }
+        }
 
-    if (signUpError) {
-      setError(signUpError.message)
+        if (registerResult.code === 'duplicate') {
+          setError(getRegistrationConflictMessage('cnpj'))
+          return
+        }
+
+        setError(registerResult.message)
+        return
+      }
+    } catch {
+      setLoading(false)
+      setError('Não foi possível concluir o cadastro. Tente novamente.')
       return
     }
 
-    setSuccess('Cadastro realizado! Verifique seu e-mail para confirmar a conta.')
+    setLoading(false)
+    setPendingPaymentAlert(false)
+    persistPreRegistration(true)
+    switchView('payment')
   }
+
+  async function finalizePayment(method: PaymentMethod) {
+    setPaymentLoading(true)
+    setPaymentError(null)
+
+    try {
+      // Integração com Stripe será implementada em seguida
+      await new Promise((resolve) => setTimeout(resolve, 1200))
+      await activateSubscription(cnpj)
+      completePayment()
+      setPaymentActivation(getPaymentActivation(method))
+    } catch {
+      setPaymentError('Não foi possível confirmar o pagamento. Tente novamente.')
+    } finally {
+      setPaymentLoading(false)
+    }
+  }
+
+  const handlePixConfirmed = useCallback(async () => {
+    try {
+      await activateSubscription(cnpj)
+      clearPreRegistration(cnpj)
+      setPaymentSuccess(true)
+      setPaymentActivation('instant')
+    } catch {
+      setPaymentError('Não foi possível confirmar o pagamento PIX. Tente novamente.')
+    }
+  }, [cnpj])
 
   return (
     <div className="login-page">
@@ -306,7 +526,11 @@ export default function LoginPage() {
         </aside>
 
         <main className="login-form-section">
-          <div className={`login-card ${view === 'register' ? 'login-card--register' : ''}`}>
+          <div
+            className={`login-card ${
+              view === 'register' || view === 'payment' ? 'login-card--register' : ''
+            }`}
+          >
             {view === 'login' ? (
               <>
                 <header className="login-card__header">
@@ -314,7 +538,7 @@ export default function LoginPage() {
                   <p>Acesse sua conta para continuar</p>
                 </header>
 
-                <form className="login-form" onSubmit={handleEmailLogin}>
+                <form className="login-form" onSubmit={handleLogin}>
                   {error && (
                     <div className="login-form__error" role="alert">
                       {error}
@@ -322,19 +546,19 @@ export default function LoginPage() {
                   )}
 
                   <div className="form-field">
-                    <label htmlFor="email">E-mail</label>
+                    <label htmlFor="identifier">E-mail ou CNPJ</label>
                     <div className="form-field__input-wrap">
                       <span className="form-field__icon">
                         <MailIcon />
                       </span>
                       <input
-                        id="email"
-                        type="email"
-                        placeholder="Digite seu e-mail"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        id="identifier"
+                        type="text"
+                        placeholder="Digite seu e-mail ou CNPJ"
+                        value={identifier}
+                        onChange={(e) => setIdentifier(e.target.value)}
                         required
-                        autoComplete="email"
+                        autoComplete="username"
                       />
                     </div>
                   </div>
@@ -374,9 +598,13 @@ export default function LoginPage() {
                       />
                       <span>Lembrar-me</span>
                     </label>
-                    <a href="#" onClick={(e) => e.preventDefault()}>
+                    <button
+                      type="button"
+                      className="login-card__link login-form__forgot-link"
+                      onClick={() => switchView('forgot-password')}
+                    >
                       Esqueci minha senha
-                    </a>
+                    </button>
                   </div>
 
                   <button type="submit" className="btn btn--primary" disabled={loading}>
@@ -391,14 +619,14 @@ export default function LoginPage() {
                   </button>
                 </p>
               </>
-            ) : (
+            ) : view === 'forgot-password' ? (
               <>
                 <header className="login-card__header">
-                  <h1>Cadastre-se</h1>
-                  <p>Preencha os dados do seu posto</p>
+                  <h1>Esqueci minha senha</h1>
+                  <p>Informe o CNPJ da sua conta para receber o e-mail de recuperação</p>
                 </header>
 
-                <form className="login-form login-form--register" onSubmit={handleRegister}>
+                <form className="login-form" onSubmit={handleForgotPassword}>
                   {error && (
                     <div className="login-form__error" role="alert">
                       {error}
@@ -412,7 +640,115 @@ export default function LoginPage() {
                   )}
 
                   <div className="form-field">
-                    <label htmlFor="posto-name">Nome completo do posto</label>
+                    <label htmlFor="forgot-cnpj">CNPJ</label>
+                    <div className="form-field__input-wrap">
+                      <span className="form-field__icon">
+                        <DocumentIcon />
+                      </span>
+                      <input
+                        id="forgot-cnpj"
+                        type="text"
+                        placeholder="00.000.000/0000-00"
+                        value={forgotCnpj}
+                        onChange={(e) => setForgotCnpj(formatCnpj(e.target.value))}
+                        required
+                        inputMode="numeric"
+                      />
+                    </div>
+                  </div>
+
+                  <button type="submit" className="btn btn--primary" disabled={loading}>
+                    {loading ? 'Enviando...' : 'Enviar e-mail de recuperação'}
+                  </button>
+                </form>
+
+                <p className="login-card__footer">
+                  Lembrou a senha?{' '}
+                  <button type="button" className="login-card__link" onClick={() => switchView('login')}>
+                    Voltar para login
+                  </button>
+                </p>
+              </>
+            ) : view === 'payment' ? (
+              <>
+                <header className="login-card__header">
+                  <h1>Assinatura</h1>
+                  <p>Finalize o pagamento para ativar sua conta</p>
+                </header>
+
+                {paymentSuccess ? (
+                  <div className="payment-success">
+                    <div className="login-form__success" role="status">
+                      {paymentActivation === 'pending'
+                        ? 'Boleto gerado e enviado para seu e-mail! Sua conta será ativada no próximo dia útil após a confirmação do pagamento.'
+                        : 'Pagamento confirmado! Sua conta foi ativada e você já pode acessar o sistema.'}
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      onClick={() => switchView('login')}
+                    >
+                      {paymentActivation === 'pending' ? 'Ir para login' : 'Acessar o sistema'}
+                    </button>
+                  </div>
+                ) : (
+                  <PaymentForm
+                    postoName={postoName}
+                    cnpj={cnpj}
+                    email={email}
+                    loading={paymentLoading}
+                    error={paymentError}
+                    onSubmit={finalizePayment}
+                    onPixConfirmed={handlePixConfirmed}
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                <header className="login-card__header">
+                  <h1>Cadastre-se</h1>
+                  <p>Preencha os dados do seu posto</p>
+                </header>
+
+                <form className="login-form login-form--register" onSubmit={handleRegister}>
+                  <input
+                    type="text"
+                    name="website"
+                    value={honeypot}
+                    onChange={(e) => setHoneypot(e.target.value)}
+                    className="form-field__honeypot"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    aria-hidden="true"
+                  />
+
+                  {error && (
+                    <div className="login-form__error" role="alert">
+                      {error}
+                    </div>
+                  )}
+
+                  {success && (
+                    <div className="login-form__success" role="status">
+                      {success}
+                    </div>
+                  )}
+
+                  {pendingPaymentAlert && (
+                    <div className="login-form__warning" role="alert">
+                      Finalize o pagamento para ativar sua conta antes de fazer login. Confira seus
+                      dados abaixo e prossiga para o pagamento.
+                    </div>
+                  )}
+
+                  {preRegisterHint && !pendingPaymentAlert && (
+                    <div className="login-form__success" role="status">
+                      Cadastro em andamento recuperado. Você pode editar os dados abaixo.
+                    </div>
+                  )}
+
+                  <div className="form-field">
+                    <label htmlFor="posto-name">Razão Social</label>
                     <div className="form-field__input-wrap">
                       <span className="form-field__icon">
                         <StoreIcon />
@@ -440,7 +776,7 @@ export default function LoginPage() {
                         type="text"
                         placeholder="00.000.000/0000-00"
                         value={cnpj}
-                        onChange={(e) => setCnpj(formatCnpj(e.target.value))}
+                        onChange={(e) => handleRegisterCnpjChange(e.target.value)}
                         required
                         inputMode="numeric"
                       />
@@ -512,9 +848,19 @@ export default function LoginPage() {
                     <p className="form-field__hint">{PASSWORD_RULE_MESSAGE}</p>
                   </div>
 
-                  <button type="submit" className="btn btn--primary" disabled={loading}>
-                    {loading ? 'Cadastrando...' : 'Cadastrar'}
-                  </button>
+                  {pendingPaymentAlert ? (
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      onClick={goToPaymentFromRegister}
+                    >
+                      Ir para pagamento
+                    </button>
+                  ) : (
+                    <button type="submit" className="btn btn--primary" disabled={loading}>
+                      {loading ? 'Cadastrando...' : 'Cadastrar'}
+                    </button>
+                  )}
                 </form>
 
                 <p className="login-card__footer">

@@ -180,6 +180,16 @@
   font-size: 0.85rem;
 }
 
+.login-form__warning {
+  padding: 0.75rem 1rem;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #9a3412;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
 .form-field {
   display: flex;
   flex-direction: column;
@@ -196,6 +206,15 @@
   font-size: 0.75rem;
   color: var(--gray-400);
   line-height: 1.35;
+}
+
+.form-field__honeypot {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .form-field__input-wrap {
@@ -265,7 +284,8 @@
   cursor: pointer;
 }
 
-.login-form__options a {
+.login-form__options a,
+.login-form__forgot-link {
   font-size: 0.85rem;
   font-weight: 500;
 }
@@ -322,6 +342,224 @@
 .login-card__footer a:hover,
 .login-card__link:hover {
   text-decoration: underline;
+}
+
+/* ── Payment ── */
+
+.payment-form {
+  gap: 1rem;
+}
+
+.payment-summary {
+  padding: 1rem 1.1rem;
+  background: var(--gray-100);
+  border-radius: 12px;
+}
+
+.payment-summary__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: var(--gray-600);
+}
+
+.payment-summary__row strong {
+  font-size: 1.15rem;
+  color: var(--blue-dark);
+}
+
+.payment-summary__period {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--gray-400);
+}
+
+.form-field__label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--gray-600);
+}
+
+.payment-methods {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+
+.payment-method {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.75rem 0.5rem;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--gray-500);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.payment-method:hover {
+  border-color: var(--blue-light);
+  color: var(--blue-dark);
+}
+
+.payment-method--active {
+  border-color: var(--blue-dark);
+  background: rgba(12, 59, 122, 0.06);
+  color: var(--blue-dark);
+}
+
+.form-field__input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--gray-600);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-field__input::placeholder {
+  color: var(--gray-400);
+}
+
+.form-field__input:focus {
+  border-color: var(--blue-light);
+}
+
+.form-field__input--readonly {
+  background: var(--gray-100);
+  color: var(--gray-500);
+  cursor: default;
+}
+
+.payment-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.payment-form__info {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  line-height: 1.45;
+  padding: 0.65rem 0.85rem;
+  background: #f0f7ff;
+  border-radius: 8px;
+}
+
+.payment-form__info--instant {
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.pix-payment {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.pix-payment__qr-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: var(--gray-100);
+  border-radius: 12px;
+}
+
+.pix-payment__qr {
+  display: block;
+  width: 200px;
+  height: 200px;
+  border-radius: 8px;
+}
+
+.pix-payment__qr-loading {
+  width: 200px;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  color: var(--gray-400);
+}
+
+.pix-payment__amount {
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--gray-600);
+}
+
+.pix-payment__amount strong {
+  color: var(--blue-dark);
+}
+
+.pix-payment__copy {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.pix-payment__code {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.75rem;
+}
+
+.btn--secondary {
+  flex-shrink: 0;
+  width: auto;
+  padding: 0.75rem 1rem;
+  background: var(--white);
+  color: var(--blue-dark);
+  border: 1.5px solid var(--blue-dark);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background: rgba(12, 59, 122, 0.06);
+}
+
+.pix-payment__status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--gray-500);
+}
+
+.pix-payment__pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--blue-light);
+  animation: pix-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pix-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.9);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+.payment-success {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
 }
 
 /* ── Responsive ── */
