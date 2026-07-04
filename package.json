@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "supabase:login": "npx supabase login",
+    "supabase:deploy-auth": "npx supabase functions deploy secure-auth --project-ref jilzklxnejztpphbryti --no-verify-jwt --use-api",
+    "supabase:deploy-alerts": "npx supabase functions deploy send-security-alert --project-ref jilzklxnejztpphbryti --use-api",
+    "supabase:deploy-functions": "npm run supabase:deploy-auth && npm run supabase:deploy-alerts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",

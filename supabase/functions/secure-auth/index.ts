@@ -87,9 +87,16 @@ async function processPendingAlerts(admin: ReturnType<typeof createClient>, supa
 }
 
 const ADMIN_EMAIL = 'servidorteuposto@gmail.com'
+const ADMIN_CNPJ_DIGITS = '99999999000199'
 
 function isAdminEmail(email: string | null | undefined) {
   return email?.toLowerCase() === ADMIN_EMAIL
+}
+
+function isAdminIdentifier(identifier: string) {
+  const trimmed = identifier.trim().toLowerCase()
+  if (isAdminEmail(trimmed)) return true
+  return trimmed.replace(/\D/g, '') === ADMIN_CNPJ_DIGITS
 }
 
 function isValidCnpj(value: string) {
@@ -127,7 +134,7 @@ async function handleLogin(
     email?: string
   } | null
 
-  const adminAccount = isAdminEmail(access?.email)
+  const adminAccount = isAdminIdentifier(identifier) || isAdminEmail(access?.email)
 
   if (adminAccount) {
     await admin.rpc('security_clear_login_lockout', { p_identifier: identifier })
@@ -145,7 +152,7 @@ async function handleLogin(
     }
   }
 
-  if (!access?.found) {
+  if (!access?.found && !adminAccount) {
     await admin.rpc('security_record_login_failure', {
       p_identifier: identifier,
       p_ip_hash: ipHash,
@@ -157,7 +164,7 @@ async function handleLogin(
     }
   }
 
-  if (!adminAccount && access.subscription_status === 'pending_payment') {
+  if (!adminAccount && access?.subscription_status === 'pending_payment') {
     return {
       ok: false,
       code: 'pending_payment',
@@ -171,7 +178,7 @@ async function handleLogin(
     }
   }
 
-  const email = access.email
+  const email = access?.email ?? (isAdminEmail(identifier) ? identifier.trim().toLowerCase() : null)
   if (!email) {
     return {
       ok: false,
@@ -362,17 +369,17 @@ Deno.serve(async (req) => {
 
     if (action === 'login') {
       const result = await handleLogin(admin, supabaseUrl, body.identifier, body.password, ipHash)
-      return jsonResponse(result, result.ok ? 200 : 400)
+      return jsonResponse(result, 200)
     }
 
     if (action === 'register') {
       const result = await handleRegister(admin, body, ipHash)
-      return jsonResponse(result, result.ok ? 200 : 400)
+      return jsonResponse(result, 200)
     }
 
     if (action === 'activate_payment') {
       const result = await handleActivatePayment(admin, body.cnpj, ipHash)
-      return jsonResponse(result, result.ok ? 200 : 400)
+      return jsonResponse(result, 200)
     }
 
     if (action === 'clear_lockout') {

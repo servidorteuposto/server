@@ -1,7 +1,7 @@
 -- Camada de segurança para autenticação e cadastro
 CREATE SCHEMA IF NOT EXISTS auth_security;
 
-CREATE TABLE auth_security.login_attempts (
+CREATE TABLE IF NOT EXISTS auth_security.login_attempts (
   identifier_key text PRIMARY KEY,
   ip_hash text,
   failed_count integer NOT NULL DEFAULT 0,
@@ -11,20 +11,20 @@ CREATE TABLE auth_security.login_attempts (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE auth_security.registration_attempts (
+CREATE TABLE IF NOT EXISTS auth_security.registration_attempts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   ip_hash text NOT NULL,
   cnpj_key text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX registration_attempts_ip_created_idx
+CREATE INDEX IF NOT EXISTS registration_attempts_ip_created_idx
   ON auth_security.registration_attempts (ip_hash, created_at DESC);
 
-CREATE INDEX registration_attempts_cnpj_created_idx
+CREATE INDEX IF NOT EXISTS registration_attempts_cnpj_created_idx
   ON auth_security.registration_attempts (cnpj_key, created_at DESC);
 
-CREATE TABLE auth_security.security_alerts (
+CREATE TABLE IF NOT EXISTS auth_security.security_alerts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   identifier_key text NOT NULL,
   alert_type text NOT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE auth_security.security_alerts (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX security_alerts_unprocessed_idx
+CREATE INDEX IF NOT EXISTS security_alerts_unprocessed_idx
   ON auth_security.security_alerts (created_at)
   WHERE processed_at IS NULL;
 

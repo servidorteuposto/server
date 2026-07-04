@@ -5,3 +5,4 @@ dist
 *.local
 docs/
 scripts/generate_docs_pdf.py
+supabase/.temp/
