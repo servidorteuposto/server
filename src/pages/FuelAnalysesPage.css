@@ -258,12 +258,12 @@
   align-items: center;
   width: fit-content;
   margin-top: 0.25rem;
-  padding: 0.25rem 0.65rem;
+  padding: 0.3rem 0.7rem;
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  line-height: 1.25;
+  text-align: center;
 }
 
 .fuel-density__badge--apto {
@@ -274,6 +274,13 @@
 .fuel-density__badge--inapto {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.fuel-density__reason {
+  font-size: 0.82rem;
+  color: #b91c1c;
+  line-height: 1.4;
+  font-weight: 500;
 }
 
 .fuel-photo__preview {

@@ -20,6 +20,7 @@ import {
   supportsDensityCorrection,
   type DensityConformity,
   type DensityCorrectionResult,
+  DENSITY_CONFORMITY_LABELS,
 } from '../config/fuel-density'
 import SignaturePad from '../components/fuel-analyses/SignaturePad'
 import LiveCameraCapture from '../components/fuel-analyses/LiveCameraCapture'
@@ -70,6 +71,7 @@ type AnalysisDraft = {
   coeficienteGamma: number | null
   densidadeFormula: string | null
   densidadeLimitLabel: string | null
+  densidadeStatusReason: string | null
   photoFile: File | null
   photoPreviewUrl: string | null
   photoLatitude: number | null
@@ -105,6 +107,7 @@ function emptyAnalysis(): AnalysisDraft {
     coeficienteGamma: null,
     densidadeFormula: null,
     densidadeLimitLabel: null,
+    densidadeStatusReason: null,
     photoFile: null,
     photoPreviewUrl: null,
     photoLatitude: null,
@@ -124,6 +127,7 @@ function applyDensityCorrection(
   | 'coeficienteGamma'
   | 'densidadeFormula'
   | 'densidadeLimitLabel'
+  | 'densidadeStatusReason'
 > {
   if (!supportsDensityCorrection(productKey)) {
     return {
@@ -132,6 +136,7 @@ function applyDensityCorrection(
       coeficienteGamma: null,
       densidadeFormula: null,
       densidadeLimitLabel: null,
+      densidadeStatusReason: null,
     }
   }
 
@@ -150,6 +155,7 @@ function applyDensityCorrection(
       densidadeLimitLabel: FUEL_DENSITY_LIMITS_KG_M3[productKey]
         ? draft.densidadeLimitLabel
         : null,
+      densidadeStatusReason: null,
     }
   }
 
@@ -159,6 +165,7 @@ function applyDensityCorrection(
     coeficienteGamma: result.gammaKgM3,
     densidadeFormula: result.formulaLabel,
     densidadeLimitLabel: result.limitLabel,
+    densidadeStatusReason: result.statusReason,
   }
 }
 
@@ -972,8 +979,11 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                               <span
                                 className={`fuel-density__badge fuel-density__badge--${draft.densidadeStatus}`}
                               >
-                                {draft.densidadeStatus === 'apto' ? 'Apto' : 'Inapto'}
+                                {DENSITY_CONFORMITY_LABELS[draft.densidadeStatus]}
                               </span>
+                            )}
+                            {draft.densidadeStatusReason && (
+                              <p className="fuel-density__reason">{draft.densidadeStatusReason}</p>
                             )}
                           </div>
                         )}
@@ -1235,7 +1245,7 @@ function ReportDetailsModal({
               <p>
                 Conformidade ANP:{' '}
                 <strong className={`fuel-density__badge fuel-density__badge--${item.densidade_status}`}>
-                  {item.densidade_status === 'apto' ? 'Apto' : 'Inapto'}
+                  {DENSITY_CONFORMITY_LABELS[item.densidade_status]}
                 </strong>
               </p>
             )}

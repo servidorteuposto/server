@@ -15,6 +15,31 @@ export const FUEL_DENSITY_GAMMA_KG_M3: Record<FuelProductKey, number | null> = {
 }
 
 /**
+ * Faixa operacional do termômetro de densímetro (Portaria Inmetro / práticas ANP de RAQ).
+ * Temperatura fora disso invalida o ensaio — não pode ser Apto.
+ */
+export const DENSITY_ASSAY_TEMPERATURE_C = { min: -10, max: 50 }
+
+/**
+ * Faixa plausível de Dt lida no densímetro (kg/m³), por família de produto.
+ * Evita marcar Apto com valores fisicamente impossíveis.
+ */
+export const OBSERVED_DENSITY_RANGE_KG_M3: Record<
+  Exclude<FuelProductKey, 'gnv'>,
+  { min: number; max: number }
+> = {
+  'gasolina-comum': { min: 700, max: 800 },
+  'gasolina-aditivada': { min: 700, max: 800 },
+  'gasolina-premium': { min: 700, max: 800 },
+  'etanol-comum': { min: 790, max: 820 },
+  'etanol-aditivado': { min: 790, max: 820 },
+  'diesel-s10-comum': { min: 810, max: 880 },
+  'diesel-s10-aditivado': { min: 810, max: 880 },
+  'diesel-s500-comum': { min: 810, max: 880 },
+  'diesel-s500-aditivado': { min: 810, max: 880 },
+}
+
+/**
  * Teor de biodiesel (fração 0–1) usado para projetar a faixa ME do óleo diesel B
  * a partir do diesel A e do biodiesel (Res. ANP nº 968/2024).
  * Atualize quando o CNPE alterar o percentual vigente.
@@ -49,25 +74,29 @@ export type DensityLimit = {
 /**
  * Faixas de massa específica a 20 °C (kg/m³) conforme resoluções ANP vigentes
  * usadas no controle de qualidade no revendedor.
+ *
+ * Gasolina C: a ANP fixa só o mínimo (715). Usamos também um teto operacional
+ * coerente com densímetro de gasolina (máx. ~800 kg/m³) para impedir Apto
+ * com D20 absurdo por temperatura/ME inválidas.
  */
 export const FUEL_DENSITY_LIMITS_KG_M3: Record<FuelProductKey, DensityLimit | null> = {
   'gasolina-comum': {
     min: 715.0,
-    max: null,
+    max: 800.0,
     unit: 'kg/m³',
-    reference: 'Res. ANP nº 807/2020 — Gasolina C, mín. 715,0 kg/m³',
+    reference: 'Res. ANP nº 807/2020 — Gasolina C, mín. 715,0 kg/m³ (teto operacional do ensaio 800,0)',
   },
   'gasolina-aditivada': {
     min: 715.0,
-    max: null,
+    max: 800.0,
     unit: 'kg/m³',
-    reference: 'Res. ANP nº 807/2020 — Gasolina C, mín. 715,0 kg/m³',
+    reference: 'Res. ANP nº 807/2020 — Gasolina C, mín. 715,0 kg/m³ (teto operacional do ensaio 800,0)',
   },
   'gasolina-premium': {
     min: 715.0,
-    max: null,
+    max: 800.0,
     unit: 'kg/m³',
-    reference: 'Res. ANP nº 807/2020 — Gasolina C Premium, mín. 715,0 kg/m³',
+    reference: 'Res. ANP nº 807/2020 — Gasolina C Premium, mín. 715,0 kg/m³ (teto operacional do ensaio 800,0)',
   },
   'etanol-comum': {
     min: 802.9,
@@ -106,6 +135,11 @@ export const FUEL_DENSITY_LIMITS_KG_M3: Record<FuelProductKey, DensityLimit | nu
 
 export type DensityConformity = 'apto' | 'inapto'
 
+export const DENSITY_CONFORMITY_LABELS: Record<DensityConformity, string> = {
+  apto: 'Dentro das Especificações',
+  inapto: 'Fora das Especificações',
+}
+
 export type DensityCorrectionResult = {
   dtKgM3: number
   temperatureC: number
@@ -113,9 +147,11 @@ export type DensityCorrectionResult = {
   d20KgM3: number
   /** Valor formatado para persistir/exibir (kg/m³ com 1 casa). */
   d20Formatted: string
-  status: DensityConformity | null
+  status: DensityConformity
   limitLabel: string | null
   formulaLabel: string
+  /** Motivo quando o ensaio/entrada é inválida ou fora da faixa ANP. */
+  statusReason: string | null
 }
 
 export function parseDecimalInput(value: string): number | null {
@@ -137,32 +173,64 @@ export function supportsDensityCorrection(productKey: FuelProductKey) {
   return FUEL_DENSITY_GAMMA_KG_M3[productKey] != null
 }
 
+function formatLimitLabel(limits: DensityLimit): string | null {
+  if (limits.min != null && limits.max != null) {
+    return `${limits.min.toFixed(1)} a ${limits.max.toFixed(1)} kg/m³`
+  }
+  if (limits.min != null) return `mín. ${limits.min.toFixed(1)} kg/m³`
+  if (limits.max != null) return `máx. ${limits.max.toFixed(1)} kg/m³`
+  return null
+}
+
 export function evaluateDensityConformity(
   productKey: FuelProductKey,
   d20KgM3: number,
-): { status: DensityConformity | null; limitLabel: string | null } {
+): { status: DensityConformity | null; limitLabel: string | null; reason: string | null } {
   const limits = FUEL_DENSITY_LIMITS_KG_M3[productKey]
-  if (!limits) return { status: null, limitLabel: null }
+  if (!limits) return { status: null, limitLabel: null, reason: null }
 
+  const limitLabel = formatLimitLabel(limits)
   const minOk = limits.min == null || d20KgM3 + 1e-9 >= limits.min
   const maxOk = limits.max == null || d20KgM3 - 1e-9 <= limits.max
-  const status: DensityConformity = minOk && maxOk ? 'apto' : 'inapto'
 
-  const limitLabel =
-    limits.min != null && limits.max != null
-      ? `${limits.min.toFixed(1)} a ${limits.max.toFixed(1)} kg/m³`
-      : limits.min != null
-        ? `mín. ${limits.min.toFixed(1)} kg/m³`
-        : limits.max != null
-          ? `máx. ${limits.max.toFixed(1)} kg/m³`
-          : null
+  if (minOk && maxOk) {
+    return { status: 'apto', limitLabel, reason: null }
+  }
 
-  return { status, limitLabel }
+  return {
+    status: 'inapto',
+    limitLabel,
+    reason: `D20 ${d20KgM3.toFixed(1)} kg/m³ fora da faixa ANP/ensaio (${limitLabel}).`,
+  }
+}
+
+function validateAssayInputs(
+  productKey: FuelProductKey,
+  dtKgM3: number,
+  temperatureC: number,
+): string | null {
+  if (
+    temperatureC < DENSITY_ASSAY_TEMPERATURE_C.min ||
+    temperatureC > DENSITY_ASSAY_TEMPERATURE_C.max
+  ) {
+    return `Temperatura ${temperatureC.toFixed(1)} °C fora da faixa do ensaio (${DENSITY_ASSAY_TEMPERATURE_C.min} a ${DENSITY_ASSAY_TEMPERATURE_C.max} °C).`
+  }
+
+  if (productKey === 'gnv') return null
+
+  const range = OBSERVED_DENSITY_RANGE_KG_M3[productKey]
+  if (dtKgM3 < range.min || dtKgM3 > range.max) {
+    return `Massa específica observada ${dtKgM3.toFixed(1)} kg/m³ fora da faixa do densímetro (${range.min} a ${range.max} kg/m³).`
+  }
+
+  return null
 }
 
 /**
  * Converte densidade observada para 20 °C:
  * D20 = Dt + γ × (t − 20)
+ *
+ * Temperatura/Dt fora da faixa do ensaio → sempre Inapto (nunca Apto).
  */
 export function correctDensityTo20C(
   productKey: FuelProductKey,
@@ -178,7 +246,26 @@ export function correctDensityTo20C(
 
   const d20KgM3 = dtKgM3 + gamma * (temperatureC - 20)
   const rounded = Number(d20KgM3.toFixed(1))
-  const { status, limitLabel } = evaluateDensityConformity(productKey, rounded)
+  const formulaLabel = `D20 = ${dtKgM3.toFixed(1)} + ${gamma.toFixed(2)} × (${temperatureC.toFixed(1)} − 20)`
+  const limits = FUEL_DENSITY_LIMITS_KG_M3[productKey]
+  const limitLabel = limits ? formatLimitLabel(limits) : null
+
+  const assayError = validateAssayInputs(productKey, dtKgM3, temperatureC)
+  if (assayError) {
+    return {
+      dtKgM3,
+      temperatureC,
+      gammaKgM3: gamma,
+      d20KgM3: rounded,
+      d20Formatted: rounded.toFixed(1),
+      status: 'inapto',
+      limitLabel,
+      formulaLabel,
+      statusReason: assayError,
+    }
+  }
+
+  const conformity = evaluateDensityConformity(productKey, rounded)
 
   return {
     dtKgM3,
@@ -186,8 +273,9 @@ export function correctDensityTo20C(
     gammaKgM3: gamma,
     d20KgM3: rounded,
     d20Formatted: rounded.toFixed(1),
-    status,
-    limitLabel,
-    formulaLabel: `D20 = ${dtKgM3.toFixed(1)} + ${gamma.toFixed(2)} × (${temperatureC.toFixed(1)} − 20)`,
+    status: conformity.status ?? 'inapto',
+    limitLabel: conformity.limitLabel ?? limitLabel,
+    formulaLabel,
+    statusReason: conformity.reason,
   }
 }

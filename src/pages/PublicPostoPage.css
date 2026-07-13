@@ -214,12 +214,12 @@
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  padding: 0.25rem 0.65rem;
+  padding: 0.3rem 0.7rem;
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  line-height: 1.25;
+  text-align: center;
 }
 
 .fuel-density__badge--apto {

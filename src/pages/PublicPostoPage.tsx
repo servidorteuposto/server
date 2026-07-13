@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  FUEL_PRODUCT_LABELS,
   formatCnpj,
   formatCoords,
   formatCpf,
   formatDateTimePtBr,
-  FUEL_PRODUCT_LABELS,
   type FuelProductKey,
 } from '../config/fuel-analyses'
+import { DENSITY_CONFORMITY_LABELS } from '../config/fuel-density'
 import { formatDatePtBr, getDocumentExpiryStatus, EXPIRY_STATUS_LABELS } from '../config/regulatory-documents'
 import {
   fetchPublicPostoBoard,
@@ -253,7 +254,7 @@ function AnalysisPublicCard({
         <h4>{FUEL_PRODUCT_LABELS[item.product_key]}</h4>
         {item.densidade_status && (
           <span className={`fuel-density__badge fuel-density__badge--${item.densidade_status}`}>
-            {item.densidade_status === 'apto' ? 'Apto' : 'Inapto'}
+            {DENSITY_CONFORMITY_LABELS[item.densidade_status]}
           </span>
         )}
       </header>
