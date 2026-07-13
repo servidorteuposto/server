@@ -11,6 +11,7 @@ export type PostoProfile = {
   nome: string
   cnpj: string
   endereco: string | null
+  public_slug: string
 }
 
 export type FuelAnalysisRaqItem = {
@@ -40,6 +41,9 @@ export type FuelAnalysisItem = {
   massa_especifica_observada: string | null
   massa_especifica_convertida: string | null
   teor_alcool_gasolina: string | null
+  densidade_status: 'apto' | 'inapto' | null
+  coeficiente_gamma: number | null
+  densidade_formula: string | null
   photo_storage_path: string | null
   photo_file_name: string | null
   photo_latitude: number | null
@@ -85,6 +89,9 @@ export type AnalysisItemInput = {
   massaEspecificaObservada: string
   massaEspecificaConvertida: string
   teorAlcoolGasolina: string
+  densidadeStatus: 'apto' | 'inapto' | null
+  coeficienteGamma: number | null
+  densidadeFormula: string | null
   photoFile: File | null
   photoLatitude: number | null
   photoLongitude: number | null
@@ -133,7 +140,7 @@ async function removeStorageObjects(paths: string[]) {
 export async function getMyPostoProfile(): Promise<PostoProfile> {
   const { data, error } = await supabase
     .from('postos')
-    .select('id, nome, cnpj, endereco')
+    .select('id, nome, cnpj, endereco, public_slug')
     .maybeSingle()
 
   if (error) throw error
@@ -279,6 +286,9 @@ export async function saveFuelAnalysisReport(input: SaveFuelAnalysisReportInput)
         massa_especifica_observada: item.massaEspecificaObservada.trim() || null,
         massa_especifica_convertida: item.massaEspecificaConvertida.trim() || null,
         teor_alcool_gasolina: item.teorAlcoolGasolina.trim() || null,
+        densidade_status: item.densidadeStatus,
+        coeficiente_gamma: item.coeficienteGamma,
+        densidade_formula: item.densidadeFormula,
         photo_storage_path: photoPath,
         photo_file_name: photoFileName,
         photo_latitude: item.photoLatitude,
@@ -316,17 +326,4 @@ export async function saveFuelAnalysisReport(input: SaveFuelAnalysisReportInput)
     await removeStorageObjects(uploadedPaths)
     throw error
   }
-}
-
-export async function deleteFuelAnalysisReport(report: FuelAnalysisReport) {
-  const paths = [
-    report.signature_storage_path,
-    ...report.raq_items.map((item) => item.invoice_storage_path),
-    ...report.analysis_items.map((item) => item.photo_storage_path),
-  ].filter(Boolean) as string[]
-
-  const { error } = await supabase.from('fuel_analysis_reports').delete().eq('id', report.id)
-  if (error) throw error
-
-  await removeStorageObjects(paths)
 }

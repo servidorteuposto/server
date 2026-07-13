@@ -7,7 +7,6 @@ import {
   formatCpf,
   formatDateTimePtBr,
   FUEL_PRODUCT_LABELS,
-  isImageFile,
   isPdfOrImageFile,
   productHasAlcoholContent,
   validateCpf,
@@ -15,10 +14,16 @@ import {
   validateTransporterCnpj,
   type FuelProductKey,
 } from '../config/fuel-analyses'
-import SignaturePad from '../components/fuel-analyses/SignaturePad'
-import ConfirmDialog from '../components/regulatory/ConfirmDialog'
 import {
-  deleteFuelAnalysisReport,
+  correctDensityTo20C,
+  FUEL_DENSITY_LIMITS_KG_M3,
+  supportsDensityCorrection,
+  type DensityConformity,
+  type DensityCorrectionResult,
+} from '../config/fuel-density'
+import SignaturePad from '../components/fuel-analyses/SignaturePad'
+import LiveCameraCapture from '../components/fuel-analyses/LiveCameraCapture'
+import {
   getFuelFileUrl,
   getFuelProductSettings,
   getMyPostoProfile,
@@ -31,7 +36,9 @@ import {
   type PostoProfile,
   type RaqItemInput,
 } from '../lib/fuel-analyses'
+import { buildPublicPostoUrl } from '../config/public-posto'
 import { formatDatePtBr } from '../config/regulatory-documents'
+import QRCode from 'qrcode'
 import '../pages/RegulatoryDocumentsPage.css'
 import './FuelAnalysesPage.css'
 
@@ -59,6 +66,10 @@ type AnalysisDraft = {
   massaEspecificaObservada: string
   massaEspecificaConvertida: string
   teorAlcoolGasolina: string
+  densidadeStatus: DensityConformity | null
+  coeficienteGamma: number | null
+  densidadeFormula: string | null
+  densidadeLimitLabel: string | null
   photoFile: File | null
   photoPreviewUrl: string | null
   photoLatitude: number | null
@@ -90,12 +101,64 @@ function emptyAnalysis(): AnalysisDraft {
     massaEspecificaObservada: '',
     massaEspecificaConvertida: '',
     teorAlcoolGasolina: '',
+    densidadeStatus: null,
+    coeficienteGamma: null,
+    densidadeFormula: null,
+    densidadeLimitLabel: null,
     photoFile: null,
     photoPreviewUrl: null,
     photoLatitude: null,
     photoLongitude: null,
     photoCapturedAt: null,
     photoError: null,
+  }
+}
+
+function applyDensityCorrection(
+  productKey: FuelProductKey,
+  draft: AnalysisDraft,
+): Pick<
+  AnalysisDraft,
+  | 'massaEspecificaConvertida'
+  | 'densidadeStatus'
+  | 'coeficienteGamma'
+  | 'densidadeFormula'
+  | 'densidadeLimitLabel'
+> {
+  if (!supportsDensityCorrection(productKey)) {
+    return {
+      massaEspecificaConvertida: draft.massaEspecificaConvertida,
+      densidadeStatus: null,
+      coeficienteGamma: null,
+      densidadeFormula: null,
+      densidadeLimitLabel: null,
+    }
+  }
+
+  const result: DensityCorrectionResult | null = correctDensityTo20C(
+    productKey,
+    draft.massaEspecificaObservada,
+    draft.temperaturaObservada,
+  )
+
+  if (!result) {
+    return {
+      massaEspecificaConvertida: '',
+      densidadeStatus: null,
+      coeficienteGamma: null,
+      densidadeFormula: null,
+      densidadeLimitLabel: FUEL_DENSITY_LIMITS_KG_M3[productKey]
+        ? draft.densidadeLimitLabel
+        : null,
+    }
+  }
+
+  return {
+    massaEspecificaConvertida: result.d20Formatted,
+    densidadeStatus: result.status,
+    coeficienteGamma: result.gammaKgM3,
+    densidadeFormula: result.formulaLabel,
+    densidadeLimitLabel: result.limitLabel,
   }
 }
 
@@ -132,13 +195,17 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
   const [authorCpf, setAuthorCpf] = useState('')
   const [signatureBlob, setSignatureBlob] = useState<Blob | null>(null)
   const [submittedAtPreview, setSubmittedAtPreview] = useState(() => new Date().toISOString())
-  const [deleteTarget, setDeleteTarget] = useState<FuelAnalysisReport | null>(null)
   const [viewReport, setViewReport] = useState<FuelAnalysisReport | null>(null)
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+  const [publicUrl, setPublicUrl] = useState<string | null>(null)
 
   const enabledProducts = useMemo(
     () => FUEL_PRODUCTS.filter((product) => selectedProducts.includes(product.key)),
     [selectedProducts],
   )
+
+  const latestReport = reports[0] ?? null
+  const archivedReports = reports.slice(1)
 
   const loadPage = useCallback(async () => {
     setLoading(true)
@@ -164,6 +231,34 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
   useEffect(() => {
     loadPage()
   }, [loadPage])
+
+  useEffect(() => {
+    if (!posto?.public_slug) {
+      setQrDataUrl(null)
+      setPublicUrl(null)
+      return
+    }
+
+    const url = buildPublicPostoUrl(posto.public_slug)
+    setPublicUrl(url)
+    let cancelled = false
+
+    QRCode.toDataURL(url, {
+      width: 280,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+    })
+      .then((dataUrl) => {
+        if (!cancelled) setQrDataUrl(dataUrl)
+      })
+      .catch(() => {
+        if (!cancelled) setQrDataUrl(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [posto?.public_slug])
 
   useEffect(() => {
     if (!formOpen) return
@@ -237,30 +332,19 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
       if (patch.photoPreviewUrl === undefined && previous.photoPreviewUrl && 'photoFile' in patch) {
         URL.revokeObjectURL(previous.photoPreviewUrl)
       }
+
+      const merged = { ...previous, ...patch }
+      const densityTouched =
+        'temperaturaObservada' in patch || 'massaEspecificaObservada' in patch
+
       return {
         ...current,
-        [key]: { ...previous, ...patch },
+        [key]: densityTouched ? { ...merged, ...applyDensityCorrection(key, merged) } : merged,
       }
     })
   }
 
-  async function handlePhotoChange(key: FuelProductKey, file: File | null) {
-    if (!file) {
-      updateAnalysis(key, {
-        photoFile: null,
-        photoPreviewUrl: null,
-        photoLatitude: null,
-        photoLongitude: null,
-        photoCapturedAt: null,
-        photoError: null,
-      })
-      return
-    }
-
-    if (!isImageFile(file)) {
-      updateAnalysis(key, { photoError: 'Envie uma foto (JPG, PNG ou WEBP).' })
-      return
-    }
+  async function handleLivePhotoCapture(key: FuelProductKey, file: File) {
     if (file.size > FUEL_ANALYSES_MAX_FILE_BYTES) {
       updateAnalysis(key, { photoError: 'A foto deve ter no máximo 10 MB.' })
       return
@@ -289,6 +373,17 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
         photoError: 'Não foi possível obter a localização. Permita o GPS e tire a foto novamente.',
       })
     }
+  }
+
+  function clearLivePhoto(key: FuelProductKey) {
+    updateAnalysis(key, {
+      photoFile: null,
+      photoPreviewUrl: null,
+      photoLatitude: null,
+      photoLongitude: null,
+      photoCapturedAt: null,
+      photoError: null,
+    })
   }
 
   function validateForm(): string | null {
@@ -323,7 +418,11 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
       if (!analysis.massaEspecificaObservada.trim()) {
         return `${product.label}: informe a massa específica observada.`
       }
-      if (!analysis.massaEspecificaConvertida.trim()) {
+      if (supportsDensityCorrection(product.key)) {
+        if (!analysis.massaEspecificaConvertida.trim()) {
+          return `${product.label}: não foi possível calcular a massa específica a 20 °C. Verifique temperatura e densidade.`
+        }
+      } else if (!analysis.massaEspecificaConvertida.trim()) {
         return `${product.label}: informe a massa específica convertida.`
       }
       if (productHasAlcoholContent(product.key) && !analysis.teorAlcoolGasolina.trim()) {
@@ -389,6 +488,9 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
           massaEspecificaObservada: draft.massaEspecificaObservada,
           massaEspecificaConvertida: draft.massaEspecificaConvertida,
           teorAlcoolGasolina: draft.teorAlcoolGasolina,
+          densidadeStatus: draft.densidadeStatus,
+          coeficienteGamma: draft.coeficienteGamma,
+          densidadeFormula: draft.densidadeFormula,
           photoFile: draft.photoFile,
           photoLatitude: draft.photoLatitude,
           photoLongitude: draft.photoLongitude,
@@ -418,20 +520,6 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
     }
   }
 
-  async function handleDelete() {
-    if (!deleteTarget || isReadOnly) return
-    setBusy(true)
-    try {
-      await deleteFuelAnalysisReport(deleteTarget)
-      setDeleteTarget(null)
-      await loadPage()
-    } catch {
-      setPageError('Não foi possível excluir o relatório.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
   if (loading) {
     return <p className="reg-docs-page__loading">Carregando Análises de Combustíveis...</p>
   }
@@ -445,7 +533,10 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
       <header className="reg-docs-page__header">
         <div className="reg-docs-page__header-text">
           <h1>Análises de Combustíveis</h1>
-          <p>RAQ e análises dos combustíveis com registro fotográfico e assinatura.</p>
+          <p>
+            Lançamentos são imutáveis: para atualizar, envie uma nova planilha completa. Sempre vale o
+            último lançamento.
+          </p>
         </div>
         {!isReadOnly && productsSaved && !formOpen && (
           <button type="button" className="reg-docs-page__add-btn" onClick={openForm}>
@@ -484,6 +575,54 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
             </dd>
           </div>
         </dl>
+      </section>
+
+      <section className="fuel-panel">
+        <div className="fuel-panel__header">
+          <div>
+            <h2>QR Code público do posto</h2>
+            <p>
+              Imprima e deixe no posto. Clientes escaneiam e veem o último RAQ e documentos públicos em
+              tempo real.
+            </p>
+          </div>
+        </div>
+        <div className="fuel-qr">
+          {qrDataUrl ? (
+            <img src={qrDataUrl} alt="QR Code da página pública do posto" className="fuel-qr__image" />
+          ) : (
+            <p className="reg-doc-card__empty">Gerando QR Code...</p>
+          )}
+          <div className="fuel-qr__meta">
+            {publicUrl && (
+              <>
+                <p className="fuel-qr__url">{publicUrl}</p>
+                <div className="reg-doc-card__actions">
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    onClick={() => navigator.clipboard.writeText(publicUrl)}
+                  >
+                    Copiar link
+                  </button>
+                  <a
+                    className="btn btn--primary"
+                    href={qrDataUrl ?? '#'}
+                    download={`qrcode-${posto.nome.replace(/\s+/g, '-').toLowerCase()}.png`}
+                    onClick={(event) => {
+                      if (!qrDataUrl) event.preventDefault()
+                    }}
+                  >
+                    Baixar QR Code
+                  </a>
+                  <a className="btn btn--secondary" href={publicUrl} target="_blank" rel="noreferrer">
+                    Abrir página pública
+                  </a>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </section>
 
       <section className="fuel-panel">
@@ -729,9 +868,11 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                             />
                           </label>
                           <label className="reg-doc-form__field">
-                            <span>Temperatura Observada *</span>
+                            <span>Temperatura Observada (°C) *</span>
                             <input
                               type="text"
+                              inputMode="decimal"
+                              placeholder="Ex.: 25,0"
                               value={draft.temperaturaObservada}
                               onChange={(event) =>
                                 updateAnalysis(product.key, {
@@ -743,9 +884,11 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                             />
                           </label>
                           <label className="reg-doc-form__field">
-                            <span>Massa Específica Observada *</span>
+                            <span>Massa Específica Observada (Dt) *</span>
                             <input
                               type="text"
+                              inputMode="decimal"
+                              placeholder="Ex.: 745 ou 0,745"
                               value={draft.massaEspecificaObservada}
                               onChange={(event) =>
                                 updateAnalysis(product.key, {
@@ -757,17 +900,32 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                             />
                           </label>
                           <label className="reg-doc-form__field">
-                            <span>Massa Específica Convertida 20/4ºC *</span>
+                            <span>Massa Específica Convertida 20/4 °C (D20)</span>
                             <input
                               type="text"
-                              value={draft.massaEspecificaConvertida}
-                              onChange={(event) =>
-                                updateAnalysis(product.key, {
-                                  massaEspecificaConvertida: event.target.value,
-                                })
+                              value={
+                                supportsDensityCorrection(product.key)
+                                  ? draft.massaEspecificaConvertida
+                                    ? `${draft.massaEspecificaConvertida} kg/m³`
+                                    : ''
+                                  : draft.massaEspecificaConvertida
                               }
+                              onChange={
+                                supportsDensityCorrection(product.key)
+                                  ? undefined
+                                  : (event) =>
+                                      updateAnalysis(product.key, {
+                                        massaEspecificaConvertida: event.target.value,
+                                      })
+                              }
+                              readOnly={supportsDensityCorrection(product.key)}
                               disabled={busy}
-                              required
+                              required={!supportsDensityCorrection(product.key)}
+                              placeholder={
+                                supportsDensityCorrection(product.key)
+                                  ? 'Calculado automaticamente'
+                                  : undefined
+                              }
                             />
                           </label>
                           {productHasAlcoholContent(product.key) && (
@@ -788,26 +946,45 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                           )}
                         </div>
 
+                        {supportsDensityCorrection(product.key) && (
+                          <div className="fuel-density">
+                            <p className="fuel-density__formula">
+                              D20 = Dt + γ × (t − 20)
+                              {draft.coeficienteGamma != null && (
+                                <>
+                                  {' '}
+                                  · γ = {draft.coeficienteGamma.toFixed(2)} kg/m³/°C
+                                </>
+                              )}
+                            </p>
+                            {draft.densidadeFormula && (
+                              <p className="fuel-density__calc">{draft.densidadeFormula}</p>
+                            )}
+                            {draft.densidadeLimitLabel && (
+                              <p className="fuel-density__limit">
+                                Limite ANP: {draft.densidadeLimitLabel}
+                                {FUEL_DENSITY_LIMITS_KG_M3[product.key]?.reference
+                                  ? ` (${FUEL_DENSITY_LIMITS_KG_M3[product.key]?.reference})`
+                                  : ''}
+                              </p>
+                            )}
+                            {draft.densidadeStatus && (
+                              <span
+                                className={`fuel-density__badge fuel-density__badge--${draft.densidadeStatus}`}
+                              >
+                                {draft.densidadeStatus === 'apto' ? 'Apto' : 'Inapto'}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
                         <div className="fuel-photo">
-                          <label className="reg-doc-form__field reg-doc-form__field--file">
-                            <span>Foto comprovando o local *</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              onChange={(event) =>
-                                handlePhotoChange(product.key, event.target.files?.[0] ?? null)
-                              }
-                              disabled={busy}
-                            />
-                          </label>
-                          {draft.photoPreviewUrl && (
-                            <img
-                              src={draft.photoPreviewUrl}
-                              alt={`Foto ${product.label}`}
-                              className="fuel-photo__preview"
-                            />
-                          )}
+                          <LiveCameraCapture
+                            disabled={busy}
+                            previewUrl={draft.photoPreviewUrl}
+                            onCapture={(file) => handleLivePhotoCapture(product.key, file)}
+                            onClear={() => clearLivePhoto(product.key)}
+                          />
                           <dl className="fuel-photo__meta">
                             <div>
                               <dt>Data e hora da foto</dt>
@@ -891,44 +1068,65 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
 
       {!formOpen && (
         <section className="fuel-panel">
-          <h2>Histórico de RAQs</h2>
-          {!reports.length ? (
+          <h2>Lançamento vigente</h2>
+          <p className="fuel-panel__hint">
+            Não é possível editar nem apagar planilhas já lançadas. Um novo lançamento completo substitui
+            o anterior na página pública.
+          </p>
+          {!latestReport ? (
             <p className="reg-doc-card__empty">Nenhum relatório lançado ainda.</p>
           ) : (
-            <div className="fuel-history">
-              {reports.map((report) => (
-                <article key={report.id} className="fuel-history__card">
-                  <div>
-                    <h3>{formatDateTimePtBr(report.submitted_at)}</h3>
-                    <p>
-                      {report.author_full_name} · CPF {formatCpf(report.author_cpf)}
-                    </p>
-                    <p>
-                      {report.raq_items.length} produto(s) · {report.endereco}
-                    </p>
-                  </div>
-                  <div className="reg-doc-card__actions">
-                    <button
-                      type="button"
-                      className="btn btn--secondary"
-                      onClick={() => setViewReport(report)}
-                    >
-                      Ver detalhes
-                    </button>
-                    {!isReadOnly && (
+            <article className="fuel-history__card fuel-history__card--current">
+              <div>
+                <span className="fuel-history__badge">Vigente</span>
+                <h3>{formatDateTimePtBr(latestReport.submitted_at)}</h3>
+                <p>
+                  {latestReport.author_full_name} · CPF {formatCpf(latestReport.author_cpf)}
+                </p>
+                <p>
+                  {latestReport.raq_items.length} produto(s) · {latestReport.endereco}
+                </p>
+              </div>
+              <div className="reg-doc-card__actions">
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() => setViewReport(latestReport)}
+                >
+                  Ver detalhes
+                </button>
+              </div>
+            </article>
+          )}
+
+          {archivedReports.length > 0 && (
+            <>
+              <h3 className="fuel-history__archive-title">Arquivo (somente leitura)</h3>
+              <div className="fuel-history">
+                {archivedReports.map((report) => (
+                  <article key={report.id} className="fuel-history__card">
+                    <div>
+                      <h3>{formatDateTimePtBr(report.submitted_at)}</h3>
+                      <p>
+                        {report.author_full_name} · CPF {formatCpf(report.author_cpf)}
+                      </p>
+                      <p>
+                        {report.raq_items.length} produto(s) · {report.endereco}
+                      </p>
+                    </div>
+                    <div className="reg-doc-card__actions">
                       <button
                         type="button"
-                        className="btn btn--danger"
-                        onClick={() => setDeleteTarget(report)}
-                        disabled={busy}
+                        className="btn btn--secondary"
+                        onClick={() => setViewReport(report)}
                       >
-                        Excluir
+                        Ver detalhes
                       </button>
-                    )}
-                  </div>
-                </article>
-              ))}
-            </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </>
           )}
         </section>
       )}
@@ -936,16 +1134,6 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
       {viewReport && (
         <ReportDetailsModal report={viewReport} onClose={() => setViewReport(null)} />
       )}
-
-      <ConfirmDialog
-        open={Boolean(deleteTarget)}
-        title="Excluir relatório"
-        message="Deseja excluir este RAQ e todas as análises vinculadas? Esta ação não pode ser desfeita."
-        confirmLabel="Excluir"
-        busy={busy}
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteTarget(null)}
-      />
     </div>
   )
 }
@@ -1041,7 +1229,16 @@ function ReportDetailsModal({
             <p>Cor: {item.cor}</p>
             <p>Temperatura: {item.temperatura_observada}</p>
             <p>ME observada: {item.massa_especifica_observada}</p>
-            <p>ME convertida: {item.massa_especifica_convertida}</p>
+            <p>ME convertida 20 °C: {item.massa_especifica_convertida}</p>
+            {item.densidade_formula && <p>Cálculo: {item.densidade_formula}</p>}
+            {item.densidade_status && (
+              <p>
+                Conformidade ANP:{' '}
+                <strong className={`fuel-density__badge fuel-density__badge--${item.densidade_status}`}>
+                  {item.densidade_status === 'apto' ? 'Apto' : 'Inapto'}
+                </strong>
+              </p>
+            )}
             {item.teor_alcool_gasolina && <p>Teor de álcool: {item.teor_alcool_gasolina}</p>}
             <p>
               Foto em:{' '}

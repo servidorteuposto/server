@@ -1,0 +1,240 @@
+.public-posto {
+  min-height: 100%;
+  padding: 1.25rem 1rem 2.5rem;
+  background:
+    radial-gradient(circle at top left, rgba(61, 143, 212, 0.18), transparent 40%),
+    linear-gradient(180deg, #f7fbff 0%, #eef3f8 100%);
+  color: var(--blue-dark);
+}
+
+.public-posto__hero,
+.public-posto__section {
+  width: min(960px, 100%);
+  margin: 0 auto 1rem;
+  background: var(--white);
+  border: 1px solid rgba(61, 143, 212, 0.2);
+  border-radius: 16px;
+  padding: 1.25rem 1.35rem;
+  box-shadow: var(--shadow-card);
+}
+
+.public-posto__brand {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--blue-light);
+  margin-bottom: 0.45rem;
+}
+
+.public-posto__hero h1 {
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  margin-bottom: 0.45rem;
+}
+
+.public-posto__hero p {
+  color: var(--gray-600);
+  line-height: 1.45;
+}
+
+.public-posto__live {
+  margin-top: 0.75rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--blue-medium);
+}
+
+.public-posto__section-head {
+  margin-bottom: 1rem;
+}
+
+.public-posto__section-head h2 {
+  font-size: 1.15rem;
+  margin-bottom: 0.3rem;
+}
+
+.public-posto__section-head p,
+.public-posto__empty,
+.public-posto__author {
+  color: var(--gray-600);
+  font-size: 0.9rem;
+}
+
+.public-posto__section h3 {
+  margin: 1rem 0 0.65rem;
+  font-size: 0.98rem;
+}
+
+.public-posto__filter {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  max-width: 320px;
+}
+
+.public-posto__filter span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gray-600);
+}
+
+.public-posto__filter select {
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font: inherit;
+  color: var(--blue-dark);
+  background: var(--white);
+}
+
+.public-posto__grid,
+.public-posto__docs {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.public-posto__grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.public-posto__card,
+.public-posto__doc {
+  border: 1px solid rgba(61, 143, 212, 0.18);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  background: rgba(61, 143, 212, 0.04);
+}
+
+.public-posto__card h4,
+.public-posto__doc h4 {
+  font-size: 0.95rem;
+  margin-bottom: 0.45rem;
+}
+
+.public-posto__card p,
+.public-posto__doc p {
+  font-size: 0.84rem;
+  color: var(--gray-600);
+  line-height: 1.4;
+}
+
+.public-posto__card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.public-posto__card-head h4 {
+  margin: 0;
+}
+
+.public-posto__photo {
+  width: 100%;
+  margin-top: 0.65rem;
+  border-radius: 10px;
+  border: 1px solid var(--gray-300);
+  object-fit: cover;
+}
+
+.public-posto__doc {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.public-posto__doc-btn {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 8px;
+  padding: 0.55rem 0.85rem;
+  background: var(--blue-dark);
+  color: var(--white);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.public-posto__doc-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.public-posto__badge {
+  display: inline-flex;
+  margin-top: 0.4rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.public-posto__badge--valid {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.public-posto__badge--expiring_soon {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.public-posto__badge--expired {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.public-posto__badge--no_expiry {
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+
+.public-posto__status,
+.public-posto__error {
+  width: min(960px, 100%);
+  margin: 2rem auto;
+  padding: 1rem 1.2rem;
+  border-radius: 12px;
+  background: var(--white);
+}
+
+.public-posto__error {
+  color: #b91c1c;
+}
+
+.public-posto__author {
+  margin-top: 1rem;
+}
+
+.fuel-density__badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fuel-density__badge--apto {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.fuel-density__badge--inapto {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+@media (max-width: 640px) {
+  .public-posto__doc {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
