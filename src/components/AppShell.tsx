@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { DEFAULT_MENU_ID, MENU_ITEMS, getMenuItem, type MenuId } from '../config/menu'
 import { MenuIcon } from './MenuIcons'
+import FuelAnalysesPage from '../pages/FuelAnalysesPage'
 import ModulePage from '../pages/ModulePage'
 import RegulatoryDocumentsPage from '../pages/RegulatoryDocumentsPage'
 import WorkSafetyPage from '../pages/WorkSafetyPage'
@@ -96,6 +97,8 @@ export default function AppShell({ user, isReadOnly, isAdmin }: AppShellProps) {
               <RegulatoryDocumentsPage isReadOnly={isReadOnly} />
             ) : activeMenuId === 'seguranca-trabalho' ? (
               <WorkSafetyPage isReadOnly={isReadOnly} />
+            ) : activeMenuId === 'analises-combustiveis' ? (
+              <FuelAnalysesPage isReadOnly={isReadOnly} />
             ) : (
               <ModulePage module={activeModule} isReadOnly={isReadOnly} />
             )}
