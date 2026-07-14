@@ -1,7 +1,14 @@
 import { FormEvent, useCallback, useEffect, useState, type ReactNode } from 'react'
 import PaymentForm from '../components/PaymentForm'
-import { requestPasswordResetByCnpj } from '../lib/auth'
-import { formatCnpj, isValidCnpj, isValidCnpjLength, CNPJ_INVALID_MESSAGE } from '../lib/cnpj'
+import { ADMIN_CNPJ_DIGITS, requestPasswordResetByIdentifier } from '../lib/auth'
+import {
+  cnpjDigits,
+  formatCnpj,
+  isValidCnpj,
+  isValidCnpjLength,
+  CNPJ_INVALID_MESSAGE,
+  looksLikeEmail,
+} from '../lib/cnpj'
 import type { PaymentActivation, PaymentMethod } from '../lib/payment'
 import { getPaymentActivation } from '../lib/payment'
 import { isValidPassword, PASSWORD_RULE_MESSAGE } from '../lib/password'
@@ -364,23 +371,28 @@ export default function LoginPage() {
     setError(null)
     setSuccess(null)
 
-    if (!isValidCnpjLength(forgotCnpj)) {
-      setLoading(false)
-      setError('Informe um CNPJ válido com 14 dígitos.')
-      return
-    }
+    const identifier = forgotCnpj.trim()
 
-    if (!isValidCnpj(forgotCnpj)) {
-      setLoading(false)
-      setError(CNPJ_INVALID_MESSAGE)
-      return
+    if (!looksLikeEmail(identifier)) {
+      if (!isValidCnpjLength(identifier)) {
+        setLoading(false)
+        setError('Informe o e-mail ou um CNPJ com 14 dígitos.')
+        return
+      }
+
+      const isAdminCnpj = cnpjDigits(identifier) === ADMIN_CNPJ_DIGITS
+      if (!isAdminCnpj && !isValidCnpj(identifier)) {
+        setLoading(false)
+        setError(CNPJ_INVALID_MESSAGE)
+        return
+      }
     }
 
     try {
-      const result = await requestPasswordResetByCnpj(forgotCnpj)
+      const result = await requestPasswordResetByIdentifier(identifier)
 
       if (!result.sent) {
-        setError('CNPJ não encontrado.')
+        setError('E-mail ou CNPJ não encontrado.')
         return
       }
 
@@ -640,7 +652,7 @@ export default function LoginPage() {
                   )}
 
                   <div className="form-field">
-                    <label htmlFor="forgot-cnpj">CNPJ</label>
+                    <label htmlFor="forgot-cnpj">E-mail ou CNPJ</label>
                     <div className="form-field__input-wrap">
                       <span className="form-field__icon">
                         <DocumentIcon />
@@ -648,11 +660,14 @@ export default function LoginPage() {
                       <input
                         id="forgot-cnpj"
                         type="text"
-                        placeholder="00.000.000/0000-00"
+                        placeholder="email@exemplo.com ou CNPJ"
                         value={forgotCnpj}
-                        onChange={(e) => setForgotCnpj(formatCnpj(e.target.value))}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          setForgotCnpj(looksLikeEmail(value) ? value : formatCnpj(value))
+                        }}
                         required
-                        inputMode="numeric"
+                        autoComplete="username"
                       />
                     </div>
                   </div>
