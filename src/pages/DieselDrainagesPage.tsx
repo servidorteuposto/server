@@ -1,7 +1,12 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import SignaturePad from '../components/fuel-analyses/SignaturePad'
 import ConfirmDialog from '../components/regulatory/ConfirmDialog'
-import { RESIDUES_CONFIRMATION_LABEL } from '../config/diesel-drainages'
+import {
+  buildTankDrainageSchedules,
+  formatDateKeyPtBr,
+  RESIDUES_CONFIRMATION_LABEL,
+  type DrainageSchedule,
+} from '../config/diesel-drainages'
 import { formatDateTimePtBr } from '../config/fuel-analyses'
 import { formatCpf, validateCpf } from '../config/work-safety'
 import {
@@ -50,6 +55,19 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
   const [viewReport, setViewReport] = useState<DieselDrainageReport | null>(null)
 
   const activeTanks = useMemo(() => tanks.filter((tank) => tank.is_active), [tanks])
+
+  const schedules = useMemo(
+    () => buildTankDrainageSchedules(activeTanks, reports),
+    [activeTanks, reports],
+  )
+
+  const alertSchedules = useMemo(
+    () =>
+      schedules.filter((schedule) =>
+        ['day_before', 'due_today', 'overdue', 'never'].includes(schedule.status),
+      ),
+    [schedules],
+  )
 
   const loadPage = useCallback(async () => {
     setLoading(true)
@@ -242,7 +260,10 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
       <header className="reg-docs-page__header">
         <div className="reg-docs-page__header-text">
           <h1>Relatórios de Drenagens de Tanques de Óleo Diesel</h1>
-          <p>Registre cada drenagem com data/hora automática, operador e assinatura.</p>
+          <p>
+            Registre cada drenagem com data/hora automática, operador e assinatura. O ciclo é
+            semanal: há aviso 1 dia antes e no dia do vencimento.
+          </p>
         </div>
         {!isReadOnly && (
           <button
@@ -259,6 +280,14 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
       </header>
 
       {pageError && <p className="reg-doc-form__error reg-docs-page__banner">{pageError}</p>}
+
+      {alertSchedules.length > 0 && (
+        <div className="diesel-alerts" role="status">
+          {alertSchedules.map((schedule) => (
+            <DrainageAlertBanner key={schedule.tankId} schedule={schedule} />
+          ))}
+        </div>
+      )}
 
       {showTanksPanel && (
         <section className="fuel-panel diesel-panel">
@@ -466,7 +495,9 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
           <p className="reg-doc-card__empty">Nenhuma drenagem lançada ainda.</p>
         ) : (
           <div className="diesel-history">
-            {reports.map((report) => (
+            {reports.map((report) => {
+              const schedule = schedules.find((item) => item.tankId === report.tank_id)
+              return (
               <article key={report.id} className="diesel-history__card">
                 <div>
                   <h3>{formatDateTimePtBr(report.drained_at)}</h3>
@@ -475,6 +506,11 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
                     {report.operator_full_name}
                   </p>
                   <p>CPF {formatCpf(report.operator_cpf)}</p>
+                  {schedule?.dueDate && schedule.status === 'ok' && (
+                    <p className="diesel-history__next">
+                      Próxima até {formatDateKeyPtBr(schedule.dueDate)}
+                    </p>
+                  )}
                   {report.observations && <p>{report.observations}</p>}
                 </div>
                 <button
@@ -485,7 +521,8 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
                   Ver detalhes
                 </button>
               </article>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>
@@ -503,6 +540,22 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
         onConfirm={handleDeleteTank}
         onCancel={() => setDeleteTankTarget(null)}
       />
+    </div>
+  )
+}
+
+function DrainageAlertBanner({ schedule }: { schedule: DrainageSchedule }) {
+  const tone =
+    schedule.status === 'day_before'
+      ? 'warn'
+      : schedule.status === 'due_today' || schedule.status === 'overdue'
+        ? 'danger'
+        : 'info'
+
+  return (
+    <div className={`diesel-alert diesel-alert--${tone}`}>
+      <strong>{schedule.tankName}</strong>
+      <p>{schedule.message}</p>
     </div>
   )
 }
