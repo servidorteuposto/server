@@ -1,0 +1,583 @@
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import SignaturePad from '../components/fuel-analyses/SignaturePad'
+import ConfirmDialog from '../components/regulatory/ConfirmDialog'
+import { RESIDUES_CONFIRMATION_LABEL } from '../config/diesel-drainages'
+import { formatDateTimePtBr } from '../config/fuel-analyses'
+import { formatCpf, validateCpf } from '../config/work-safety'
+import {
+  createDieselTank,
+  deleteDieselTank,
+  getDrainageSignatureUrl,
+  getMyPostoId,
+  listDieselDrainageReports,
+  listDieselTanks,
+  saveDieselDrainageReport,
+  updateDieselTank,
+  type DieselDrainageReport,
+  type DieselTank,
+} from '../lib/diesel-drainages'
+import '../pages/RegulatoryDocumentsPage.css'
+import '../pages/FuelAnalysesPage.css'
+import './DieselDrainagesPage.css'
+
+type DieselDrainagesPageProps = {
+  isReadOnly: boolean
+}
+
+export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageProps) {
+  const [postoId, setPostoId] = useState<string | null>(null)
+  const [tanks, setTanks] = useState<DieselTank[]>([])
+  const [reports, setReports] = useState<DieselDrainageReport[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [pageError, setPageError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [showTanksPanel, setShowTanksPanel] = useState(false)
+  const [tankName, setTankName] = useState('')
+  const [tankDescription, setTankDescription] = useState('')
+  const [editingTankId, setEditingTankId] = useState<string | null>(null)
+  const [deleteTankTarget, setDeleteTankTarget] = useState<DieselTank | null>(null)
+  const [tankFormError, setTankFormError] = useState<string | null>(null)
+
+  const [tankId, setTankId] = useState('')
+  const [operatorName, setOperatorName] = useState('')
+  const [operatorCpf, setOperatorCpf] = useState('')
+  const [observations, setObservations] = useState('')
+  const [residuesConfirmed, setResiduesConfirmed] = useState(false)
+  const [signatureBlob, setSignatureBlob] = useState<Blob | null>(null)
+  const [signatureKey, setSignatureKey] = useState(0)
+  const [drainedAtPreview, setDrainedAtPreview] = useState(() => new Date().toISOString())
+  const [viewReport, setViewReport] = useState<DieselDrainageReport | null>(null)
+
+  const activeTanks = useMemo(() => tanks.filter((tank) => tank.is_active), [tanks])
+
+  const loadPage = useCallback(async () => {
+    setLoading(true)
+    setPageError(null)
+    try {
+      const id = await getMyPostoId()
+      setPostoId(id)
+      const [tankRows, reportRows] = await Promise.all([
+        listDieselTanks(id),
+        listDieselDrainageReports(id),
+      ])
+      setTanks(tankRows)
+      setReports(reportRows)
+      setTankId((current) => current || tankRows.find((tank) => tank.is_active)?.id || '')
+      if (tankRows.length === 0) setShowTanksPanel(true)
+    } catch {
+      setPageError('Não foi possível carregar os relatórios de drenagem.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadPage()
+  }, [loadPage])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setDrainedAtPreview(new Date().toISOString())
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  function resetTankForm() {
+    setEditingTankId(null)
+    setTankName('')
+    setTankDescription('')
+    setTankFormError(null)
+  }
+
+  function startEditTank(tank: DieselTank) {
+    setEditingTankId(tank.id)
+    setTankName(tank.name)
+    setTankDescription(tank.description ?? '')
+    setTankFormError(null)
+    setShowTanksPanel(true)
+  }
+
+  async function handleSaveTank(event: FormEvent) {
+    event.preventDefault()
+    if (!postoId || isReadOnly) return
+    if (!tankName.trim()) {
+      setTankFormError('Informe o nome do tanque.')
+      return
+    }
+
+    setBusy(true)
+    setTankFormError(null)
+    try {
+      if (editingTankId) {
+        const existing = tanks.find((tank) => tank.id === editingTankId)
+        const saved = await updateDieselTank(editingTankId, {
+          name: tankName,
+          description: tankDescription,
+          isActive: existing?.is_active ?? true,
+        })
+        setTanks((current) => current.map((tank) => (tank.id === saved.id ? saved : tank)))
+      } else {
+        const saved = await createDieselTank({
+          postoId,
+          name: tankName,
+          description: tankDescription,
+        })
+        setTanks((current) => [...current, saved].sort((a, b) => a.name.localeCompare(b.name)))
+        if (!tankId) setTankId(saved.id)
+      }
+      resetTankForm()
+    } catch {
+      setTankFormError('Não foi possível salvar o tanque. Verifique se o nome já existe.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleToggleTank(tank: DieselTank) {
+    if (isReadOnly) return
+    setBusy(true)
+    try {
+      const saved = await updateDieselTank(tank.id, {
+        name: tank.name,
+        description: tank.description ?? '',
+        isActive: !tank.is_active,
+      })
+      setTanks((current) => current.map((row) => (row.id === saved.id ? saved : row)))
+      if (!saved.is_active && tankId === saved.id) {
+        setTankId(activeTanks.find((row) => row.id !== saved.id)?.id ?? '')
+      }
+    } catch {
+      setPageError('Não foi possível atualizar o tanque.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleDeleteTank() {
+    if (!deleteTankTarget || isReadOnly) return
+    setBusy(true)
+    try {
+      await deleteDieselTank(deleteTankTarget.id)
+      setTanks((current) => current.filter((tank) => tank.id !== deleteTankTarget.id))
+      if (tankId === deleteTankTarget.id) setTankId('')
+      setDeleteTankTarget(null)
+    } catch {
+      setPageError(
+        'Não foi possível excluir o tanque. Ele pode ter drenagens vinculadas — desative-o em vez disso.',
+      )
+      setDeleteTankTarget(null)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function resetDrainageForm() {
+    setOperatorName('')
+    setOperatorCpf('')
+    setObservations('')
+    setResiduesConfirmed(false)
+    setSignatureBlob(null)
+    setSignatureKey((key) => key + 1)
+    setFormError(null)
+    setDrainedAtPreview(new Date().toISOString())
+  }
+
+  async function handleSubmitDrainage(event: FormEvent) {
+    event.preventDefault()
+    if (!postoId || isReadOnly) return
+
+    if (!tankId) {
+      setFormError('Selecione o tanque da drenagem.')
+      return
+    }
+    if (!operatorName.trim()) {
+      setFormError('Informe o nome completo do operador.')
+      return
+    }
+    const cpfError = validateCpf(operatorCpf)
+    if (cpfError) {
+      setFormError(cpfError)
+      return
+    }
+    if (!residuesConfirmed) {
+      setFormError('Confirme a eliminação de resíduos e a pureza do produto na saída do dreno.')
+      return
+    }
+    if (!signatureBlob) {
+      setFormError('Assine no campo em branco antes de lançar o relatório.')
+      return
+    }
+
+    setBusy(true)
+    setFormError(null)
+    const drainedAt = new Date().toISOString()
+
+    try {
+      const saved = await saveDieselDrainageReport({
+        postoId,
+        tankId,
+        drainedAt,
+        operatorFullName: operatorName,
+        operatorCpf,
+        observations,
+        residuesConfirmed,
+        signatureBlob,
+      })
+      setReports((current) => [saved, ...current])
+      resetDrainageForm()
+    } catch {
+      setFormError('Não foi possível lançar o relatório de drenagem.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (loading) {
+    return <p className="reg-docs-page__loading">Carregando drenagens de tanques...</p>
+  }
+
+  return (
+    <div className="diesel-page">
+      <header className="reg-docs-page__header">
+        <div className="reg-docs-page__header-text">
+          <h1>Relatórios de Drenagens de Tanques de Óleo Diesel</h1>
+          <p>Registre cada drenagem com data/hora automática, operador e assinatura.</p>
+        </div>
+        {!isReadOnly && (
+          <button
+            type="button"
+            className={`reg-docs-page__add-btn${showTanksPanel ? ' diesel-page__btn-active' : ''}`}
+            onClick={() => {
+              setShowTanksPanel((open) => !open)
+              if (showTanksPanel) resetTankForm()
+            }}
+          >
+            {showTanksPanel ? 'Fechar tanques' : 'Cadastrar tanque'}
+          </button>
+        )}
+      </header>
+
+      {pageError && <p className="reg-doc-form__error reg-docs-page__banner">{pageError}</p>}
+
+      {showTanksPanel && (
+        <section className="fuel-panel diesel-panel">
+          <div className="fuel-panel__header">
+            <div>
+              <h2>{editingTankId ? 'Editar tanque' : 'Cadastro de tanques'}</h2>
+              <p>Cadastre os tanques de diesel do posto para selecioná-los nas drenagens.</p>
+            </div>
+          </div>
+
+          {!isReadOnly && (
+            <form className="diesel-tank-form" onSubmit={handleSaveTank}>
+              <label className="reg-doc-form__field">
+                <span>Nome do tanque *</span>
+                <input
+                  type="text"
+                  value={tankName}
+                  onChange={(event) => setTankName(event.target.value)}
+                  placeholder="Ex.: Tanque 01 — Diesel S-10"
+                  disabled={busy}
+                  required
+                />
+              </label>
+              <label className="reg-doc-form__field">
+                <span>Descrição (opcional)</span>
+                <input
+                  type="text"
+                  value={tankDescription}
+                  onChange={(event) => setTankDescription(event.target.value)}
+                  placeholder="Localização, capacidade, etc."
+                  disabled={busy}
+                />
+              </label>
+              {tankFormError && <p className="reg-doc-form__error">{tankFormError}</p>}
+              <div className="reg-doc-card__actions">
+                <button type="submit" className="btn btn--primary" disabled={busy}>
+                  {busy ? 'Salvando...' : editingTankId ? 'Salvar alteração' : 'Salvar tanque'}
+                </button>
+                {editingTankId && (
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    onClick={resetTankForm}
+                    disabled={busy}
+                  >
+                    Cancelar edição
+                  </button>
+                )}
+              </div>
+            </form>
+          )}
+
+          {!tanks.length ? (
+            <p className="reg-doc-card__empty">Nenhum tanque cadastrado ainda.</p>
+          ) : (
+            <div className="diesel-tank-list">
+              {tanks.map((tank) => (
+                <article key={tank.id} className="diesel-tank-list__item">
+                  <div>
+                    <h3>
+                      {tank.name}
+                      {!tank.is_active && <span className="diesel-tank-list__tag">Inativo</span>}
+                    </h3>
+                    {tank.description && <p>{tank.description}</p>}
+                  </div>
+                  {!isReadOnly && (
+                    <div className="reg-doc-card__actions">
+                      <button
+                        type="button"
+                        className="btn btn--secondary"
+                        onClick={() => startEditTank(tank)}
+                        disabled={busy}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--secondary"
+                        onClick={() => handleToggleTank(tank)}
+                        disabled={busy}
+                      >
+                        {tank.is_active ? 'Desativar' : 'Reativar'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--danger"
+                        onClick={() => setDeleteTankTarget(tank)}
+                        disabled={busy}
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {!isReadOnly && (
+        <form className="fuel-panel diesel-panel" onSubmit={handleSubmitDrainage}>
+          <h2>Nova drenagem</h2>
+          <p className="fuel-panel__hint">
+            Data e horário da drenagem: <strong>{formatDateTimePtBr(drainedAtPreview)}</strong>
+          </p>
+
+          {!activeTanks.length ? (
+            <p className="reg-doc-form__error">
+              Cadastre ao menos um tanque ativo antes de lançar uma drenagem.
+            </p>
+          ) : (
+            <>
+              <div className="diesel-fields">
+                <label className="reg-doc-form__field">
+                  <span>Tanque *</span>
+                  <select
+                    value={tankId}
+                    onChange={(event) => setTankId(event.target.value)}
+                    disabled={busy}
+                    required
+                  >
+                    <option value="">Selecione o tanque</option>
+                    {activeTanks.map((tank) => (
+                      <option key={tank.id} value={tank.id}>
+                        {tank.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="reg-doc-form__field">
+                  <span>Nome do operador *</span>
+                  <input
+                    type="text"
+                    value={operatorName}
+                    onChange={(event) => setOperatorName(event.target.value)}
+                    disabled={busy}
+                    required
+                  />
+                </label>
+
+                <label className="reg-doc-form__field">
+                  <span>CPF do operador *</span>
+                  <input
+                    type="text"
+                    value={operatorCpf}
+                    onChange={(event) => setOperatorCpf(formatCpf(event.target.value))}
+                    disabled={busy}
+                    required
+                  />
+                </label>
+              </div>
+
+              <label className="reg-doc-form__field">
+                <span>Observações</span>
+                <textarea
+                  className="diesel-observations"
+                  value={observations}
+                  onChange={(event) => setObservations(event.target.value)}
+                  rows={4}
+                  disabled={busy}
+                  placeholder="Registre observações da drenagem, se houver."
+                />
+              </label>
+
+              <label className="diesel-check">
+                <input
+                  type="checkbox"
+                  checked={residuesConfirmed}
+                  onChange={(event) => setResiduesConfirmed(event.target.checked)}
+                  disabled={busy}
+                />
+                <span>{RESIDUES_CONFIRMATION_LABEL}</span>
+              </label>
+
+              <label className="reg-doc-form__field">
+                <span>Assinatura do operador *</span>
+              </label>
+              <SignaturePad key={signatureKey} disabled={busy} onChange={setSignatureBlob} />
+
+              {formError && <p className="reg-doc-form__error">{formError}</p>}
+
+              <div className="reg-doc-card__actions diesel-form__actions">
+                <button type="submit" className="btn btn--primary" disabled={busy}>
+                  {busy ? 'Lançando...' : 'Lançar drenagem'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={resetDrainageForm}
+                  disabled={busy}
+                >
+                  Limpar
+                </button>
+              </div>
+            </>
+          )}
+        </form>
+      )}
+
+      <section className="fuel-panel diesel-panel">
+        <h2>Histórico de drenagens</h2>
+        {!reports.length ? (
+          <p className="reg-doc-card__empty">Nenhuma drenagem lançada ainda.</p>
+        ) : (
+          <div className="diesel-history">
+            {reports.map((report) => (
+              <article key={report.id} className="diesel-history__card">
+                <div>
+                  <h3>{formatDateTimePtBr(report.drained_at)}</h3>
+                  <p>
+                    Tanque: {report.tank?.name ?? 'Tanque removido'} · Operador{' '}
+                    {report.operator_full_name}
+                  </p>
+                  <p>CPF {formatCpf(report.operator_cpf)}</p>
+                  {report.observations && <p>{report.observations}</p>}
+                </div>
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() => setViewReport(report)}
+                >
+                  Ver detalhes
+                </button>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {viewReport && (
+        <DrainageDetailsModal report={viewReport} onClose={() => setViewReport(null)} />
+      )}
+
+      <ConfirmDialog
+        open={Boolean(deleteTankTarget)}
+        title="Excluir tanque"
+        message="Deseja excluir este tanque? Se houver drenagens vinculadas, a exclusão será bloqueada."
+        confirmLabel="Excluir"
+        busy={busy}
+        onConfirm={handleDeleteTank}
+        onCancel={() => setDeleteTankTarget(null)}
+      />
+    </div>
+  )
+}
+
+function DrainageDetailsModal({
+  report,
+  onClose,
+}: {
+  report: DieselDrainageReport
+  onClose: () => void
+}) {
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    getDrainageSignatureUrl(report.signature_storage_path)
+      .then((url) => {
+        if (active) setSignatureUrl(url)
+      })
+      .catch(() => {
+        if (active) setSignatureUrl(null)
+      })
+    return () => {
+      active = false
+    }
+  }, [report.signature_storage_path])
+
+  return (
+    <div className="reg-doc-modal" role="dialog" aria-modal="true">
+      <div className="reg-doc-modal__dialog diesel-details">
+        <header className="reg-doc-modal__header">
+          <h2>Detalhes da drenagem</h2>
+          <button type="button" className="reg-doc-modal__close" onClick={onClose} aria-label="Fechar">
+            ×
+          </button>
+        </header>
+
+        <dl className="diesel-details__meta">
+          <div>
+            <dt>Data e horário</dt>
+            <dd>{formatDateTimePtBr(report.drained_at)}</dd>
+          </div>
+          <div>
+            <dt>Tanque</dt>
+            <dd>{report.tank?.name ?? 'Tanque removido'}</dd>
+          </div>
+          <div>
+            <dt>Operador</dt>
+            <dd>
+              {report.operator_full_name} · CPF {formatCpf(report.operator_cpf)}
+            </dd>
+          </div>
+          <div>
+            <dt>Confirmação de resíduos/pureza</dt>
+            <dd>{report.residues_confirmed ? 'Confirmado' : 'Não confirmado'}</dd>
+          </div>
+          <div>
+            <dt>Observações</dt>
+            <dd>{report.observations || '—'}</dd>
+          </div>
+        </dl>
+
+        {signatureUrl && (
+          <div className="diesel-details__signature">
+            <h3>Assinatura</h3>
+            <img src={signatureUrl} alt="Assinatura do operador" />
+          </div>
+        )}
+
+        <div className="reg-doc-modal__actions">
+          <button type="button" className="btn btn--secondary" onClick={onClose}>
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

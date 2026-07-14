@@ -1,5 +1,4 @@
 import { FUEL_ANALYSES_STORAGE_BUCKET, type FuelProductKey } from '../config/fuel-analyses'
-import { REGULATORY_STORAGE_BUCKET } from '../config/regulatory-documents'
 import { supabase } from './supabase'
 import type {
   FuelAnalysisItem,
@@ -15,23 +14,11 @@ export type PublicPostoInfo = {
   public_slug: string
 }
 
-export type PublicRegulatoryDocument = {
-  id: string
-  title: string
-  template_key: string | null
-  issued_at: string
-  expires_at: string | null
-  file_name: string
-  storage_path: string
-  preview_storage_path: string | null
-}
-
 export type PublicPostoBoard = {
   posto: PublicPostoInfo
   report: Omit<FuelAnalysisReport, 'raq_items' | 'analysis_items'> | null
   raq_items: FuelAnalysisRaqItem[]
   analysis_items: FuelAnalysisItem[]
-  documents: PublicRegulatoryDocument[]
 }
 
 export async function getMyPostoPublicSlug(): Promise<string> {
@@ -46,15 +33,6 @@ export async function fetchPublicPostoBoard(slug: string): Promise<PublicPostoBo
   if (error) throw error
   if (!data) return null
   return data as PublicPostoBoard
-}
-
-export async function getPublicRegulatoryFileUrl(path: string) {
-  const { data, error } = await supabase.storage
-    .from(REGULATORY_STORAGE_BUCKET)
-    .createSignedUrl(path, 60 * 30)
-
-  if (error) throw error
-  return data.signedUrl
 }
 
 export async function getPublicFuelFileUrl(path: string) {

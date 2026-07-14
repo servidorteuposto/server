@@ -205,6 +205,8 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
   const [viewReport, setViewReport] = useState<FuelAnalysisReport | null>(null)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [publicUrl, setPublicUrl] = useState<string | null>(null)
+  const [showQrPanel, setShowQrPanel] = useState(false)
+  const [showProductsPanel, setShowProductsPanel] = useState(false)
 
   const enabledProducts = useMemo(
     () => FUEL_PRODUCTS.filter((product) => selectedProducts.includes(product.key)),
@@ -225,8 +227,10 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
         getFuelProductSettings(profile.id),
         listFuelAnalysisReports(profile.id),
       ])
-      setSelectedProducts(products)
-      setProductsSaved(products.length > 0)
+      const managedProducts = products.filter((key) => key !== 'gnv')
+      setSelectedProducts(managedProducts)
+      setProductsSaved(managedProducts.length > 0)
+      setShowProductsPanel(managedProducts.length === 0)
       setReports(rows)
     } catch {
       setPageError('Não foi possível carregar Análises de Combustíveis.')
@@ -296,6 +300,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
         setPosto({ ...posto, endereco: endereco.trim() })
       }
       setProductsSaved(true)
+      setShowProductsPanel(false)
     } catch {
       setPageError('Não foi possível salvar os produtos do posto.')
     } finally {
@@ -323,6 +328,8 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
     setSignatureBlob(null)
     setFormError(null)
     setSubmittedAtPreview(new Date().toISOString())
+    setShowQrPanel(false)
+    setShowProductsPanel(false)
     setFormOpen(true)
   }
 
@@ -545,14 +552,46 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
             último lançamento.
           </p>
         </div>
-        {!isReadOnly && productsSaved && !formOpen && (
-          <button type="button" className="reg-docs-page__add-btn" onClick={openForm}>
-            Incluir RAQ
-          </button>
+        {!formOpen && (
+          <div className="fuel-header-actions">
+            {!isReadOnly && (
+              <button
+                type="button"
+                className={`reg-docs-page__add-btn fuel-header-actions__btn${showProductsPanel ? ' is-active' : ''}`}
+                onClick={() => {
+                  setShowProductsPanel((open) => !open)
+                  setShowQrPanel(false)
+                }}
+              >
+                Produtos
+              </button>
+            )}
+            <button
+              type="button"
+              className={`reg-docs-page__add-btn fuel-header-actions__btn fuel-header-actions__btn--ghost${showQrPanel ? ' is-active' : ''}`}
+              onClick={() => {
+                setShowQrPanel((open) => !open)
+                setShowProductsPanel(false)
+              }}
+            >
+              QR Code
+            </button>
+            {!isReadOnly && productsSaved && (
+              <button type="button" className="reg-docs-page__add-btn" onClick={openForm}>
+                Incluir RAQ
+              </button>
+            )}
+          </div>
         )}
       </header>
 
       {pageError && <p className="reg-doc-form__error reg-docs-page__banner">{pageError}</p>}
+
+      {!productsSaved && !showProductsPanel && !formOpen && !isReadOnly && (
+        <p className="fuel-setup-hint">
+          Configure os produtos gerenciados pelo posto antes de lançar o primeiro RAQ.
+        </p>
+      )}
 
       <section className="fuel-panel">
         <h2>Registro das Análises da Qualidade — RAQ</h2>
@@ -584,89 +623,107 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
         </dl>
       </section>
 
-      <section className="fuel-panel">
-        <div className="fuel-panel__header">
-          <div>
-            <h2>QR Code público do posto</h2>
-            <p>
-              Imprima e deixe no posto. Clientes escaneiam e veem o último RAQ e documentos públicos em
-              tempo real.
-            </p>
-          </div>
-        </div>
-        <div className="fuel-qr">
-          {qrDataUrl ? (
-            <img src={qrDataUrl} alt="QR Code da página pública do posto" className="fuel-qr__image" />
-          ) : (
-            <p className="reg-doc-card__empty">Gerando QR Code...</p>
-          )}
-          <div className="fuel-qr__meta">
-            {publicUrl && (
-              <>
-                <p className="fuel-qr__url">{publicUrl}</p>
-                <div className="reg-doc-card__actions">
-                  <button
-                    type="button"
-                    className="btn btn--secondary"
-                    onClick={() => navigator.clipboard.writeText(publicUrl)}
-                  >
-                    Copiar link
-                  </button>
-                  <a
-                    className="btn btn--primary"
-                    href={qrDataUrl ?? '#'}
-                    download={`qrcode-${posto.nome.replace(/\s+/g, '-').toLowerCase()}.png`}
-                    onClick={(event) => {
-                      if (!qrDataUrl) event.preventDefault()
-                    }}
-                  >
-                    Baixar QR Code
-                  </a>
-                  <a className="btn btn--secondary" href={publicUrl} target="_blank" rel="noreferrer">
-                    Abrir página pública
-                  </a>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section className="fuel-panel">
-        <div className="fuel-panel__header">
-          <div>
-            <h2>Produtos gerenciados</h2>
-            <p>Selecione quais produtos o posto trabalha antes de preencher o RAQ.</p>
-          </div>
-          {!isReadOnly && (
+      {showQrPanel && (
+        <section className="fuel-panel">
+          <div className="fuel-panel__header">
+            <div>
+              <h2>QR Code público do posto</h2>
+              <p>Imprima e deixe no posto. Clientes escaneiam e veem o último RAQ em tempo real.</p>
+            </div>
             <button
               type="button"
-              className="btn btn--primary"
-              onClick={handleSaveProducts}
-              disabled={busy || formOpen}
+              className="btn btn--secondary"
+              onClick={() => setShowQrPanel(false)}
             >
-              Salvar produtos
+              Fechar
             </button>
-          )}
-        </div>
+          </div>
+          <div className="fuel-qr">
+            {qrDataUrl ? (
+              <img src={qrDataUrl} alt="QR Code da página pública do posto" className="fuel-qr__image" />
+            ) : (
+              <p className="reg-doc-card__empty">Gerando QR Code...</p>
+            )}
+            <div className="fuel-qr__meta">
+              {publicUrl && (
+                <>
+                  <p className="fuel-qr__url">{publicUrl}</p>
+                  <div className="reg-doc-card__actions">
+                    <button
+                      type="button"
+                      className="btn btn--secondary"
+                      onClick={() => navigator.clipboard.writeText(publicUrl)}
+                    >
+                      Copiar link
+                    </button>
+                    <a
+                      className="btn btn--primary"
+                      href={qrDataUrl ?? '#'}
+                      download={`qrcode-${posto.nome.replace(/\s+/g, '-').toLowerCase()}.png`}
+                      onClick={(event) => {
+                        if (!qrDataUrl) event.preventDefault()
+                      }}
+                    >
+                      Baixar QR Code
+                    </a>
+                    <a className="btn btn--secondary" href={publicUrl} target="_blank" rel="noreferrer">
+                      Abrir página pública
+                    </a>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
-        <div className="fuel-products">
-          {FUEL_PRODUCTS.map((product) => {
-            const checked = selectedProducts.includes(product.key)
-            return (
-              <label key={product.key} className={`fuel-products__item${checked ? ' is-active' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggleProduct(product.key)}
-                  disabled={isReadOnly || busy || formOpen}
-                />
-                <span>{product.label}</span>
-              </label>
-            )
-          })}
-        </div>
-      </section>
+      {showProductsPanel && (
+        <section className="fuel-panel">
+          <div className="fuel-panel__header">
+            <div>
+              <h2>Produtos gerenciados</h2>
+              <p>Selecione os produtos do posto. Depois disso, só abra de novo se precisar alterar.</p>
+            </div>
+            <div className="fuel-panel__header-actions">
+              {!isReadOnly && (
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={handleSaveProducts}
+                  disabled={busy}
+                >
+                  Salvar produtos
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn--secondary"
+                onClick={() => setShowProductsPanel(false)}
+                disabled={busy}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+
+          <div className="fuel-products">
+            {FUEL_PRODUCTS.map((product) => {
+              const checked = selectedProducts.includes(product.key)
+              return (
+                <label key={product.key} className={`fuel-products__item${checked ? ' is-active' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleProduct(product.key)}
+                    disabled={isReadOnly || busy}
+                  />
+                  <span>{product.label}</span>
+                </label>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       {formOpen && (
         <form className="fuel-form" onSubmit={handleSubmit}>

@@ -3,6 +3,56 @@
   gap: 1rem;
 }
 
+.fuel-header-actions {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.fuel-header-actions .reg-docs-page__add-btn {
+  grid-column: auto;
+  grid-row: auto;
+  justify-self: auto;
+}
+
+.fuel-header-actions__btn--ghost {
+  background: var(--white);
+  color: var(--blue-dark);
+  border: 1px solid var(--gray-300);
+}
+
+.fuel-header-actions__btn--ghost:hover,
+.fuel-header-actions__btn.is-active {
+  background: #f0f7ff;
+  border-color: var(--blue-light);
+  color: var(--blue-dark);
+}
+
+.fuel-header-actions__btn.is-active {
+  box-shadow: inset 0 0 0 1px rgba(61, 143, 212, 0.35);
+}
+
+.fuel-setup-hint {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.88rem;
+}
+
+.fuel-panel__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
 .fuel-panel {
   background: var(--white);
   border: 1px solid rgba(61, 143, 212, 0.22);

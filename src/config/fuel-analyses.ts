@@ -14,7 +14,7 @@ export type FuelProductKey =
   | 'gnv'
 
 export type FuelProduct = {
-  key: FuelProductKey
+  key: Exclude<FuelProductKey, 'gnv'>
   label: string
   hasAlcoholContent: boolean
 }
@@ -29,12 +29,12 @@ export const FUEL_PRODUCTS: FuelProduct[] = [
   { key: 'diesel-s10-aditivado', label: 'Diesel S-10 Aditivado', hasAlcoholContent: false },
   { key: 'diesel-s500-comum', label: 'Diesel S-500 Comum', hasAlcoholContent: false },
   { key: 'diesel-s500-aditivado', label: 'Diesel S-500 Aditivado', hasAlcoholContent: false },
-  { key: 'gnv', label: 'Gás Natural Veicular', hasAlcoholContent: false },
 ]
 
-export const FUEL_PRODUCT_LABELS: Record<FuelProductKey, string> = Object.fromEntries(
-  FUEL_PRODUCTS.map((product) => [product.key, product.label]),
-) as Record<FuelProductKey, string>
+export const FUEL_PRODUCT_LABELS: Record<FuelProductKey, string> = {
+  ...Object.fromEntries(FUEL_PRODUCTS.map((product) => [product.key, product.label])),
+  gnv: 'Gás Natural Veicular',
+} as Record<FuelProductKey, string>
 
 export const FUEL_ANALYSES_STORAGE_BUCKET = 'fuel-analyses'
 export const FUEL_ANALYSES_MAX_FILE_BYTES = 10 * 1024 * 1024

@@ -1,0 +1,213 @@
+.diesel-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.diesel-panel {
+  background: var(--white);
+  border: 1px solid rgba(61, 143, 212, 0.22);
+  border-radius: 14px;
+  padding: 1.15rem 1.2rem;
+  box-shadow: var(--shadow-card);
+}
+
+.fuel-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.fuel-panel__hint {
+  font-size: 0.88rem;
+  color: var(--gray-600);
+  line-height: 1.45;
+  margin-bottom: 0.85rem;
+}
+
+.diesel-page .reg-docs-page__add-btn.diesel-page__btn-active {
+  background: #0a3268;
+}
+
+.diesel-panel h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--blue-dark);
+  margin-bottom: 0.75rem;
+}
+
+.diesel-tank-form {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.diesel-tank-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.diesel-tank-list__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 12px;
+  background: rgba(61, 143, 212, 0.03);
+}
+
+.diesel-tank-list__item h3 {
+  font-size: 0.95rem;
+  color: var(--blue-dark);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.diesel-tank-list__item p {
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--gray-600);
+}
+
+.diesel-tank-list__tag {
+  display: inline-flex;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.diesel-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.diesel-fields .reg-doc-form__field,
+.diesel-panel .reg-doc-form__field {
+  margin-bottom: 0;
+}
+
+.diesel-fields select,
+.diesel-observations {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font: inherit;
+  color: var(--blue-dark);
+  background: var(--white);
+}
+
+.diesel-observations {
+  resize: vertical;
+  min-height: 96px;
+}
+
+.diesel-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin: 0.85rem 0 1rem;
+  font-size: 0.88rem;
+  color: var(--gray-600);
+  line-height: 1.4;
+}
+
+.diesel-check input {
+  margin-top: 0.2rem;
+}
+
+.diesel-form__actions {
+  margin-top: 1rem;
+}
+
+.diesel-history {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.diesel-history__card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 12px;
+  background: rgba(61, 143, 212, 0.03);
+}
+
+.diesel-history__card h3 {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  color: var(--blue-dark);
+}
+
+.diesel-history__card p {
+  font-size: 0.85rem;
+  color: var(--gray-600);
+  line-height: 1.4;
+}
+
+.diesel-details {
+  width: min(560px, 100%);
+}
+
+.diesel-details__meta {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.diesel-details__meta dt {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gray-500);
+}
+
+.diesel-details__meta dd {
+  font-size: 0.9rem;
+  color: var(--gray-600);
+}
+
+.diesel-details__signature h3 {
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+  color: var(--blue-dark);
+}
+
+.diesel-details__signature img {
+  width: min(100%, 320px);
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: var(--white);
+}
+
+@media (min-width: 720px) {
+  .diesel-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .diesel-fields .reg-doc-form__field:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .diesel-tank-list__item,
+  .diesel-history__card {
+    flex-direction: column;
+  }
+}
