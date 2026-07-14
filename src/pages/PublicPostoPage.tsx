@@ -113,7 +113,7 @@ export default function PublicPostoPage({ slug }: PublicPostoPageProps) {
               <span>{board.posto.endereco || 'Endereço não informado'}</span>
             </div>
             <p className="public-posto__live">
-              Atualização em tempo real · vale sempre o último lançamento
+              Atualização em tempo real · cada combustível mostra o último RAQ daquele produto
             </p>
           </div>
         </header>
@@ -133,10 +133,10 @@ export default function PublicPostoPage({ slug }: PublicPostoPageProps) {
             )}
           </div>
 
-          {!board.report ? (
+          {!board.report || (board.raq_items.length === 0 && board.analysis_items.length === 0) ? (
             <div className="public-posto__empty">
               <strong>Nenhum RAQ publicado ainda</strong>
-              <p>Assim que o posto lançar a planilha, ela aparece aqui automaticamente.</p>
+              <p>Assim que o posto lançar um RAQ, ele aparece aqui automaticamente.</p>
             </div>
           ) : (
             <>
@@ -272,8 +272,17 @@ function AnalysisPublicCard({
         </div>
         {item.teor_alcool_gasolina && (
           <div>
-            <dt>Teor de álcool</dt>
-            <dd>{item.teor_alcool_gasolina}</dd>
+            <dt>
+              {item.product_key.startsWith('etanol-')
+                ? 'Teor alcoólico (°INPM)'
+                : 'Teor de álcool'}
+            </dt>
+            <dd>
+              {item.teor_alcool_gasolina}
+              {item.product_key.startsWith('etanol-') && !item.teor_alcool_gasolina.includes('INPM')
+                ? ' °INPM'
+                : ''}
+            </dd>
           </div>
         )}
         <div>

@@ -72,31 +72,52 @@ export type DensityLimit = {
 }
 
 /**
+ * Teor alcoólico na gasolina C (% vol): somente 29 a 31 é conforme.
+ * Abaixo ou acima → luz vermelha (Fora das Especificações).
+ */
+export const GASOLINE_ALCOHOL_PERCENT = { min: 29, max: 31 }
+
+/**
+ * Teor alcoólico do etanol hidratado combustível (% massa / °INPM).
+ * Res. ANP nº 907/2022 — EHC: 92,5 a 95,4.
+ */
+export const ETHANOL_ALCOHOL_PERCENT = { min: 92.5, max: 95.4 }
+
+/**
+ * Correlação aproximada Massa Específica × °INPM (soluções hidroalcoólicas a 20 °C).
+ * C = −758,31·d² + 882,02·d − 124,99  (d em g/cm³).
+ * Útil para automação; referência oficial de ensaio: NBR 5992.
+ */
+export function calculateEthanolInpmFromD20KgM3(d20KgM3: number): number {
+  const d = d20KgM3 / 1000
+  const c = -758.31 * d * d + 882.02 * d - 124.99
+  return Number(c.toFixed(1))
+}
+
+/**
  * Faixas de massa específica a 20 °C (kg/m³) conforme resoluções ANP vigentes
  * usadas no controle de qualidade no revendedor.
  *
- * Gasolina C: a ANP fixa só o mínimo (715). Usamos também um teto operacional
- * coerente com densímetro de gasolina (máx. ~800 kg/m³) para impedir Apto
- * com D20 absurdo por temperatura/ME inválidas.
+ * Gasolina C: mínimo 715 kg/m³ (sem teto ANP). Abaixo disso → luz vermelha.
  */
 export const FUEL_DENSITY_LIMITS_KG_M3: Record<FuelProductKey, DensityLimit | null> = {
   'gasolina-comum': {
     min: 715.0,
-    max: 800.0,
+    max: null,
     unit: 'kg/m³',
-    reference: 'Res. ANP nº 807/2020 — Gasolina C, mín. 715,0 kg/m³ (teto operacional do ensaio 800,0)',
+    reference: 'Res. ANP nº 807/2020 — Gasolina C, mín. 715,0 kg/m³',
   },
   'gasolina-aditivada': {
     min: 715.0,
-    max: 800.0,
+    max: null,
     unit: 'kg/m³',
-    reference: 'Res. ANP nº 807/2020 — Gasolina C, mín. 715,0 kg/m³ (teto operacional do ensaio 800,0)',
+    reference: 'Res. ANP nº 807/2020 — Gasolina C, mín. 715,0 kg/m³',
   },
   'gasolina-premium': {
     min: 715.0,
-    max: 800.0,
+    max: null,
     unit: 'kg/m³',
-    reference: 'Res. ANP nº 807/2020 — Gasolina C Premium, mín. 715,0 kg/m³ (teto operacional do ensaio 800,0)',
+    reference: 'Res. ANP nº 807/2020 — Gasolina C Premium, mín. 715,0 kg/m³',
   },
   'etanol-comum': {
     min: 802.9,
@@ -152,6 +173,100 @@ export type DensityCorrectionResult = {
   formulaLabel: string
   /** Motivo quando o ensaio/entrada é inválida ou fora da faixa ANP. */
   statusReason: string | null
+  /** Rótulo amigável da situação (densidade / teor). */
+  statusLabel: string
+  /** Teor alcoólico automático (etanol °INPM); null se não aplicável. */
+  alcoholFormatted: string | null
+}
+
+export function gasolineAlcoholLimitLabel() {
+  return `${GASOLINE_ALCOHOL_PERCENT.min}% a ${GASOLINE_ALCOHOL_PERCENT.max}%`
+}
+
+export function ethanolAlcoholLimitLabel() {
+  return `${ETHANOL_ALCOHOL_PERCENT.min.toFixed(1).replace('.', ',')}% a ${ETHANOL_ALCOHOL_PERCENT.max.toFixed(1).replace('.', ',')}% (°INPM)`
+}
+
+export function evaluateGasolineAlcoholConformity(teorInput: string): {
+  status: DensityConformity | null
+  limitLabel: string
+  reason: string | null
+} {
+  const limitLabel = gasolineAlcoholLimitLabel()
+  const value = parseDecimalInput(teorInput)
+  if (value == null) {
+    return { status: null, limitLabel, reason: null }
+  }
+
+  if (value + 1e-9 >= GASOLINE_ALCOHOL_PERCENT.min && value - 1e-9 <= GASOLINE_ALCOHOL_PERCENT.max) {
+    return { status: 'apto', limitLabel, reason: null }
+  }
+
+  return {
+    status: 'inapto',
+    limitLabel,
+    reason: `Teor alcoólico ${value.toFixed(1).replace('.', ',')}% fora da faixa (${limitLabel}).`,
+  }
+}
+
+export function evaluateEthanolAlcoholConformity(teorInput: string): {
+  status: DensityConformity | null
+  limitLabel: string
+  reason: string | null
+} {
+  const limitLabel = ethanolAlcoholLimitLabel()
+  const value = parseDecimalInput(teorInput)
+  if (value == null) {
+    return { status: null, limitLabel, reason: null }
+  }
+
+  if (value + 1e-9 >= ETHANOL_ALCOHOL_PERCENT.min && value - 1e-9 <= ETHANOL_ALCOHOL_PERCENT.max) {
+    return { status: 'apto', limitLabel, reason: null }
+  }
+
+  return {
+    status: 'inapto',
+    limitLabel,
+    reason: `Teor alcoólico ${value.toFixed(1).replace('.', ',')} °INPM fora da faixa (${limitLabel}).`,
+  }
+}
+
+export function buildFuelStatusLabel(options: {
+  densityOk: boolean | null
+  alcoholOk: boolean | null
+}): string {
+  const { densityOk, alcoholOk } = options
+
+  if (densityOk === true && alcoholOk === true) {
+    return 'Densidade e teor alcoólico conforme'
+  }
+  if (densityOk === true && alcoholOk == null) {
+    return 'Densidade conforme'
+  }
+  if (densityOk === true && alcoholOk === false) {
+    return 'Teor alcoólico fora dos padrões'
+  }
+  if (densityOk === false && alcoholOk === true) {
+    return 'Densidade fora dos padrões'
+  }
+  if (densityOk === false && alcoholOk === false) {
+    return 'Densidade e teor alcoólico fora dos padrões'
+  }
+  if (densityOk === false) {
+    return 'Densidade fora dos padrões'
+  }
+  if (alcoholOk === false) {
+    return 'Teor alcoólico fora dos padrões'
+  }
+  if (densityOk === true) {
+    return DENSITY_CONFORMITY_LABELS.apto
+  }
+  return DENSITY_CONFORMITY_LABELS.inapto
+}
+
+function combineStatusReasons(...reasons: Array<string | null | undefined>) {
+  const parts = reasons.filter((reason): reason is string => Boolean(reason))
+  return parts.length > 0 ? parts.join(' ') : null
 }
 
 export function parseDecimalInput(value: string): number | null {
@@ -175,10 +290,14 @@ export function supportsDensityCorrection(productKey: FuelProductKey) {
 
 function formatLimitLabel(limits: DensityLimit): string | null {
   if (limits.min != null && limits.max != null) {
-    return `${limits.min.toFixed(1)} a ${limits.max.toFixed(1)} kg/m³`
+    return `${limits.min.toFixed(1).replace('.', ',')} a ${limits.max.toFixed(1).replace('.', ',')} kg/m³`
   }
-  if (limits.min != null) return `mín. ${limits.min.toFixed(1)} kg/m³`
-  if (limits.max != null) return `máx. ${limits.max.toFixed(1)} kg/m³`
+  if (limits.min != null) {
+    return `igual ou superior a ${limits.min.toFixed(1).replace('.', ',')} kg/m³`
+  }
+  if (limits.max != null) {
+    return `máx. ${limits.max.toFixed(1).replace('.', ',')} kg/m³`
+  }
   return null
 }
 
@@ -231,11 +350,13 @@ function validateAssayInputs(
  * D20 = Dt + γ × (t − 20)
  *
  * Temperatura/Dt fora da faixa do ensaio → sempre Inapto (nunca Apto).
+ * Gasolina: teor manual 29–31%. Etanol: teor °INPM calculado da densidade.
  */
 export function correctDensityTo20C(
   productKey: FuelProductKey,
   densityInput: string,
   temperatureInput: string,
+  alcoholInput?: string,
 ): DensityCorrectionResult | null {
   const gamma = FUEL_DENSITY_GAMMA_KG_M3[productKey]
   if (gamma == null) return null
@@ -250,8 +371,27 @@ export function correctDensityTo20C(
   const limits = FUEL_DENSITY_LIMITS_KG_M3[productKey]
   const limitLabel = limits ? formatLimitLabel(limits) : null
 
+  const isGasoline = productKey.startsWith('gasolina-')
+  const isEthanol = productKey.startsWith('etanol-')
+
+  let alcoholFormatted: string | null = null
+  let alcohol: {
+    status: DensityConformity | null
+    limitLabel: string
+    reason: string | null
+  } | null = null
+
+  if (isEthanol) {
+    alcoholFormatted = calculateEthanolInpmFromD20KgM3(rounded).toFixed(1)
+    alcohol = evaluateEthanolAlcoholConformity(alcoholFormatted)
+  } else if (isGasoline && alcoholInput != null && alcoholInput.trim() !== '') {
+    alcohol = evaluateGasolineAlcoholConformity(alcoholInput)
+  }
+
   const assayError = validateAssayInputs(productKey, dtKgM3, temperatureC)
   if (assayError) {
+    const densityOk = false
+    const alcoholOk = alcohol?.status == null ? null : alcohol.status === 'apto'
     return {
       dtKgM3,
       temperatureC,
@@ -261,11 +401,17 @@ export function correctDensityTo20C(
       status: 'inapto',
       limitLabel,
       formulaLabel,
-      statusReason: assayError,
+      statusReason: combineStatusReasons(assayError, alcohol?.reason),
+      statusLabel: buildFuelStatusLabel({ densityOk, alcoholOk }),
+      alcoholFormatted,
     }
   }
 
   const conformity = evaluateDensityConformity(productKey, rounded)
+  const densityOk = conformity.status === 'apto'
+  const alcoholOk = alcohol?.status == null ? null : alcohol.status === 'apto'
+  const status: DensityConformity =
+    densityOk && (alcoholOk == null || alcoholOk) ? 'apto' : 'inapto'
 
   return {
     dtKgM3,
@@ -273,9 +419,11 @@ export function correctDensityTo20C(
     gammaKgM3: gamma,
     d20KgM3: rounded,
     d20Formatted: rounded.toFixed(1),
-    status: conformity.status ?? 'inapto',
+    status,
     limitLabel: conformity.limitLabel ?? limitLabel,
     formulaLabel,
-    statusReason: conformity.reason,
+    statusReason: combineStatusReasons(conformity.reason, alcohol?.reason),
+    statusLabel: buildFuelStatusLabel({ densityOk, alcoholOk }),
+    alcoholFormatted,
   }
 }

@@ -16,19 +16,20 @@ export type FuelProductKey =
 export type FuelProduct = {
   key: Exclude<FuelProductKey, 'gnv'>
   label: string
-  hasAlcoholContent: boolean
+  /** Manual (gasolina) ou automático via densidade (etanol). */
+  alcoholKind: 'none' | 'gasoline' | 'ethanol'
 }
 
 export const FUEL_PRODUCTS: FuelProduct[] = [
-  { key: 'gasolina-comum', label: 'Gasolina Comum', hasAlcoholContent: true },
-  { key: 'gasolina-aditivada', label: 'Gasolina Aditivada', hasAlcoholContent: true },
-  { key: 'gasolina-premium', label: 'Gasolina Premium', hasAlcoholContent: true },
-  { key: 'etanol-comum', label: 'Etanol Comum', hasAlcoholContent: false },
-  { key: 'etanol-aditivado', label: 'Etanol Aditivado', hasAlcoholContent: false },
-  { key: 'diesel-s10-comum', label: 'Diesel S-10 Comum', hasAlcoholContent: false },
-  { key: 'diesel-s10-aditivado', label: 'Diesel S-10 Aditivado', hasAlcoholContent: false },
-  { key: 'diesel-s500-comum', label: 'Diesel S-500 Comum', hasAlcoholContent: false },
-  { key: 'diesel-s500-aditivado', label: 'Diesel S-500 Aditivado', hasAlcoholContent: false },
+  { key: 'gasolina-comum', label: 'Gasolina Comum', alcoholKind: 'gasoline' },
+  { key: 'gasolina-aditivada', label: 'Gasolina Aditivada', alcoholKind: 'gasoline' },
+  { key: 'gasolina-premium', label: 'Gasolina Premium', alcoholKind: 'gasoline' },
+  { key: 'etanol-comum', label: 'Etanol Comum', alcoholKind: 'ethanol' },
+  { key: 'etanol-aditivado', label: 'Etanol Aditivado', alcoholKind: 'ethanol' },
+  { key: 'diesel-s10-comum', label: 'Diesel S-10 Comum', alcoholKind: 'none' },
+  { key: 'diesel-s10-aditivado', label: 'Diesel S-10 Aditivado', alcoholKind: 'none' },
+  { key: 'diesel-s500-comum', label: 'Diesel S-500 Comum', alcoholKind: 'none' },
+  { key: 'diesel-s500-aditivado', label: 'Diesel S-500 Aditivado', alcoholKind: 'none' },
 ]
 
 export const FUEL_PRODUCT_LABELS: Record<FuelProductKey, string> = {
@@ -44,7 +45,12 @@ export function isFuelProductKey(value: string): value is FuelProductKey {
 }
 
 export function productHasAlcoholContent(key: FuelProductKey) {
-  return FUEL_PRODUCTS.find((product) => product.key === key)?.hasAlcoholContent ?? false
+  const kind = FUEL_PRODUCTS.find((product) => product.key === key)?.alcoholKind
+  return kind === 'gasoline' || kind === 'ethanol'
+}
+
+export function productAlcoholKind(key: FuelProductKey) {
+  return FUEL_PRODUCTS.find((product) => product.key === key)?.alcoholKind ?? 'none'
 }
 
 export function formatDateTimePtBr(value: string | Date) {

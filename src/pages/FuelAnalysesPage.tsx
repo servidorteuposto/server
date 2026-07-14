@@ -8,6 +8,7 @@ import {
   formatDateTimePtBr,
   FUEL_PRODUCT_LABELS,
   isPdfOrImageFile,
+  productAlcoholKind,
   productHasAlcoholContent,
   validateCpf,
   validateDistributorCnpj,
@@ -16,11 +17,13 @@ import {
 } from '../config/fuel-analyses'
 import {
   correctDensityTo20C,
+  DENSITY_CONFORMITY_LABELS,
+  ethanolAlcoholLimitLabel,
   FUEL_DENSITY_LIMITS_KG_M3,
+  gasolineAlcoholLimitLabel,
   supportsDensityCorrection,
   type DensityConformity,
   type DensityCorrectionResult,
-  DENSITY_CONFORMITY_LABELS,
 } from '../config/fuel-density'
 import SignaturePad from '../components/fuel-analyses/SignaturePad'
 import LiveCameraCapture from '../components/fuel-analyses/LiveCameraCapture'
@@ -72,6 +75,7 @@ type AnalysisDraft = {
   densidadeFormula: string | null
   densidadeLimitLabel: string | null
   densidadeStatusReason: string | null
+  densidadeStatusLabel: string | null
   photoFile: File | null
   photoPreviewUrl: string | null
   photoLatitude: number | null
@@ -108,6 +112,7 @@ function emptyAnalysis(): AnalysisDraft {
     densidadeFormula: null,
     densidadeLimitLabel: null,
     densidadeStatusReason: null,
+    densidadeStatusLabel: null,
     photoFile: null,
     photoPreviewUrl: null,
     photoLatitude: null,
@@ -123,20 +128,24 @@ function applyDensityCorrection(
 ): Pick<
   AnalysisDraft,
   | 'massaEspecificaConvertida'
+  | 'teorAlcoolGasolina'
   | 'densidadeStatus'
   | 'coeficienteGamma'
   | 'densidadeFormula'
   | 'densidadeLimitLabel'
   | 'densidadeStatusReason'
+  | 'densidadeStatusLabel'
 > {
   if (!supportsDensityCorrection(productKey)) {
     return {
       massaEspecificaConvertida: draft.massaEspecificaConvertida,
+      teorAlcoolGasolina: draft.teorAlcoolGasolina,
       densidadeStatus: null,
       coeficienteGamma: null,
       densidadeFormula: null,
       densidadeLimitLabel: null,
       densidadeStatusReason: null,
+      densidadeStatusLabel: null,
     }
   }
 
@@ -144,11 +153,14 @@ function applyDensityCorrection(
     productKey,
     draft.massaEspecificaObservada,
     draft.temperaturaObservada,
+    draft.teorAlcoolGasolina,
   )
 
   if (!result) {
     return {
       massaEspecificaConvertida: '',
+      teorAlcoolGasolina:
+        productAlcoholKind(productKey) === 'ethanol' ? '' : draft.teorAlcoolGasolina,
       densidadeStatus: null,
       coeficienteGamma: null,
       densidadeFormula: null,
@@ -156,16 +168,20 @@ function applyDensityCorrection(
         ? draft.densidadeLimitLabel
         : null,
       densidadeStatusReason: null,
+      densidadeStatusLabel: null,
     }
   }
 
   return {
     massaEspecificaConvertida: result.d20Formatted,
+    teorAlcoolGasolina:
+      result.alcoholFormatted != null ? result.alcoholFormatted : draft.teorAlcoolGasolina,
     densidadeStatus: result.status,
     coeficienteGamma: result.gammaKgM3,
     densidadeFormula: result.formulaLabel,
     densidadeLimitLabel: result.limitLabel,
     densidadeStatusReason: result.statusReason,
+    densidadeStatusLabel: result.statusLabel,
   }
 }
 
@@ -207,10 +223,17 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
   const [publicUrl, setPublicUrl] = useState<string | null>(null)
   const [showQrPanel, setShowQrPanel] = useState(false)
   const [showProductsPanel, setShowProductsPanel] = useState(false)
+  /** Combustíveis que chegaram neste recebimento (um, vários ou todos). */
+  const [launchProductKeys, setLaunchProductKeys] = useState<FuelProductKey[]>([])
 
   const enabledProducts = useMemo(
     () => FUEL_PRODUCTS.filter((product) => selectedProducts.includes(product.key)),
     [selectedProducts],
+  )
+
+  const launchProducts = useMemo(
+    () => enabledProducts.filter((product) => launchProductKeys.includes(product.key)),
+    [enabledProducts, launchProductKeys],
   )
 
   const latestReport = reports[0] ?? null
@@ -313,16 +336,11 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
       setPageError('Selecione e salve os produtos gerenciados antes de incluir um RAQ.')
       return
     }
-    const nextRaq: Partial<Record<FuelProductKey, RaqDraft>> = {}
-    const nextAnalysis: Partial<Record<FuelProductKey, AnalysisDraft>> = {}
-    for (const product of enabledProducts) {
-      nextRaq[product.key] = emptyRaq()
-      nextAnalysis[product.key] = emptyAnalysis()
-    }
-    setRaqDrafts(nextRaq)
-    setAnalysisDrafts(nextAnalysis)
-    setOpenRaq(enabledProducts[0]?.key ?? null)
-    setOpenAnalysis(enabledProducts[0]?.key ?? null)
+    setLaunchProductKeys([])
+    setRaqDrafts({})
+    setAnalysisDrafts({})
+    setOpenRaq(null)
+    setOpenAnalysis(null)
     setAuthorName('')
     setAuthorCpf('')
     setSignatureBlob(null)
@@ -331,6 +349,39 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
     setShowQrPanel(false)
     setShowProductsPanel(false)
     setFormOpen(true)
+  }
+
+  function toggleLaunchProduct(key: FuelProductKey) {
+    const removing = launchProductKeys.includes(key)
+    const nextKeys = removing
+      ? launchProductKeys.filter((item) => item !== key)
+      : [...launchProductKeys, key]
+
+    setLaunchProductKeys(nextKeys)
+
+    if (removing) {
+      setRaqDrafts((drafts) => {
+        const copy = { ...drafts }
+        delete copy[key]
+        return copy
+      })
+      setAnalysisDrafts((drafts) => {
+        const previous = drafts[key]
+        if (previous?.photoPreviewUrl) URL.revokeObjectURL(previous.photoPreviewUrl)
+        const copy = { ...drafts }
+        delete copy[key]
+        return copy
+      })
+      setOpenRaq((open) => (open === key ? nextKeys[0] ?? null : open))
+      setOpenAnalysis((open) => (open === key ? nextKeys[0] ?? null : open))
+    } else {
+      setRaqDrafts((drafts) => ({ ...drafts, [key]: emptyRaq() }))
+      setAnalysisDrafts((drafts) => ({ ...drafts, [key]: emptyAnalysis() }))
+      setOpenRaq(key)
+      setOpenAnalysis(key)
+    }
+
+    setFormError(null)
   }
 
   function updateRaq(key: FuelProductKey, patch: Partial<RaqDraft>) {
@@ -349,7 +400,9 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
 
       const merged = { ...previous, ...patch }
       const densityTouched =
-        'temperaturaObservada' in patch || 'massaEspecificaObservada' in patch
+        'temperaturaObservada' in patch ||
+        'massaEspecificaObservada' in patch ||
+        'teorAlcoolGasolina' in patch
 
       return {
         ...current,
@@ -402,8 +455,11 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
 
   function validateForm(): string | null {
     if (!endereco.trim()) return 'Informe o endereço do posto revendedor.'
+    if (!launchProductKeys.length) {
+      return 'Selecione pelo menos um combustível que chegou neste recebimento.'
+    }
 
-    for (const product of enabledProducts) {
+    for (const product of launchProducts) {
       const raq = raqDrafts[product.key] ?? emptyRaq()
       if (!raq.volumeReceivedLiters.trim()) {
         return `${product.label}: informe o volume recebido.`
@@ -440,7 +496,9 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
         return `${product.label}: informe a massa específica convertida.`
       }
       if (productHasAlcoholContent(product.key) && !analysis.teorAlcoolGasolina.trim()) {
-        return `${product.label}: informe o teor de álcool na gasolina.`
+        return productAlcoholKind(product.key) === 'ethanol'
+          ? `${product.label}: não foi possível calcular o teor alcoólico (°INPM). Verifique a densidade.`
+          : `${product.label}: informe o teor de álcool na gasolina.`
       }
       if (!analysis.photoFile) return `${product.label}: tire a foto comprovando o local.`
       if (analysis.photoLatitude == null || analysis.photoLongitude == null) {
@@ -475,7 +533,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
         setPosto({ ...posto, endereco: endereco.trim() })
       }
 
-      const raqItems: RaqItemInput[] = enabledProducts.map((product) => {
+      const raqItems: RaqItemInput[] = launchProducts.map((product) => {
         const draft = raqDrafts[product.key] ?? emptyRaq()
         return {
           productKey: product.key,
@@ -492,7 +550,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
         }
       })
 
-      const analysisItems: AnalysisItemInput[] = enabledProducts.map((product) => {
+      const analysisItems: AnalysisItemInput[] = launchProducts.map((product) => {
         const draft = analysisDrafts[product.key] ?? emptyAnalysis()
         return {
           productKey: product.key,
@@ -548,8 +606,9 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
         <div className="reg-docs-page__header-text">
           <h1>Análises de Combustíveis</h1>
           <p>
-            Lançamentos são imutáveis: para atualizar, envie uma nova planilha completa. Sempre vale o
-            último lançamento.
+            Lançamentos são imutáveis. Em cada RAQ, marque só os combustíveis que chegaram. Se depois
+            vier só etanol, lance só ele — na página pública atualiza aquele produto e os outros
+            permanecem com os dados anteriores.
           </p>
         </div>
         {!formOpen && (
@@ -728,9 +787,36 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
       {formOpen && (
         <form className="fuel-form" onSubmit={handleSubmit}>
           <section className="fuel-panel">
+            <h2>Combustíveis deste recebimento</h2>
+            <p className="fuel-panel__hint">
+              Marque só o que chegou agora. Os produtos não marcados não entram neste lançamento e
+              mantêm o RAQ anterior na página pública.
+            </p>
+            <div className="fuel-products">
+              {enabledProducts.map((product) => {
+                const checked = launchProductKeys.includes(product.key)
+                return (
+                  <label
+                    key={product.key}
+                    className={`fuel-products__item${checked ? ' is-active' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleLaunchProduct(product.key)}
+                      disabled={busy}
+                    />
+                    <span>{product.label}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </section>
+
+          <section className="fuel-panel">
             <h2>1. Registro das Análises da Qualidade — RAQ</h2>
             <div className="fuel-accordion">
-              {enabledProducts.map((product) => {
+              {launchProducts.map((product) => {
                 const draft = raqDrafts[product.key] ?? emptyRaq()
                 const open = openRaq === product.key
                 return (
@@ -885,15 +971,15 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
           </section>
 
           <section className="fuel-panel">
-            <h2>2. Análises dos Combustíveis</h2>
+            <h2>2. Análise do combustível</h2>
             <p className="fuel-panel__hint">
-              Em cada produto, tire uma foto no local. As coordenadas GPS e data/hora serão registradas
-              automaticamente.
+              Tire uma foto no local. As coordenadas GPS e data/hora serão registradas automaticamente.
             </p>
             <div className="fuel-accordion">
-              {enabledProducts.map((product) => {
+              {launchProducts.map((product) => {
                 const draft = analysisDrafts[product.key] ?? emptyAnalysis()
                 const open = openAnalysis === product.key
+                const alcoholKind = productAlcoholKind(product.key)
                 return (
                   <article key={product.key} className="fuel-accordion__item">
                     <button
@@ -992,11 +1078,13 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                               }
                             />
                           </label>
-                          {productHasAlcoholContent(product.key) && (
+                          {alcoholKind === 'gasoline' && (
                             <label className="reg-doc-form__field">
-                              <span>Teor de álcool na Gasolina *</span>
+                              <span>Teor de álcool na Gasolina * (29% a 31%)</span>
                               <input
                                 type="text"
+                                inputMode="decimal"
+                                placeholder="Ex.: 30"
                                 value={draft.teorAlcoolGasolina}
                                 onChange={(event) =>
                                   updateAnalysis(product.key, {
@@ -1005,6 +1093,22 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                                 }
                                 disabled={busy}
                                 required
+                              />
+                            </label>
+                          )}
+                          {alcoholKind === 'ethanol' && (
+                            <label className="reg-doc-form__field">
+                              <span>Teor alcoólico °INPM (calculado)</span>
+                              <input
+                                type="text"
+                                value={
+                                  draft.teorAlcoolGasolina
+                                    ? `${draft.teorAlcoolGasolina} °INPM`
+                                    : ''
+                                }
+                                readOnly
+                                disabled={busy}
+                                placeholder="Calculado automaticamente pela densidade a 20 °C"
                               />
                             </label>
                           )}
@@ -1021,22 +1125,38 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                                 </>
                               )}
                             </p>
+                            {alcoholKind === 'ethanol' && (
+                              <p className="fuel-density__formula">
+                                °INPM ≈ −758,31·d² + 882,02·d − 124,99 (d = D20 em g/cm³)
+                              </p>
+                            )}
                             {draft.densidadeFormula && (
                               <p className="fuel-density__calc">{draft.densidadeFormula}</p>
                             )}
                             {draft.densidadeLimitLabel && (
                               <p className="fuel-density__limit">
-                                Limite ANP: {draft.densidadeLimitLabel}
+                                Densidade esperada: {draft.densidadeLimitLabel}
                                 {FUEL_DENSITY_LIMITS_KG_M3[product.key]?.reference
                                   ? ` (${FUEL_DENSITY_LIMITS_KG_M3[product.key]?.reference})`
                                   : ''}
+                              </p>
+                            )}
+                            {alcoholKind === 'gasoline' && (
+                              <p className="fuel-density__limit">
+                                Teor alcoólico esperado: {gasolineAlcoholLimitLabel()}
+                              </p>
+                            )}
+                            {alcoholKind === 'ethanol' && (
+                              <p className="fuel-density__limit">
+                                Teor alcoólico esperado: {ethanolAlcoholLimitLabel()}
                               </p>
                             )}
                             {draft.densidadeStatus && (
                               <span
                                 className={`fuel-density__badge fuel-density__badge--${draft.densidadeStatus}`}
                               >
-                                {DENSITY_CONFORMITY_LABELS[draft.densidadeStatus]}
+                                {draft.densidadeStatusLabel ??
+                                  DENSITY_CONFORMITY_LABELS[draft.densidadeStatus]}
                               </span>
                             )}
                             {draft.densidadeStatusReason && (
@@ -1135,10 +1255,10 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
 
       {!formOpen && (
         <section className="fuel-panel">
-          <h2>Lançamento vigente</h2>
+          <h2>Últimos lançamentos</h2>
           <p className="fuel-panel__hint">
-            Não é possível editar nem apagar planilhas já lançadas. Um novo lançamento completo substitui
-            o anterior na página pública.
+            Não é possível editar nem apagar. Cada lançamento pode ter um ou vários produtos. Na
+            página pública, cada combustível mostra o RAQ mais recente daquele produto.
           </p>
           {!latestReport ? (
             <p className="reg-doc-card__empty">Nenhum relatório lançado ainda.</p>
@@ -1306,7 +1426,13 @@ function ReportDetailsModal({
                 </strong>
               </p>
             )}
-            {item.teor_alcool_gasolina && <p>Teor de álcool: {item.teor_alcool_gasolina}</p>}
+            {item.teor_alcool_gasolina && (
+              <p>
+                {item.product_key.startsWith('etanol-')
+                  ? `Teor alcoólico: ${item.teor_alcool_gasolina} °INPM`
+                  : `Teor de álcool: ${item.teor_alcool_gasolina}%`}
+              </p>
+            )}
             <p>
               Foto em:{' '}
               {item.photo_captured_at ? formatDateTimePtBr(item.photo_captured_at) : '—'}
