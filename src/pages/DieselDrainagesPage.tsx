@@ -8,7 +8,6 @@ import {
   type DrainageSchedule,
 } from '../config/diesel-drainages'
 import { formatDateTimePtBr } from '../config/fuel-analyses'
-import { formatCpf, validateCpf } from '../config/work-safety'
 import {
   createDieselTank,
   deleteDieselTank,
@@ -46,7 +45,10 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
 
   const [tankId, setTankId] = useState('')
   const [operatorName, setOperatorName] = useState('')
-  const [operatorCpf, setOperatorCpf] = useState('')
+  const [waterPresent, setWaterPresent] = useState<boolean | null>(null)
+  const [impuritiesPresent, setImpuritiesPresent] = useState<boolean | null>(null)
+  const [drainedVolumeLiters, setDrainedVolumeLiters] = useState('')
+  const [measureTaken, setMeasureTaken] = useState('')
   const [observations, setObservations] = useState('')
   const [residuesConfirmed, setResiduesConfirmed] = useState(false)
   const [signatureBlob, setSignatureBlob] = useState<Blob | null>(null)
@@ -192,7 +194,10 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
 
   function resetDrainageForm() {
     setOperatorName('')
-    setOperatorCpf('')
+    setWaterPresent(null)
+    setImpuritiesPresent(null)
+    setDrainedVolumeLiters('')
+    setMeasureTaken('')
     setObservations('')
     setResiduesConfirmed(false)
     setSignatureBlob(null)
@@ -213,9 +218,22 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
       setFormError('Informe o nome completo do operador.')
       return
     }
-    const cpfError = validateCpf(operatorCpf)
-    if (cpfError) {
-      setFormError(cpfError)
+    if (waterPresent === null) {
+      setFormError('Informe se houve presença de água.')
+      return
+    }
+    if (impuritiesPresent === null) {
+      setFormError('Informe se houve presença de impurezas.')
+      return
+    }
+
+    const volume = Number(drainedVolumeLiters.replace(',', '.'))
+    if (!drainedVolumeLiters.trim() || Number.isNaN(volume) || volume < 0) {
+      setFormError('Informe a quantidade drenada em litros (número válido).')
+      return
+    }
+    if (!measureTaken.trim()) {
+      setFormError('Informe a medida adotada.')
       return
     }
     if (!residuesConfirmed) {
@@ -237,9 +255,12 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
         tankId,
         drainedAt,
         operatorFullName: operatorName,
-        operatorCpf,
         observations,
         residuesConfirmed,
+        waterPresent,
+        impuritiesPresent,
+        drainedVolumeLiters: volume,
+        measureTaken,
         signatureBlob,
       })
       setReports((current) => [saved, ...current])
@@ -429,15 +450,83 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
                     required
                   />
                 </label>
+              </div>
 
+              <div className="diesel-fields">
+                <fieldset className="diesel-yesno">
+                  <legend>Presença de água? *</legend>
+                  <label className="diesel-yesno__option">
+                    <input
+                      type="radio"
+                      name="water-present"
+                      checked={waterPresent === true}
+                      onChange={() => setWaterPresent(true)}
+                      disabled={busy}
+                    />
+                    <span>Sim</span>
+                  </label>
+                  <label className="diesel-yesno__option">
+                    <input
+                      type="radio"
+                      name="water-present"
+                      checked={waterPresent === false}
+                      onChange={() => setWaterPresent(false)}
+                      disabled={busy}
+                    />
+                    <span>Não</span>
+                  </label>
+                </fieldset>
+
+                <fieldset className="diesel-yesno">
+                  <legend>Presença de impurezas? *</legend>
+                  <label className="diesel-yesno__option">
+                    <input
+                      type="radio"
+                      name="impurities-present"
+                      checked={impuritiesPresent === true}
+                      onChange={() => setImpuritiesPresent(true)}
+                      disabled={busy}
+                    />
+                    <span>Sim</span>
+                  </label>
+                  <label className="diesel-yesno__option">
+                    <input
+                      type="radio"
+                      name="impurities-present"
+                      checked={impuritiesPresent === false}
+                      onChange={() => setImpuritiesPresent(false)}
+                      disabled={busy}
+                    />
+                    <span>Não</span>
+                  </label>
+                </fieldset>
+              </div>
+
+              <div className="diesel-fields">
                 <label className="reg-doc-form__field">
-                  <span>CPF do operador *</span>
+                  <span>Quantidade drenada (em litros) *</span>
                   <input
-                    type="text"
-                    value={operatorCpf}
-                    onChange={(event) => setOperatorCpf(formatCpf(event.target.value))}
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    value={drainedVolumeLiters}
+                    onChange={(event) => setDrainedVolumeLiters(event.target.value)}
                     disabled={busy}
                     required
+                    placeholder="Ex.: 12,5"
+                  />
+                </label>
+
+                <label className="reg-doc-form__field">
+                  <span>Medida adotada *</span>
+                  <input
+                    type="text"
+                    value={measureTaken}
+                    onChange={(event) => setMeasureTaken(event.target.value)}
+                    disabled={busy}
+                    required
+                    placeholder="Descreva a medida adotada"
                   />
                 </label>
               </div>
@@ -505,7 +594,13 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
                     Tanque: {report.tank?.name ?? 'Tanque removido'} · Operador{' '}
                     {report.operator_full_name}
                   </p>
-                  <p>CPF {formatCpf(report.operator_cpf)}</p>
+                  {report.drained_volume_liters != null && (
+                    <p>
+                      Volume: {formatLiters(report.drained_volume_liters)} · Água:{' '}
+                      {formatYesNo(report.water_present)} · Impurezas:{' '}
+                      {formatYesNo(report.impurities_present)}
+                    </p>
+                  )}
                   {schedule?.dueDate && schedule.status === 'ok' && (
                     <p className="diesel-history__next">
                       Próxima até {formatDateKeyPtBr(schedule.dueDate)}
@@ -542,6 +637,19 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
       />
     </div>
   )
+}
+
+function formatYesNo(value: boolean | null | undefined) {
+  if (value === true) return 'Sim'
+  if (value === false) return 'Não'
+  return '—'
+}
+
+function formatLiters(value: number) {
+  return `${new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value)} L`
 }
 
 function DrainageAlertBanner({ schedule }: { schedule: DrainageSchedule }) {
@@ -604,9 +712,27 @@ function DrainageDetailsModal({
           </div>
           <div>
             <dt>Operador</dt>
+            <dd>{report.operator_full_name}</dd>
+          </div>
+          <div>
+            <dt>Presença de água</dt>
+            <dd>{formatYesNo(report.water_present)}</dd>
+          </div>
+          <div>
+            <dt>Presença de impurezas</dt>
+            <dd>{formatYesNo(report.impurities_present)}</dd>
+          </div>
+          <div>
+            <dt>Quantidade drenada</dt>
             <dd>
-              {report.operator_full_name} · CPF {formatCpf(report.operator_cpf)}
+              {report.drained_volume_liters != null
+                ? formatLiters(report.drained_volume_liters)
+                : '—'}
             </dd>
+          </div>
+          <div>
+            <dt>Medida adotada</dt>
+            <dd>{report.measure_taken || '—'}</dd>
           </div>
           <div>
             <dt>Confirmação de resíduos/pureza</dt>

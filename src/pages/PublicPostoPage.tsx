@@ -3,7 +3,6 @@ import {
   FUEL_PRODUCT_LABELS,
   formatCnpj,
   formatCoords,
-  formatCpf,
   formatDateTimePtBr,
   type FuelProductKey,
 } from '../config/fuel-analyses'
@@ -15,6 +14,11 @@ import {
   uniqueProductsFromBoard,
   type PublicPostoBoard,
 } from '../lib/public-posto'
+import {
+  buildRaqPdfFileName,
+  generateRaqPrintPdf,
+  openRaqPdfForPrint,
+} from '../lib/raq-print-report'
 import './PublicPostoPage.css'
 
 type PublicPostoPageProps = {
@@ -26,6 +30,8 @@ export default function PublicPostoPage({ slug }: PublicPostoPageProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [productFilter, setProductFilter] = useState<FuelProductKey | 'all'>('all')
+  const [printing, setPrinting] = useState(false)
+  const [printError, setPrintError] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -68,6 +74,29 @@ export default function PublicPostoPage({ slug }: PublicPostoPageProps) {
     if (productFilter === 'all') return board.analysis_items
     return board.analysis_items.filter((item) => item.product_key === productFilter)
   }, [board, productFilter])
+
+  async function handlePrintRaq() {
+    if (!board?.report) return
+    if (!filteredRaq.length && !filteredAnalysis.length) return
+
+    setPrinting(true)
+    setPrintError(null)
+
+    try {
+      const payload = {
+        posto: board.posto,
+        report: board.report,
+        raq_items: filteredRaq,
+        analysis_items: filteredAnalysis,
+      }
+      const bytes = await generateRaqPrintPdf(payload)
+      await openRaqPdfForPrint(bytes, buildRaqPdfFileName(payload))
+    } catch {
+      setPrintError('Não foi possível gerar o PDF do RAQ. Tente novamente.')
+    } finally {
+      setPrinting(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -126,12 +155,27 @@ export default function PublicPostoPage({ slug }: PublicPostoPageProps) {
               <h2>Análises de Combustíveis</h2>
               <p>Registro das Análises da Qualidade (RAQ)</p>
             </div>
-            {board.report && (
-              <p className="public-posto__stamp">
-                {formatDateTimePtBr(board.report.submitted_at)}
-              </p>
-            )}
+            <div className="public-posto__section-actions">
+              {board.report && (
+                <p className="public-posto__stamp">
+                  {formatDateTimePtBr(board.report.submitted_at)}
+                </p>
+              )}
+              {board.report &&
+                (board.raq_items.length > 0 || board.analysis_items.length > 0) && (
+                  <button
+                    type="button"
+                    className="public-posto__print-btn"
+                    onClick={handlePrintRaq}
+                    disabled={printing || (!filteredRaq.length && !filteredAnalysis.length)}
+                  >
+                    {printing ? 'Gerando PDF...' : 'Imprimir RAQ'}
+                  </button>
+                )}
+            </div>
           </div>
+
+          {printError && <p className="public-posto__error">{printError}</p>}
 
           {!board.report || (board.raq_items.length === 0 && board.analysis_items.length === 0) ? (
             <div className="public-posto__empty">
@@ -206,8 +250,7 @@ export default function PublicPostoPage({ slug }: PublicPostoPageProps) {
               </div>
 
               <p className="public-posto__author">
-                Responsável: {board.report.author_full_name} · CPF{' '}
-                {formatCpf(board.report.author_cpf)}
+                Responsável: {board.report.author_full_name}
               </p>
             </>
           )}

@@ -4,13 +4,11 @@ import {
   FUEL_PRODUCTS,
   formatCnpj,
   formatCoords,
-  formatCpf,
   formatDateTimePtBr,
   FUEL_PRODUCT_LABELS,
   isPdfOrImageFile,
   productAlcoholKind,
   productHasAlcoholContent,
-  validateCpf,
   validateDistributorCnpj,
   validateTransporterCnpj,
   type FuelProductKey,
@@ -215,7 +213,6 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
   const [openRaq, setOpenRaq] = useState<FuelProductKey | null>(null)
   const [openAnalysis, setOpenAnalysis] = useState<FuelProductKey | null>(null)
   const [authorName, setAuthorName] = useState('')
-  const [authorCpf, setAuthorCpf] = useState('')
   const [signatureBlob, setSignatureBlob] = useState<Blob | null>(null)
   const [submittedAtPreview, setSubmittedAtPreview] = useState(() => new Date().toISOString())
   const [viewReport, setViewReport] = useState<FuelAnalysisReport | null>(null)
@@ -342,7 +339,6 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
     setOpenRaq(null)
     setOpenAnalysis(null)
     setAuthorName('')
-    setAuthorCpf('')
     setSignatureBlob(null)
     setFormError(null)
     setSubmittedAtPreview(new Date().toISOString())
@@ -507,8 +503,6 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
     }
 
     if (!authorName.trim()) return 'Informe o nome completo de quem está lançando o relatório.'
-    const cpfError = validateCpf(authorCpf)
-    if (cpfError) return cpfError
     if (!signatureBlob) return 'Assine no campo em branco antes de lançar o relatório.'
     return null
   }
@@ -576,7 +570,6 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
         cnpj: posto.cnpj,
         endereco: endereco.trim(),
         authorFullName: authorName,
-        authorCpf,
         signatureBlob: signatureBlob!,
         submittedAt,
         raqItems,
@@ -1218,16 +1211,6 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                   required
                 />
               </label>
-              <label className="reg-doc-form__field">
-                <span>CPF *</span>
-                <input
-                  type="text"
-                  value={authorCpf}
-                  onChange={(event) => setAuthorCpf(formatCpf(event.target.value))}
-                  disabled={busy}
-                  required
-                />
-              </label>
             </div>
             <label className="reg-doc-form__field">
               <span>Assinatura *</span>
@@ -1268,7 +1251,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                 <span className="fuel-history__badge">Vigente</span>
                 <h3>{formatDateTimePtBr(latestReport.submitted_at)}</h3>
                 <p>
-                  {latestReport.author_full_name} · CPF {formatCpf(latestReport.author_cpf)}
+                  {latestReport.author_full_name}
                 </p>
                 <p>
                   {latestReport.raq_items.length} produto(s) · {latestReport.endereco}
@@ -1295,7 +1278,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                     <div>
                       <h3>{formatDateTimePtBr(report.submitted_at)}</h3>
                       <p>
-                        {report.author_full_name} · CPF {formatCpf(report.author_cpf)}
+                        {report.author_full_name}
                       </p>
                       <p>
                         {report.raq_items.length} produto(s) · {report.endereco}
@@ -1378,7 +1361,7 @@ function ReportDetailsModal({
           <div>
             <dt>Responsável</dt>
             <dd>
-              {report.author_full_name} · {formatCpf(report.author_cpf)}
+              {report.author_full_name}
             </dd>
           </div>
         </dl>

@@ -1,5 +1,4 @@
 import { DIESEL_DRAINAGES_STORAGE_BUCKET } from '../config/diesel-drainages'
-import { stripCpf } from '../config/work-safety'
 import { getMyPostoId } from './regulatory-documents'
 import { supabase } from './supabase'
 
@@ -19,9 +18,13 @@ export type DieselDrainageReport = {
   tank_id: string
   drained_at: string
   operator_full_name: string
-  operator_cpf: string
+  operator_cpf: string | null
   observations: string | null
   residues_confirmed: boolean
+  water_present: boolean | null
+  impurities_present: boolean | null
+  drained_volume_liters: number | null
+  measure_taken: string | null
   signature_storage_path: string
   created_at: string
   tank?: DieselTank | null
@@ -32,9 +35,12 @@ export type SaveDieselDrainageInput = {
   tankId: string
   drainedAt: string
   operatorFullName: string
-  operatorCpf: string
   observations: string
   residuesConfirmed: boolean
+  waterPresent: boolean
+  impuritiesPresent: boolean
+  drainedVolumeLiters: number
+  measureTaken: string
   signatureBlob: Blob
 }
 
@@ -140,9 +146,13 @@ export async function saveDieselDrainageReport(input: SaveDieselDrainageInput) {
       tank_id: input.tankId,
       drained_at: input.drainedAt,
       operator_full_name: input.operatorFullName.trim(),
-      operator_cpf: stripCpf(input.operatorCpf),
+      operator_cpf: null,
       observations: input.observations.trim() || null,
       residues_confirmed: true,
+      water_present: input.waterPresent,
+      impurities_present: input.impuritiesPresent,
+      drained_volume_liters: input.drainedVolumeLiters,
+      measure_taken: input.measureTaken.trim(),
       signature_storage_path: signaturePath,
     })
     .select('*, tank:diesel_tanks(*)')

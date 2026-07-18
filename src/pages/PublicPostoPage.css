@@ -155,6 +155,40 @@
   text-align: right;
 }
 
+.public-posto__section-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.55rem;
+  flex-shrink: 0;
+}
+
+.public-posto__print-btn {
+  appearance: none;
+  border: none;
+  border-radius: 10px;
+  padding: 0.55rem 0.95rem;
+  background: var(--blue-dark);
+  color: var(--white);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 8px 18px -12px rgba(8, 37, 82, 0.7);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.public-posto__print-btn:hover:not(:disabled) {
+  background: #0a3268;
+  transform: translateY(-1px);
+}
+
+.public-posto__print-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .public-posto__section h3 {
   margin: 1.15rem 0 0.7rem;
   font-size: 0.82rem;
@@ -330,8 +364,17 @@
     flex-direction: column;
   }
 
+  .public-posto__section-actions {
+    width: 100%;
+    align-items: stretch;
+  }
+
   .public-posto__stamp {
     text-align: left;
+  }
+
+  .public-posto__print-btn {
+    width: 100%;
   }
 
   .public-posto__item dl div {

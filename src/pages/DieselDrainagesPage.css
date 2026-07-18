@@ -144,6 +144,8 @@
 }
 
 .diesel-fields select,
+.diesel-fields input[type='text'],
+.diesel-fields input[type='number'],
 .diesel-observations {
   width: 100%;
   padding: 0.6rem 0.75rem;
@@ -157,6 +159,38 @@
 .diesel-observations {
   resize: vertical;
   min-height: 96px;
+}
+
+.diesel-yesno {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 12px;
+  background: rgba(61, 143, 212, 0.03);
+}
+
+.diesel-yesno legend {
+  padding: 0 0.25rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--gray-600);
+}
+
+.diesel-yesno__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-right: 1.1rem;
+  margin-top: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--blue-dark);
+  cursor: pointer;
+}
+
+.diesel-yesno__option input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--blue-dark);
 }
 
 .diesel-check {
@@ -244,10 +278,6 @@
 @media (min-width: 720px) {
   .diesel-fields {
     grid-template-columns: 1fr 1fr;
-  }
-
-  .diesel-fields .reg-doc-form__field:first-child {
-    grid-column: 1 / -1;
   }
 }
 

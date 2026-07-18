@@ -3,7 +3,6 @@ import {
   type FuelProductKey,
 } from '../config/fuel-analyses'
 import { cnpjDigits } from './cnpj'
-import { stripCpf } from '../config/work-safety'
 import { supabase } from './supabase'
 
 export type PostoProfile = {
@@ -58,7 +57,7 @@ export type FuelAnalysisReport = {
   cnpj: string
   endereco: string
   author_full_name: string
-  author_cpf: string
+  author_cpf: string | null
   signature_storage_path: string
   submitted_at: string
   created_at: string
@@ -104,7 +103,6 @@ export type SaveFuelAnalysisReportInput = {
   cnpj: string
   endereco: string
   authorFullName: string
-  authorCpf: string
   signatureBlob: Blob
   submittedAt: string
   raqItems: RaqItemInput[]
@@ -304,7 +302,7 @@ export async function saveFuelAnalysisReport(input: SaveFuelAnalysisReportInput)
       cnpj: cnpjDigits(input.cnpj),
       endereco: input.endereco.trim(),
       author_full_name: input.authorFullName.trim(),
-      author_cpf: stripCpf(input.authorCpf),
+      author_cpf: null,
       signature_storage_path: signaturePath,
       submitted_at: input.submittedAt,
     })
