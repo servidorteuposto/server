@@ -6,6 +6,7 @@ import DieselDrainagesPage from '../pages/DieselDrainagesPage'
 import FuelAnalysesPage from '../pages/FuelAnalysesPage'
 import ModulePage from '../pages/ModulePage'
 import RegulatoryDocumentsPage from '../pages/RegulatoryDocumentsPage'
+import SettingsPage from '../pages/SettingsPage'
 import WorkSafetyPage from '../pages/WorkSafetyPage'
 import { supabase } from '../lib/supabase'
 import './AppShell.css'
@@ -102,6 +103,8 @@ export default function AppShell({ user, isReadOnly, isAdmin }: AppShellProps) {
               <FuelAnalysesPage isReadOnly={isReadOnly} />
             ) : activeMenuId === 'relatorios-drenagens-diesel' ? (
               <DieselDrainagesPage isReadOnly={isReadOnly} />
+            ) : activeMenuId === 'configuracoes' ? (
+              <SettingsPage isReadOnly={isReadOnly} />
             ) : (
               <ModulePage module={activeModule} isReadOnly={isReadOnly} />
             )}
