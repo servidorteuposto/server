@@ -17,6 +17,19 @@ import {
 import '../pages/RegulatoryDocumentsPage.css'
 import './SettingsPage.css'
 
+function formatPhone(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 11)
+  if (digits.length <= 10) {
+    return digits.replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{4})(\d)/, '$1-$2')
+  }
+  return digits.replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2')
+}
+
+function isValidWhatsappPhone(value: string) {
+  const digits = value.replace(/\D/g, '')
+  return digits.length === 0 || digits.length === 10 || digits.length === 11
+}
+
 type SettingsPageProps = {
   isReadOnly: boolean
 }
@@ -41,6 +54,8 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
   const [uf, setUf] = useState('')
   const [latitude, setLatitude] = useState('')
   const [longitude, setLongitude] = useState('')
+  const [avisoWhatsapp1, setAvisoWhatsapp1] = useState('')
+  const [avisoWhatsapp2, setAvisoWhatsapp2] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [removePhoto, setRemovePhoto] = useState(false)
@@ -57,6 +72,8 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
     setUf(data.uf ?? '')
     setLatitude(data.latitude != null ? String(data.latitude) : '')
     setLongitude(data.longitude != null ? String(data.longitude) : '')
+    setAvisoWhatsapp1(data.aviso_whatsapp_1 ? formatPhone(data.aviso_whatsapp_1) : '')
+    setAvisoWhatsapp2(data.aviso_whatsapp_2 ? formatPhone(data.aviso_whatsapp_2) : '')
     setPhotoFile(null)
     setRemovePhoto(false)
   }, [])
@@ -177,6 +194,11 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
       return
     }
 
+    if (!isValidWhatsappPhone(avisoWhatsapp1) || !isValidWhatsappPhone(avisoWhatsapp2)) {
+      setFormError('Informe telefones de WhatsApp válidos com DDD (10 ou 11 dígitos).')
+      return
+    }
+
     const cepDigits = stripCep(cep)
     if (cepDigits && cepDigits.length !== 8) {
       setFormError('Informe um CEP válido com 8 dígitos.')
@@ -218,6 +240,8 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
         uf,
         latitude: lat,
         longitude: lng,
+        avisoWhatsapp1,
+        avisoWhatsapp2,
         photoFile,
         existingPhotoPath: profile.foto_storage_path,
         removePhoto,
@@ -253,7 +277,7 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
       <header className="reg-docs-page__header settings-page__header">
         <div className="reg-docs-page__header-text">
           <h1>Configurações do Sistema</h1>
-          <p>Dados cadastrais do posto, endereço, foto e localização.</p>
+          <p>Dados cadastrais do posto, contatos de aviso, endereço, foto e localização.</p>
         </div>
       </header>
 
@@ -277,6 +301,40 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
             <input type="text" value={formatCnpj(profile.cnpj)} disabled readOnly />
             <small className="settings-hint">O CNPJ não pode ser alterado após o cadastro.</small>
           </label>
+        </section>
+
+        <section className="settings-section">
+          <h2>Contato de Avisos</h2>
+          <p className="settings-section__hint">
+            Cadastre até 2 números de WhatsApp para receber avisos de documentos perto de vencer e
+            outros alertas do sistema. A integração com a API será conectada em breve.
+          </p>
+          <div className="settings-grid">
+            <label className="reg-doc-form__field">
+              <span>WhatsApp 1</span>
+              <input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={avisoWhatsapp1}
+                onChange={(event) => setAvisoWhatsapp1(formatPhone(event.target.value))}
+                disabled={isReadOnly || busy}
+                placeholder="(00) 00000-0000"
+              />
+            </label>
+            <label className="reg-doc-form__field">
+              <span>WhatsApp 2</span>
+              <input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={avisoWhatsapp2}
+                onChange={(event) => setAvisoWhatsapp2(formatPhone(event.target.value))}
+                disabled={isReadOnly || busy}
+                placeholder="(00) 00000-0000"
+              />
+            </label>
+          </div>
         </section>
 
         <section className="settings-section">

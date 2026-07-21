@@ -25,6 +25,7 @@ import {
 } from '../lib/subscription'
 import { getRememberedIdentifier, setRememberedIdentifier } from '../lib/session'
 import { secureLogin, secureRegister } from '../lib/secure-auth'
+import SupportContactForm from '../components/SupportContactForm'
 import './LoginPage.css'
 
 function FeatureIcon({ color, children }: { color: string; children: ReactNode }) {
@@ -202,7 +203,7 @@ function formatPhone(value: string) {
   return digits.replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2')
 }
 
-type AuthView = 'login' | 'register' | 'forgot-password' | 'payment'
+type AuthView = 'login' | 'register' | 'forgot-password' | 'payment' | 'support'
 
 export default function LoginPage() {
   const [view, setView] = useState<AuthView>('login')
@@ -540,7 +541,9 @@ export default function LoginPage() {
         <main className="login-form-section">
           <div
             className={`login-card ${
-              view === 'register' || view === 'payment' ? 'login-card--register' : ''
+              view === 'register' || view === 'payment' || view === 'support'
+                ? 'login-card--register'
+                : ''
             }`}
           >
             {view === 'login' ? (
@@ -630,6 +633,12 @@ export default function LoginPage() {
                     Cadastre-se
                   </button>
                 </p>
+                <p className="login-card__footer login-card__footer--secondary">
+                  Precisa de ajuda?{' '}
+                  <button type="button" className="login-card__link" onClick={() => switchView('support')}>
+                    Fale com o suporte
+                  </button>
+                </p>
               </>
             ) : view === 'forgot-password' ? (
               <>
@@ -683,6 +692,12 @@ export default function LoginPage() {
                     Voltar para login
                   </button>
                 </p>
+                <p className="login-card__footer login-card__footer--secondary">
+                  Precisa de ajuda?{' '}
+                  <button type="button" className="login-card__link" onClick={() => switchView('support')}>
+                    Fale com o suporte
+                  </button>
+                </p>
               </>
             ) : view === 'payment' ? (
               <>
@@ -717,6 +732,29 @@ export default function LoginPage() {
                     onPixConfirmed={handlePixConfirmed}
                   />
                 )}
+              </>
+            ) : view === 'support' ? (
+              <>
+                <header className="login-card__header">
+                  <h1>Fale com o suporte</h1>
+                  <p>Dúvida, sugestão ou reclamação — anexe prints se precisar</p>
+                </header>
+
+                <SupportContactForm
+                  variant="login"
+                  audience="sem_cadastro"
+                  footer={
+                    <p className="login-card__footer">
+                      <button
+                        type="button"
+                        className="login-card__link"
+                        onClick={() => switchView('login')}
+                      >
+                        Voltar para login
+                      </button>
+                    </p>
+                  }
+                />
               </>
             ) : (
               <>
@@ -882,6 +920,12 @@ export default function LoginPage() {
                   Já tem uma conta?{' '}
                   <button type="button" className="login-card__link" onClick={() => switchView('login')}>
                     Entrar
+                  </button>
+                </p>
+                <p className="login-card__footer login-card__footer--secondary">
+                  Precisa de ajuda?{' '}
+                  <button type="button" className="login-card__link" onClick={() => switchView('support')}>
+                    Fale com o suporte
                   </button>
                 </p>
               </>

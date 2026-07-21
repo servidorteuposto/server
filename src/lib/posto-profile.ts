@@ -25,6 +25,8 @@ export type PostoSettingsProfile = {
   latitude: number | null
   longitude: number | null
   public_slug: string
+  aviso_whatsapp_1: string | null
+  aviso_whatsapp_2: string | null
 }
 
 export type UpdatePostoSettingsInput = {
@@ -39,13 +41,15 @@ export type UpdatePostoSettingsInput = {
   uf: string
   latitude: number | null
   longitude: number | null
+  avisoWhatsapp1: string
+  avisoWhatsapp2: string
   photoFile?: File | null
   existingPhotoPath?: string | null
   removePhoto?: boolean
 }
 
 const PROFILE_SELECT =
-  'id, nome, cnpj, telefone, email, endereco, cep, logradouro, numero, complemento, bairro, cidade, uf, foto_storage_path, latitude, longitude, public_slug'
+  'id, nome, cnpj, telefone, email, endereco, cep, logradouro, numero, complemento, bairro, cidade, uf, foto_storage_path, latitude, longitude, public_slug, aviso_whatsapp_1, aviso_whatsapp_2'
 
 export async function getMyPostoSettings(): Promise<PostoSettingsProfile> {
   const { data, error } = await supabase.from('postos').select(PROFILE_SELECT).maybeSingle()
@@ -142,6 +146,8 @@ export async function updatePostoSettings(input: UpdatePostoSettingsInput) {
       latitude: input.latitude,
       longitude: input.longitude,
       foto_storage_path: fotoPath,
+      aviso_whatsapp_1: input.avisoWhatsapp1.trim() || null,
+      aviso_whatsapp_2: input.avisoWhatsapp2.trim() || null,
     })
     .eq('id', input.postoId)
     .select(PROFILE_SELECT)

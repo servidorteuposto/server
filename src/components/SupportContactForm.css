@@ -1,0 +1,132 @@
+.support-form__input {
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--gray-600);
+  outline: none;
+  transition: border-color 0.2s;
+  background: var(--white);
+  font-family: inherit;
+}
+
+.support-form__input::placeholder {
+  color: var(--gray-400);
+}
+
+.support-form__input:focus {
+  border-color: var(--blue-light);
+}
+
+.support-form select.support-form__input,
+.support-form--app select {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  color: var(--blue-dark);
+  background: var(--white);
+  font-family: inherit;
+}
+
+.support-form__textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--blue-dark);
+  background: var(--white);
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.support-form__textarea:focus {
+  outline: 2px solid rgba(61, 143, 212, 0.35);
+  border-color: var(--blue-light);
+}
+
+.support-form--login .support-form__textarea {
+  margin-top: 0.15rem;
+}
+
+.support-form--app {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.support-form--app .support-form__textarea {
+  margin-top: 0.25rem;
+}
+
+.support-form .form-field__honeypot {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.support-form__success {
+  padding: 0.75rem 1rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  color: #15803d;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.support-form__actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 0.35rem;
+}
+
+.support-form__photos {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.support-form__photos input[type='file'] {
+  width: 100%;
+  font-size: 0.85rem;
+}
+
+.support-form__preview-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 0.65rem;
+  margin: 0.35rem 0 0;
+  padding: 0;
+}
+
+.support-form__preview-item {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.support-form__preview-item img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--gray-300);
+  background: var(--gray-100);
+}
+
+.support-form__preview-item button {
+  border: none;
+  background: none;
+  color: #b91c1c;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}

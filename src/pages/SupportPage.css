@@ -1,0 +1,9 @@
+.support-page__card {
+  max-width: 640px;
+}
+
+.support-page__loading {
+  margin: 0;
+  color: var(--gray-600);
+  font-size: 0.95rem;
+}

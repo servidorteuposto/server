@@ -69,11 +69,12 @@
 .app-sidebar__nav {
   flex: 1;
   min-height: 0;
-  padding: 0.75rem 0.65rem 1.25rem;
+  padding: 0.75rem 0.65rem 0.5rem;
   overflow: hidden;
 }
 
-.app-sidebar__nav ul {
+.app-sidebar__nav ul,
+.app-sidebar__pinned ul {
   list-style: none;
   display: flex;
   flex-direction: column;
@@ -115,9 +116,18 @@
   opacity: 0.9;
 }
 
-.app-sidebar__footer {
+.app-sidebar__bottom {
   flex-shrink: 0;
   margin-top: auto;
+}
+
+.app-sidebar__pinned {
+  padding: 0.35rem 0.65rem 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-sidebar__footer {
+  flex-shrink: 0;
   padding: 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;

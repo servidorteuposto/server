@@ -65,6 +65,20 @@ const icons: Record<MenuId, (props: IconProps) => ReactNode> = {
       <path d="M7 16h6" />
     </IconBase>
   ),
+  suporte: ({ className }) => (
+    <IconBase className={className}>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </IconBase>
+  ),
+  'painel-suporte': ({ className }) => (
+    <IconBase className={className}>
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+      <path d="M8 7h8" />
+      <path d="M8 11h8" />
+      <path d="M8 15h5" />
+    </IconBase>
+  ),
   configuracoes: ({ className }) => (
     <IconBase className={className}>
       <circle cx="12" cy="12" r="3" />
