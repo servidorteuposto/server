@@ -250,9 +250,9 @@
 .app-shell__mobile-menu {
   display: none;
   position: fixed;
-  top: calc(0.75rem + env(safe-area-inset-top, 0));
-  left: calc(0.75rem + env(safe-area-inset-left, 0));
-  z-index: 10;
+  top: calc(0.75rem + env(safe-area-inset-top, 0px));
+  left: calc(0.75rem + env(safe-area-inset-left, 0px));
+  z-index: 25;
   flex-direction: column;
   justify-content: center;
   gap: 4px;
@@ -275,6 +275,10 @@
   margin: 0 auto;
   background: var(--blue-dark);
   border-radius: 1px;
+}
+
+.app-shell:has(.reg-doc-modal) .app-shell__mobile-menu {
+  display: none !important;
 }
 
 .app-content {

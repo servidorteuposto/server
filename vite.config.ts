@@ -13,7 +13,7 @@ export default defineConfig({
         short_name: 'Teu Posto',
         description: 'Gestão regulatória e operacional do seu posto de combustíveis.',
         theme_color: '#0c3b7a',
-        background_color: '#0c3b7a',
+        background_color: '#ffffff',
         display: 'standalone',
         orientation: 'any',
         start_url: '/',

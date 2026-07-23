@@ -230,6 +230,20 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
           onClick={() => setSidebarOpen(false)}
         />
 
+        {isDrawerLayout && !sidebarOpen && (
+          <button
+            type="button"
+            className="app-shell__mobile-menu"
+            aria-label="Abrir menu"
+            aria-expanded={sidebarOpen}
+            onClick={() => setSidebarOpen(true)}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+        )}
+
         <aside
           className="app-sidebar"
           data-open={!isDrawerLayout || sidebarOpen}
@@ -301,20 +315,6 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
         </aside>
 
         <div className="app-main">
-          {isDrawerLayout && !sidebarOpen && (
-            <button
-              type="button"
-              className="app-shell__mobile-menu"
-              aria-label="Abrir menu"
-              aria-expanded={sidebarOpen}
-              onClick={() => setSidebarOpen(true)}
-            >
-              <span />
-              <span />
-              <span />
-            </button>
-          )}
-
           <main className="app-content" data-home={activeMenuId === null}>
             {renderActivePage()}
           </main>
