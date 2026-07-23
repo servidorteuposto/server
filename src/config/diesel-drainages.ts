@@ -8,6 +8,33 @@ export const DIESEL_DRAINAGE_INTERVAL_DAYS = 7
 
 export const DRAINAGE_TIME_ZONE = 'America/Sao_Paulo'
 
+export type DieselTankTypeKey =
+  | 'diesel-s10-comum'
+  | 'diesel-s10-aditivado'
+  | 'diesel-s500-comum'
+  | 'diesel-s500-aditivado'
+
+export type DieselTankType = {
+  key: DieselTankTypeKey
+  label: string
+}
+
+export const DIESEL_TANK_TYPES: DieselTankType[] = [
+  { key: 'diesel-s10-comum', label: 'S10 Comum' },
+  { key: 'diesel-s10-aditivado', label: 'S10 Aditivado' },
+  { key: 'diesel-s500-comum', label: 'S500 Comum' },
+  { key: 'diesel-s500-aditivado', label: 'S500 Aditivado' },
+]
+
+export const DIESEL_TANK_TYPE_LABELS: Record<DieselTankTypeKey, string> = Object.fromEntries(
+  DIESEL_TANK_TYPES.map((type) => [type.key, type.label]),
+) as Record<DieselTankTypeKey, string>
+
+export function isDieselTankTypeLabel(name: string) {
+  const normalized = name.trim().toLowerCase()
+  return DIESEL_TANK_TYPES.some((type) => type.label.toLowerCase() === normalized)
+}
+
 export type DrainageReminderKind = 'day_before' | 'due_day'
 
 export type DrainageDueStatus = 'ok' | 'day_before' | 'due_today' | 'overdue' | 'never'

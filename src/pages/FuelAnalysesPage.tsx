@@ -5,10 +5,14 @@ import {
   formatCnpj,
   formatCoords,
   formatDateTimePtBr,
+  formatRaqVolumeLabel,
   FUEL_PRODUCT_LABELS,
   isPdfOrImageFile,
+  isRaqVolumePreset,
   productAlcoholKind,
   productHasAlcoholContent,
+  RAQ_VOLUME_CUSTOM_OPTION,
+  RAQ_VOLUME_PRESETS,
   validateDistributorCnpj,
   validateTransporterCnpj,
   type FuelProductKey,
@@ -25,19 +29,18 @@ import {
 } from '../config/fuel-density'
 import SignaturePad from '../components/fuel-analyses/SignaturePad'
 import LiveCameraCapture from '../components/fuel-analyses/LiveCameraCapture'
+import PartnerSuggestField from '../components/fuel-analyses/PartnerSuggestField'
 import {
   getFuelFileUrl,
-  getFuelProductSettings,
   getMyPostoProfile,
   listFuelAnalysisReports,
   saveFuelAnalysisReport,
-  saveFuelProductSettings,
-  updatePostoEndereco,
   type AnalysisItemInput,
   type FuelAnalysisReport,
   type PostoProfile,
   type RaqItemInput,
 } from '../lib/fuel-analyses'
+import { listPartners, type PostoPartner } from '../lib/partners'
 import { buildPublicPostoUrl } from '../config/public-posto'
 import { formatDatePtBr } from '../config/regulatory-documents'
 import QRCode from 'qrcode'
@@ -50,6 +53,7 @@ type FuelAnalysesPageProps = {
 
 type RaqDraft = {
   volumeReceivedLiters: string
+  volumeIsCustom: boolean
   collectionDate: string
   transporterName: string
   transporterCnpj: string
@@ -85,6 +89,7 @@ type AnalysisDraft = {
 function emptyRaq(): RaqDraft {
   return {
     volumeReceivedLiters: '',
+    volumeIsCustom: false,
     collectionDate: '',
     transporterName: '',
     transporterCnpj: '',
@@ -199,9 +204,6 @@ function readGeolocation(): Promise<GeolocationPosition> {
 
 export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) {
   const [posto, setPosto] = useState<PostoProfile | null>(null)
-  const [endereco, setEndereco] = useState('')
-  const [selectedProducts, setSelectedProducts] = useState<FuelProductKey[]>([])
-  const [productsSaved, setProductsSaved] = useState(false)
   const [reports, setReports] = useState<FuelAnalysisReport[]>([])
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState<string | null>(null)
@@ -219,18 +221,14 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [publicUrl, setPublicUrl] = useState<string | null>(null)
   const [showQrPanel, setShowQrPanel] = useState(false)
-  const [showProductsPanel, setShowProductsPanel] = useState(false)
   /** Combustíveis que chegaram neste recebimento (um, vários ou todos). */
   const [launchProductKeys, setLaunchProductKeys] = useState<FuelProductKey[]>([])
-
-  const enabledProducts = useMemo(
-    () => FUEL_PRODUCTS.filter((product) => selectedProducts.includes(product.key)),
-    [selectedProducts],
-  )
+  const [transporters, setTransporters] = useState<PostoPartner[]>([])
+  const [distributors, setDistributors] = useState<PostoPartner[]>([])
 
   const launchProducts = useMemo(
-    () => enabledProducts.filter((product) => launchProductKeys.includes(product.key)),
-    [enabledProducts, launchProductKeys],
+    () => FUEL_PRODUCTS.filter((product) => launchProductKeys.includes(product.key)),
+    [launchProductKeys],
   )
 
   const latestReport = reports[0] ?? null
@@ -242,16 +240,13 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
     try {
       const profile = await getMyPostoProfile()
       setPosto(profile)
-      setEndereco(profile.endereco ?? '')
-      const [products, rows] = await Promise.all([
-        getFuelProductSettings(profile.id),
+      const [rows, partners] = await Promise.all([
         listFuelAnalysisReports(profile.id),
+        listPartners(profile.id),
       ])
-      const managedProducts = products.filter((key) => key !== 'gnv')
-      setSelectedProducts(managedProducts)
-      setProductsSaved(managedProducts.length > 0)
-      setShowProductsPanel(managedProducts.length === 0)
       setReports(rows)
+      setTransporters(partners.filter((partner) => partner.partner_type === 'transporter'))
+      setDistributors(partners.filter((partner) => partner.partner_type === 'distributor'))
     } catch {
       setPageError('Não foi possível carregar Análises de Combustíveis.')
     } finally {
@@ -299,40 +294,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
     return () => window.clearInterval(timer)
   }, [formOpen])
 
-  function toggleProduct(key: FuelProductKey) {
-    setSelectedProducts((current) =>
-      current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
-    )
-  }
-
-  async function handleSaveProducts() {
-    if (!posto || isReadOnly) return
-    if (!selectedProducts.length) {
-      setPageError('Selecione pelo menos um produto gerenciado pelo posto.')
-      return
-    }
-    setBusy(true)
-    setPageError(null)
-    try {
-      await saveFuelProductSettings(posto.id, selectedProducts)
-      if (endereco.trim() && endereco.trim() !== (posto.endereco ?? '')) {
-        await updatePostoEndereco(posto.id, endereco.trim())
-        setPosto({ ...posto, endereco: endereco.trim() })
-      }
-      setProductsSaved(true)
-      setShowProductsPanel(false)
-    } catch {
-      setPageError('Não foi possível salvar os produtos do posto.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
   function openForm() {
-    if (!enabledProducts.length) {
-      setPageError('Selecione e salve os produtos gerenciados antes de incluir um RAQ.')
-      return
-    }
     setLaunchProductKeys([])
     setRaqDrafts({})
     setAnalysisDrafts({})
@@ -343,8 +305,18 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
     setFormError(null)
     setSubmittedAtPreview(new Date().toISOString())
     setShowQrPanel(false)
-    setShowProductsPanel(false)
     setFormOpen(true)
+
+    if (posto?.id) {
+      void listPartners(posto.id)
+        .then((partners) => {
+          setTransporters(partners.filter((partner) => partner.partner_type === 'transporter'))
+          setDistributors(partners.filter((partner) => partner.partner_type === 'distributor'))
+        })
+        .catch(() => {
+          /* mantém a lista já carregada */
+        })
+    }
   }
 
   function toggleLaunchProduct(key: FuelProductKey) {
@@ -450,7 +422,9 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
   }
 
   function validateForm(): string | null {
-    if (!endereco.trim()) return 'Informe o endereço do posto revendedor.'
+    if (!posto?.endereco?.trim()) {
+      return 'Cadastre o endereço do posto em Configurações do Sistema antes de lançar o RAQ.'
+    }
     if (!launchProductKeys.length) {
       return 'Selecione pelo menos um combustível que chegou neste recebimento.'
     }
@@ -459,6 +433,10 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
       const raq = raqDrafts[product.key] ?? emptyRaq()
       if (!raq.volumeReceivedLiters.trim()) {
         return `${product.label}: informe o volume recebido.`
+      }
+      const volumeNumber = Number(raq.volumeReceivedLiters.replace(/\./g, '').replace(',', '.'))
+      if (Number.isNaN(volumeNumber) || volumeNumber <= 0) {
+        return `${product.label}: informe um volume válido em litros.`
       }
       if (!raq.collectionDate) return `${product.label}: informe a data da coleta.`
       if (!raq.transporterName.trim()) return `${product.label}: informe o transportador.`
@@ -522,10 +500,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
     const submittedAt = new Date().toISOString()
 
     try {
-      if (endereco.trim() !== (posto.endereco ?? '')) {
-        await updatePostoEndereco(posto.id, endereco.trim())
-        setPosto({ ...posto, endereco: endereco.trim() })
-      }
+      const reportEndereco = posto.endereco!.trim()
 
       const raqItems: RaqItemInput[] = launchProducts.map((product) => {
         const draft = raqDrafts[product.key] ?? emptyRaq()
@@ -568,7 +543,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
         postoId: posto.id,
         razaoSocial: posto.nome,
         cnpj: posto.cnpj,
-        endereco: endereco.trim(),
+        endereco: reportEndereco,
         authorFullName: authorName,
         signatureBlob: signatureBlob!,
         submittedAt,
@@ -600,35 +575,20 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
           <h1>Análises de Combustíveis</h1>
           <p>
             Lançamentos são imutáveis. Em cada RAQ, marque só os combustíveis que chegaram. Se depois
-            vier só etanol, lance só ele — na página pública atualiza aquele produto e os outros
+            vier só etanol, lance só ele. Na página pública atualiza aquele produto e os outros
             permanecem com os dados anteriores.
           </p>
         </div>
         {!formOpen && (
           <div className="fuel-header-actions">
-            {!isReadOnly && (
-              <button
-                type="button"
-                className={`reg-docs-page__add-btn fuel-header-actions__btn${showProductsPanel ? ' is-active' : ''}`}
-                onClick={() => {
-                  setShowProductsPanel((open) => !open)
-                  setShowQrPanel(false)
-                }}
-              >
-                Produtos
-              </button>
-            )}
             <button
               type="button"
               className={`reg-docs-page__add-btn fuel-header-actions__btn fuel-header-actions__btn--ghost${showQrPanel ? ' is-active' : ''}`}
-              onClick={() => {
-                setShowQrPanel((open) => !open)
-                setShowProductsPanel(false)
-              }}
+              onClick={() => setShowQrPanel((open) => !open)}
             >
               QR Code
             </button>
-            {!isReadOnly && productsSaved && (
+            {!isReadOnly && (
               <button type="button" className="reg-docs-page__add-btn" onClick={openForm}>
                 Incluir RAQ
               </button>
@@ -639,68 +599,46 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
 
       {pageError && <p className="reg-doc-form__error reg-docs-page__banner">{pageError}</p>}
 
-      {!productsSaved && !showProductsPanel && !formOpen && !isReadOnly && (
-        <p className="fuel-setup-hint">
-          Configure os produtos gerenciados pelo posto antes de lançar o primeiro RAQ.
-        </p>
-      )}
-
-      <section className="fuel-panel">
-        <h2>Registro das Análises da Qualidade — RAQ</h2>
-        <dl className="fuel-company">
-          <div>
-            <dt>Razão Social</dt>
-            <dd>{posto.nome}</dd>
-          </div>
-          <div>
-            <dt>CNPJ do Posto Revendedor</dt>
-            <dd>{formatCnpj(posto.cnpj)}</dd>
-          </div>
-          <div>
-            <dt>Endereço</dt>
-            <dd>
-              {isReadOnly || formOpen ? (
-                endereco.trim() || '—'
-              ) : (
-                <input
-                  type="text"
-                  value={endereco}
-                  onChange={(event) => setEndereco(event.target.value)}
-                  placeholder="Endereço completo do posto"
-                  disabled={busy}
-                />
-              )}
-            </dd>
-          </div>
-        </dl>
-      </section>
-
       {showQrPanel && (
-        <section className="fuel-panel">
-          <div className="fuel-panel__header">
-            <div>
-              <h2>QR Code público do posto</h2>
-              <p>Imprima e deixe no posto. Clientes escaneiam e veem o último RAQ em tempo real.</p>
-            </div>
-            <button
-              type="button"
-              className="btn btn--secondary"
-              onClick={() => setShowQrPanel(false)}
-            >
-              Fechar
-            </button>
-          </div>
-          <div className="fuel-qr">
-            {qrDataUrl ? (
-              <img src={qrDataUrl} alt="QR Code da página pública do posto" className="fuel-qr__image" />
-            ) : (
-              <p className="reg-doc-card__empty">Gerando QR Code...</p>
-            )}
-            <div className="fuel-qr__meta">
-              {publicUrl && (
-                <>
-                  <p className="fuel-qr__url">{publicUrl}</p>
-                  <div className="reg-doc-card__actions">
+        <div
+          className="reg-doc-modal"
+          role="presentation"
+          onClick={() => setShowQrPanel(false)}
+        >
+          <div
+            className="reg-doc-modal__dialog fuel-qr-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fuel-qr-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="reg-doc-modal__header">
+              <h2 id="fuel-qr-title">QR Code do posto</h2>
+              <button
+                type="button"
+                className="reg-doc-modal__close"
+                onClick={() => setShowQrPanel(false)}
+                aria-label="Fechar"
+              >
+                ×
+              </button>
+            </header>
+            <p className="fuel-qr-modal__hint">
+              Imprima e deixe no posto. Clientes escaneiam e veem o último RAQ.
+            </p>
+            <div className="fuel-qr-modal__body">
+              {qrDataUrl ? (
+                <img
+                  src={qrDataUrl}
+                  alt="QR Code da página pública do posto"
+                  className="fuel-qr-modal__image"
+                />
+              ) : (
+                <p className="reg-doc-card__empty">Gerando QR Code...</p>
+              )}
+              <div className="fuel-qr-modal__actions">
+                {publicUrl && (
+                  <>
                     <button
                       type="button"
                       className="btn btn--secondary"
@@ -716,65 +654,22 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                         if (!qrDataUrl) event.preventDefault()
                       }}
                     >
-                      Baixar QR Code
+                      Baixar QR
                     </a>
-                    <a className="btn btn--secondary" href={publicUrl} target="_blank" rel="noreferrer">
-                      Abrir página pública
+                    <a
+                      className="btn btn--secondary"
+                      href={publicUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Abrir página
                     </a>
-                  </div>
-                </>
-              )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </section>
-      )}
-
-      {showProductsPanel && (
-        <section className="fuel-panel">
-          <div className="fuel-panel__header">
-            <div>
-              <h2>Produtos gerenciados</h2>
-              <p>Selecione os produtos do posto. Depois disso, só abra de novo se precisar alterar.</p>
-            </div>
-            <div className="fuel-panel__header-actions">
-              {!isReadOnly && (
-                <button
-                  type="button"
-                  className="btn btn--primary"
-                  onClick={handleSaveProducts}
-                  disabled={busy}
-                >
-                  Salvar produtos
-                </button>
-              )}
-              <button
-                type="button"
-                className="btn btn--secondary"
-                onClick={() => setShowProductsPanel(false)}
-                disabled={busy}
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-
-          <div className="fuel-products">
-            {FUEL_PRODUCTS.map((product) => {
-              const checked = selectedProducts.includes(product.key)
-              return (
-                <label key={product.key} className={`fuel-products__item${checked ? ' is-active' : ''}`}>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleProduct(product.key)}
-                    disabled={isReadOnly || busy}
-                  />
-                  <span>{product.label}</span>
-                </label>
-              )
-            })}
-          </div>
-        </section>
+        </div>
       )}
 
       {formOpen && (
@@ -786,7 +681,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
               mantêm o RAQ anterior na página pública.
             </p>
             <div className="fuel-products">
-              {enabledProducts.map((product) => {
+              {FUEL_PRODUCTS.map((product) => {
                 const checked = launchProductKeys.includes(product.key)
                 return (
                   <label
@@ -827,17 +722,61 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                         <div className="fuel-fields">
                           <label className="reg-doc-form__field">
                             <span>Volume recebido (litros) *</span>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={draft.volumeReceivedLiters}
-                              onChange={(event) =>
-                                updateRaq(product.key, { volumeReceivedLiters: event.target.value })
+                            <select
+                              value={
+                                draft.volumeIsCustom
+                                  ? RAQ_VOLUME_CUSTOM_OPTION
+                                  : draft.volumeReceivedLiters
                               }
+                              onChange={(event) => {
+                                const value = event.target.value
+                                if (value === RAQ_VOLUME_CUSTOM_OPTION) {
+                                  updateRaq(product.key, {
+                                    volumeIsCustom: true,
+                                    volumeReceivedLiters: isRaqVolumePreset(draft.volumeReceivedLiters)
+                                      ? ''
+                                      : draft.volumeReceivedLiters,
+                                  })
+                                  return
+                                }
+                                updateRaq(product.key, {
+                                  volumeIsCustom: false,
+                                  volumeReceivedLiters: value,
+                                })
+                              }}
                               disabled={busy}
-                              required
-                            />
+                              required={!draft.volumeIsCustom}
+                            >
+                              <option value="">Selecione o volume</option>
+                              {RAQ_VOLUME_PRESETS.map((liters) => (
+                                <option key={liters} value={String(liters)}>
+                                  {formatRaqVolumeLabel(liters)}
+                                </option>
+                              ))}
+                              <option value={RAQ_VOLUME_CUSTOM_OPTION}>Outro (digitar)</option>
+                            </select>
                           </label>
+                          {draft.volumeIsCustom && (
+                            <label className="reg-doc-form__field">
+                              <span>Informe o volume (litros) *</span>
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                min="1"
+                                step="1"
+                                value={draft.volumeReceivedLiters}
+                                onChange={(event) =>
+                                  updateRaq(product.key, {
+                                    volumeIsCustom: true,
+                                    volumeReceivedLiters: event.target.value,
+                                  })
+                                }
+                                disabled={busy}
+                                required
+                                placeholder="Ex.: 3500"
+                              />
+                            </label>
+                          )}
                           <label className="reg-doc-form__field">
                             <span>Data da coleta *</span>
                             <input
@@ -850,32 +789,40 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                               required
                             />
                           </label>
-                          <label className="reg-doc-form__field">
-                            <span>Transportador *</span>
-                            <input
-                              type="text"
-                              value={draft.transporterName}
-                              onChange={(event) =>
-                                updateRaq(product.key, { transporterName: event.target.value })
-                              }
-                              disabled={busy}
-                              required
-                            />
-                          </label>
-                          <label className="reg-doc-form__field">
-                            <span>CNPJ do Transportador *</span>
-                            <input
-                              type="text"
-                              value={draft.transporterCnpj}
-                              onChange={(event) =>
-                                updateRaq(product.key, {
-                                  transporterCnpj: formatCnpj(event.target.value),
-                                })
-                              }
-                              disabled={busy}
-                              required
-                            />
-                          </label>
+                          <PartnerSuggestField
+                            label="Transportador *"
+                            mode="name"
+                            value={draft.transporterName}
+                            partners={transporters}
+                            disabled={busy}
+                            required
+                            onChange={(value) =>
+                              updateRaq(product.key, { transporterName: value })
+                            }
+                            onSelect={(partner) =>
+                              updateRaq(product.key, {
+                                transporterName: partner.razao_social,
+                                transporterCnpj: formatCnpj(partner.cnpj),
+                              })
+                            }
+                          />
+                          <PartnerSuggestField
+                            label="CNPJ do Transportador *"
+                            mode="cnpj"
+                            value={draft.transporterCnpj}
+                            partners={transporters}
+                            disabled={busy}
+                            required
+                            onChange={(value) =>
+                              updateRaq(product.key, { transporterCnpj: value })
+                            }
+                            onSelect={(partner) =>
+                              updateRaq(product.key, {
+                                transporterName: partner.razao_social,
+                                transporterCnpj: formatCnpj(partner.cnpj),
+                              })
+                            }
+                          />
                           <label className="reg-doc-form__field">
                             <span>Nota Fiscal do Produto (número) *</span>
                             <input
@@ -928,32 +875,40 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                               required
                             />
                           </label>
-                          <label className="reg-doc-form__field">
-                            <span>Distribuidor *</span>
-                            <input
-                              type="text"
-                              value={draft.distributorName}
-                              onChange={(event) =>
-                                updateRaq(product.key, { distributorName: event.target.value })
-                              }
-                              disabled={busy}
-                              required
-                            />
-                          </label>
-                          <label className="reg-doc-form__field">
-                            <span>CNPJ do Distribuidor *</span>
-                            <input
-                              type="text"
-                              value={draft.distributorCnpj}
-                              onChange={(event) =>
-                                updateRaq(product.key, {
-                                  distributorCnpj: formatCnpj(event.target.value),
-                                })
-                              }
-                              disabled={busy}
-                              required
-                            />
-                          </label>
+                          <PartnerSuggestField
+                            label="Distribuidor *"
+                            mode="name"
+                            value={draft.distributorName}
+                            partners={distributors}
+                            disabled={busy}
+                            required
+                            onChange={(value) =>
+                              updateRaq(product.key, { distributorName: value })
+                            }
+                            onSelect={(partner) =>
+                              updateRaq(product.key, {
+                                distributorName: partner.razao_social,
+                                distributorCnpj: formatCnpj(partner.cnpj),
+                              })
+                            }
+                          />
+                          <PartnerSuggestField
+                            label="CNPJ do Distribuidor *"
+                            mode="cnpj"
+                            value={draft.distributorCnpj}
+                            partners={distributors}
+                            disabled={busy}
+                            required
+                            onChange={(value) =>
+                              updateRaq(product.key, { distributorCnpj: value })
+                            }
+                            onSelect={(partner) =>
+                              updateRaq(product.key, {
+                                distributorName: partner.razao_social,
+                                distributorCnpj: formatCnpj(partner.cnpj),
+                              })
+                            }
+                          />
                         </div>
                       </div>
                     )}
@@ -1221,9 +1176,6 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
           {formError && <p className="reg-doc-form__error">{formError}</p>}
 
           <div className="reg-doc-card__actions fuel-form__actions">
-            <button type="submit" className="btn btn--primary" disabled={busy}>
-              {busy ? 'Lançando...' : 'Lançar relatório'}
-            </button>
             <button
               type="button"
               className="btn btn--secondary"
@@ -1231,6 +1183,9 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
               disabled={busy}
             >
               Cancelar
+            </button>
+            <button type="submit" className="btn btn--primary" disabled={busy}>
+              {busy ? 'Lançando...' : 'Lançar relatório'}
             </button>
           </div>
         </form>

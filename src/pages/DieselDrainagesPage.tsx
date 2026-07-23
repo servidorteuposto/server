@@ -1,22 +1,19 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import SignaturePad from '../components/fuel-analyses/SignaturePad'
-import ConfirmDialog from '../components/regulatory/ConfirmDialog'
 import {
   buildTankDrainageSchedules,
   formatDateKeyPtBr,
+  isDieselTankTypeLabel,
   RESIDUES_CONFIRMATION_LABEL,
   type DrainageSchedule,
 } from '../config/diesel-drainages'
 import { formatDateTimePtBr } from '../config/fuel-analyses'
 import {
-  createDieselTank,
-  deleteDieselTank,
+  ensureStandardDieselTanks,
   getDrainageSignatureUrl,
   getMyPostoId,
   listDieselDrainageReports,
-  listDieselTanks,
   saveDieselDrainageReport,
-  updateDieselTank,
   type DieselDrainageReport,
   type DieselTank,
 } from '../lib/diesel-drainages'
@@ -36,12 +33,6 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
   const [busy, setBusy] = useState(false)
   const [pageError, setPageError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
-  const [showTanksPanel, setShowTanksPanel] = useState(false)
-  const [tankName, setTankName] = useState('')
-  const [tankDescription, setTankDescription] = useState('')
-  const [editingTankId, setEditingTankId] = useState<string | null>(null)
-  const [deleteTankTarget, setDeleteTankTarget] = useState<DieselTank | null>(null)
-  const [tankFormError, setTankFormError] = useState<string | null>(null)
 
   const [tankId, setTankId] = useState('')
   const [operatorName, setOperatorName] = useState('')
@@ -56,17 +47,20 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
   const [drainedAtPreview, setDrainedAtPreview] = useState(() => new Date().toISOString())
   const [viewReport, setViewReport] = useState<DieselDrainageReport | null>(null)
 
-  const activeTanks = useMemo(() => tanks.filter((tank) => tank.is_active), [tanks])
+  const selectableTanks = useMemo(
+    () => tanks.filter((tank) => tank.is_active && isDieselTankTypeLabel(tank.name)),
+    [tanks],
+  )
 
   const schedules = useMemo(
-    () => buildTankDrainageSchedules(activeTanks, reports),
-    [activeTanks, reports],
+    () => buildTankDrainageSchedules(selectableTanks, reports),
+    [selectableTanks, reports],
   )
 
   const alertSchedules = useMemo(
     () =>
       schedules.filter((schedule) =>
-        ['day_before', 'due_today', 'overdue', 'never'].includes(schedule.status),
+        ['day_before', 'due_today', 'overdue'].includes(schedule.status),
       ),
     [schedules],
   )
@@ -78,13 +72,15 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
       const id = await getMyPostoId()
       setPostoId(id)
       const [tankRows, reportRows] = await Promise.all([
-        listDieselTanks(id),
+        ensureStandardDieselTanks(id),
         listDieselDrainageReports(id),
       ])
       setTanks(tankRows)
       setReports(reportRows)
-      setTankId((current) => current || tankRows.find((tank) => tank.is_active)?.id || '')
-      if (tankRows.length === 0) setShowTanksPanel(true)
+      setTankId((current) => {
+        if (current && tankRows.some((tank) => tank.id === current)) return current
+        return tankRows[0]?.id ?? ''
+      })
     } catch {
       setPageError('Não foi possível carregar os relatórios de drenagem.')
     } finally {
@@ -102,95 +98,6 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
     }, 1000)
     return () => window.clearInterval(timer)
   }, [])
-
-  function resetTankForm() {
-    setEditingTankId(null)
-    setTankName('')
-    setTankDescription('')
-    setTankFormError(null)
-  }
-
-  function startEditTank(tank: DieselTank) {
-    setEditingTankId(tank.id)
-    setTankName(tank.name)
-    setTankDescription(tank.description ?? '')
-    setTankFormError(null)
-    setShowTanksPanel(true)
-  }
-
-  async function handleSaveTank(event: FormEvent) {
-    event.preventDefault()
-    if (!postoId || isReadOnly) return
-    if (!tankName.trim()) {
-      setTankFormError('Informe o nome do tanque.')
-      return
-    }
-
-    setBusy(true)
-    setTankFormError(null)
-    try {
-      if (editingTankId) {
-        const existing = tanks.find((tank) => tank.id === editingTankId)
-        const saved = await updateDieselTank(editingTankId, {
-          name: tankName,
-          description: tankDescription,
-          isActive: existing?.is_active ?? true,
-        })
-        setTanks((current) => current.map((tank) => (tank.id === saved.id ? saved : tank)))
-      } else {
-        const saved = await createDieselTank({
-          postoId,
-          name: tankName,
-          description: tankDescription,
-        })
-        setTanks((current) => [...current, saved].sort((a, b) => a.name.localeCompare(b.name)))
-        if (!tankId) setTankId(saved.id)
-      }
-      resetTankForm()
-    } catch {
-      setTankFormError('Não foi possível salvar o tanque. Verifique se o nome já existe.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function handleToggleTank(tank: DieselTank) {
-    if (isReadOnly) return
-    setBusy(true)
-    try {
-      const saved = await updateDieselTank(tank.id, {
-        name: tank.name,
-        description: tank.description ?? '',
-        isActive: !tank.is_active,
-      })
-      setTanks((current) => current.map((row) => (row.id === saved.id ? saved : row)))
-      if (!saved.is_active && tankId === saved.id) {
-        setTankId(activeTanks.find((row) => row.id !== saved.id)?.id ?? '')
-      }
-    } catch {
-      setPageError('Não foi possível atualizar o tanque.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function handleDeleteTank() {
-    if (!deleteTankTarget || isReadOnly) return
-    setBusy(true)
-    try {
-      await deleteDieselTank(deleteTankTarget.id)
-      setTanks((current) => current.filter((tank) => tank.id !== deleteTankTarget.id))
-      if (tankId === deleteTankTarget.id) setTankId('')
-      setDeleteTankTarget(null)
-    } catch {
-      setPageError(
-        'Não foi possível excluir o tanque. Ele pode ter drenagens vinculadas — desative-o em vez disso.',
-      )
-      setDeleteTankTarget(null)
-    } finally {
-      setBusy(false)
-    }
-  }
 
   function resetDrainageForm() {
     setOperatorName('')
@@ -211,7 +118,7 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
     if (!postoId || isReadOnly) return
 
     if (!tankId) {
-      setFormError('Selecione o tanque da drenagem.')
+      setFormError('Selecione o tipo de tanque da drenagem.')
       return
     }
     if (!operatorName.trim()) {
@@ -282,22 +189,10 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
         <div className="reg-docs-page__header-text">
           <h1>Relatórios de Drenagens de Tanques de Óleo Diesel</h1>
           <p>
-            Registre cada drenagem com data/hora automática, operador e assinatura. O ciclo é
-            semanal: há aviso 1 dia antes e no dia do vencimento.
+            Selecione o tipo de tanque (S10 ou S500), registre a drenagem com data/hora automática,
+            operador e assinatura. O ciclo é semanal: há aviso 1 dia antes e no dia do vencimento.
           </p>
         </div>
-        {!isReadOnly && (
-          <button
-            type="button"
-            className={`reg-docs-page__add-btn${showTanksPanel ? ' diesel-page__btn-active' : ''}`}
-            onClick={() => {
-              setShowTanksPanel((open) => !open)
-              if (showTanksPanel) resetTankForm()
-            }}
-          >
-            {showTanksPanel ? 'Fechar tanques' : 'Cadastrar tanque'}
-          </button>
-        )}
       </header>
 
       {pageError && <p className="reg-doc-form__error reg-docs-page__banner">{pageError}</p>}
@@ -310,105 +205,6 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
         </div>
       )}
 
-      {showTanksPanel && (
-        <section className="fuel-panel diesel-panel">
-          <div className="fuel-panel__header">
-            <div>
-              <h2>{editingTankId ? 'Editar tanque' : 'Cadastro de tanques'}</h2>
-              <p>Cadastre os tanques de diesel do posto para selecioná-los nas drenagens.</p>
-            </div>
-          </div>
-
-          {!isReadOnly && (
-            <form className="diesel-tank-form" onSubmit={handleSaveTank}>
-              <label className="reg-doc-form__field">
-                <span>Nome do tanque *</span>
-                <input
-                  type="text"
-                  value={tankName}
-                  onChange={(event) => setTankName(event.target.value)}
-                  placeholder="Ex.: Tanque 01 — Diesel S-10"
-                  disabled={busy}
-                  required
-                />
-              </label>
-              <label className="reg-doc-form__field">
-                <span>Descrição (opcional)</span>
-                <input
-                  type="text"
-                  value={tankDescription}
-                  onChange={(event) => setTankDescription(event.target.value)}
-                  placeholder="Localização, capacidade, etc."
-                  disabled={busy}
-                />
-              </label>
-              {tankFormError && <p className="reg-doc-form__error">{tankFormError}</p>}
-              <div className="reg-doc-card__actions">
-                <button type="submit" className="btn btn--primary" disabled={busy}>
-                  {busy ? 'Salvando...' : editingTankId ? 'Salvar alteração' : 'Salvar tanque'}
-                </button>
-                {editingTankId && (
-                  <button
-                    type="button"
-                    className="btn btn--secondary"
-                    onClick={resetTankForm}
-                    disabled={busy}
-                  >
-                    Cancelar edição
-                  </button>
-                )}
-              </div>
-            </form>
-          )}
-
-          {!tanks.length ? (
-            <p className="reg-doc-card__empty">Nenhum tanque cadastrado ainda.</p>
-          ) : (
-            <div className="diesel-tank-list">
-              {tanks.map((tank) => (
-                <article key={tank.id} className="diesel-tank-list__item">
-                  <div>
-                    <h3>
-                      {tank.name}
-                      {!tank.is_active && <span className="diesel-tank-list__tag">Inativo</span>}
-                    </h3>
-                    {tank.description && <p>{tank.description}</p>}
-                  </div>
-                  {!isReadOnly && (
-                    <div className="reg-doc-card__actions">
-                      <button
-                        type="button"
-                        className="btn btn--secondary"
-                        onClick={() => startEditTank(tank)}
-                        disabled={busy}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--secondary"
-                        onClick={() => handleToggleTank(tank)}
-                        disabled={busy}
-                      >
-                        {tank.is_active ? 'Desativar' : 'Reativar'}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--danger"
-                        onClick={() => setDeleteTankTarget(tank)}
-                        disabled={busy}
-                      >
-                        Excluir
-                      </button>
-                    </div>
-                  )}
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
       {!isReadOnly && (
         <form className="fuel-panel diesel-panel" onSubmit={handleSubmitDrainage}>
           <h2>Nova drenagem</h2>
@@ -416,9 +212,9 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
             Data e horário da drenagem: <strong>{formatDateTimePtBr(drainedAtPreview)}</strong>
           </p>
 
-          {!activeTanks.length ? (
+          {!selectableTanks.length ? (
             <p className="reg-doc-form__error">
-              Cadastre ao menos um tanque ativo antes de lançar uma drenagem.
+              Não foi possível carregar os tipos de tanque. Atualize a página e tente novamente.
             </p>
           ) : (
             <>
@@ -432,7 +228,7 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
                     required
                   >
                     <option value="">Selecione o tanque</option>
-                    {activeTanks.map((tank) => (
+                    {selectableTanks.map((tank) => (
                       <option key={tank.id} value={tank.id}>
                         {tank.name}
                       </option>
@@ -561,9 +357,6 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
               {formError && <p className="reg-doc-form__error">{formError}</p>}
 
               <div className="reg-doc-card__actions diesel-form__actions">
-                <button type="submit" className="btn btn--primary" disabled={busy}>
-                  {busy ? 'Lançando...' : 'Lançar drenagem'}
-                </button>
                 <button
                   type="button"
                   className="btn btn--secondary"
@@ -571,6 +364,9 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
                   disabled={busy}
                 >
                   Limpar
+                </button>
+                <button type="submit" className="btn btn--primary" disabled={busy}>
+                  {busy ? 'Lançando...' : 'Lançar drenagem'}
                 </button>
               </div>
             </>
@@ -587,35 +383,35 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
             {reports.map((report) => {
               const schedule = schedules.find((item) => item.tankId === report.tank_id)
               return (
-              <article key={report.id} className="diesel-history__card">
-                <div>
-                  <h3>{formatDateTimePtBr(report.drained_at)}</h3>
-                  <p>
-                    Tanque: {report.tank?.name ?? 'Tanque removido'} · Operador{' '}
-                    {report.operator_full_name}
-                  </p>
-                  {report.drained_volume_liters != null && (
+                <article key={report.id} className="diesel-history__card">
+                  <div>
+                    <h3>{formatDateTimePtBr(report.drained_at)}</h3>
                     <p>
-                      Volume: {formatLiters(report.drained_volume_liters)} · Água:{' '}
-                      {formatYesNo(report.water_present)} · Impurezas:{' '}
-                      {formatYesNo(report.impurities_present)}
+                      Tanque: {report.tank?.name ?? 'Tanque removido'} · Operador{' '}
+                      {report.operator_full_name}
                     </p>
-                  )}
-                  {schedule?.dueDate && schedule.status === 'ok' && (
-                    <p className="diesel-history__next">
-                      Próxima até {formatDateKeyPtBr(schedule.dueDate)}
-                    </p>
-                  )}
-                  {report.observations && <p>{report.observations}</p>}
-                </div>
-                <button
-                  type="button"
-                  className="btn btn--secondary"
-                  onClick={() => setViewReport(report)}
-                >
-                  Ver detalhes
-                </button>
-              </article>
+                    {report.drained_volume_liters != null && (
+                      <p>
+                        Volume: {formatLiters(report.drained_volume_liters)} · Água:{' '}
+                        {formatYesNo(report.water_present)} · Impurezas:{' '}
+                        {formatYesNo(report.impurities_present)}
+                      </p>
+                    )}
+                    {schedule?.dueDate && schedule.status === 'ok' && (
+                      <p className="diesel-history__next">
+                        Próxima até {formatDateKeyPtBr(schedule.dueDate)}
+                      </p>
+                    )}
+                    {report.observations && <p>{report.observations}</p>}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    onClick={() => setViewReport(report)}
+                  >
+                    Ver detalhes
+                  </button>
+                </article>
               )
             })}
           </div>
@@ -625,16 +421,6 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
       {viewReport && (
         <DrainageDetailsModal report={viewReport} onClose={() => setViewReport(null)} />
       )}
-
-      <ConfirmDialog
-        open={Boolean(deleteTankTarget)}
-        title="Excluir tanque"
-        message="Deseja excluir este tanque? Se houver drenagens vinculadas, a exclusão será bloqueada."
-        confirmLabel="Excluir"
-        busy={busy}
-        onConfirm={handleDeleteTank}
-        onCancel={() => setDeleteTankTarget(null)}
-      />
     </div>
   )
 }

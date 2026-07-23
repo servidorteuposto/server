@@ -40,6 +40,23 @@ export const FUEL_PRODUCT_LABELS: Record<FuelProductKey, string> = {
 export const FUEL_ANALYSES_STORAGE_BUCKET = 'fuel-analyses'
 export const FUEL_ANALYSES_MAX_FILE_BYTES = 10 * 1024 * 1024
 
+/** Volumes padrão do RAQ (litros). */
+export const RAQ_VOLUME_PRESETS = [
+  1000, 2000, 2500, 5000, 7500, 10000, 12500, 15000, 20000,
+] as const
+
+export const RAQ_VOLUME_CUSTOM_OPTION = 'custom'
+
+export function formatRaqVolumeLabel(liters: number) {
+  return `${new Intl.NumberFormat('pt-BR').format(liters)} L`
+}
+
+export function isRaqVolumePreset(value: string) {
+  const normalized = Number(value.replace(/\./g, '').replace(',', '.'))
+  if (Number.isNaN(normalized)) return false
+  return (RAQ_VOLUME_PRESETS as readonly number[]).includes(normalized)
+}
+
 export function isFuelProductKey(value: string): value is FuelProductKey {
   return FUEL_PRODUCTS.some((product) => product.key === value)
 }

@@ -28,15 +28,28 @@ body,
   height: 100%;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   font-family: var(--font-family);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font-family: inherit;
+  font-size: 16px;
+}
+
+button {
+  touch-action: manipulation;
 }
 
 a {
@@ -46,4 +59,21 @@ a {
 
 a:hover {
   text-decoration: underline;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
+@media (min-width: 721px) {
+  button,
+  input,
+  select,
+  textarea {
+    font-size: inherit;
+  }
 }

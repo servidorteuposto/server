@@ -1,6 +1,7 @@
 .login-page {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
 }
 
@@ -29,6 +30,7 @@
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* ── Branding (left) ── */
@@ -39,6 +41,7 @@
   justify-content: space-between;
   padding: 0 3.5rem 2.5rem 0.75rem;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .login-branding__header {
@@ -133,6 +136,7 @@
 
 .login-card--register {
   max-height: calc(100vh - 3rem);
+  max-height: calc(100dvh - 3rem);
   overflow-y: auto;
 }
 

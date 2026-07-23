@@ -4,6 +4,7 @@ export type MenuId =
   | 'analises-combustiveis'
   | 'verificacao-metrologica-bicos'
   | 'relatorios-drenagens-diesel'
+  | 'cadastro-direto'
   | 'suporte'
   | 'painel-suporte'
   | 'configuracoes'
@@ -43,6 +44,11 @@ export const MENU_ITEMS: MenuItem[] = [
     id: 'relatorios-drenagens-diesel',
     label: 'Relatórios de Drenagens de Tanques de Óleo Diesel',
     description: 'Relatórios e registros de drenagens dos tanques de óleo diesel.',
+  },
+  {
+    id: 'cadastro-direto',
+    label: 'Cadastro Direto',
+    description: 'Cadastro de transportadores e distribuidores para agilizar o RAQ.',
   },
   {
     id: 'suporte',

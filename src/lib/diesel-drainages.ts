@@ -1,4 +1,7 @@
-import { DIESEL_DRAINAGES_STORAGE_BUCKET } from '../config/diesel-drainages'
+import {
+  DIESEL_DRAINAGES_STORAGE_BUCKET,
+  DIESEL_TANK_TYPES,
+} from '../config/diesel-drainages'
 import { getMyPostoId } from './regulatory-documents'
 import { supabase } from './supabase'
 
@@ -55,6 +58,52 @@ export async function listDieselTanks(postoId: string) {
 
   if (error) throw error
   return (data ?? []) as DieselTank[]
+}
+
+/** Garante os 4 tipos padrão de tanque diesel para o posto. */
+export async function ensureStandardDieselTanks(postoId: string) {
+  const existing = await listDieselTanks(postoId)
+  const byName = new Map(existing.map((tank) => [tank.name.trim().toLowerCase(), tank]))
+
+  const ensured: DieselTank[] = []
+
+  for (const type of DIESEL_TANK_TYPES) {
+    const found = byName.get(type.label.toLowerCase())
+    if (found) {
+      if (!found.is_active) {
+        const reactivated = await updateDieselTank(found.id, {
+          name: type.label,
+          description: found.description ?? '',
+          isActive: true,
+        })
+        ensured.push(reactivated)
+      } else {
+        ensured.push(found)
+      }
+      continue
+    }
+
+    const created = await createDieselTank({
+      postoId,
+      name: type.label,
+      description: `Tanque de diesel ${type.label}`,
+    })
+    ensured.push(created)
+  }
+
+  return sortTanksByStandardOrder(ensured)
+}
+
+export function sortTanksByStandardOrder(tanks: DieselTank[]) {
+  const order = new Map(DIESEL_TANK_TYPES.map((type, index) => [type.label.toLowerCase(), index]))
+  return [...tanks].sort((a, b) => {
+    const aOrder = order.get(a.name.trim().toLowerCase())
+    const bOrder = order.get(b.name.trim().toLowerCase())
+    if (aOrder != null && bOrder != null) return aOrder - bOrder
+    if (aOrder != null) return -1
+    if (bOrder != null) return 1
+    return a.name.localeCompare(b.name, 'pt-BR')
+  })
 }
 
 export async function createDieselTank(input: {

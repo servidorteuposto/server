@@ -65,6 +65,14 @@ const icons: Record<MenuId, (props: IconProps) => ReactNode> = {
       <path d="M7 16h6" />
     </IconBase>
   ),
+  'cadastro-direto': ({ className }) => (
+    <IconBase className={className}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M19 8v6" />
+      <path d="M22 11h-6" />
+    </IconBase>
+  ),
   suporte: ({ className }) => (
     <IconBase className={className}>
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />

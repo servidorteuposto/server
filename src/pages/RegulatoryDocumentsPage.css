@@ -22,7 +22,8 @@
   font-size: 0.95rem;
   color: var(--gray-600);
   line-height: 1.5;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .reg-docs-page__add-btn {
@@ -271,7 +272,10 @@
 }
 
 .reg-doc-form__field input[type='text'],
-.reg-doc-form__field input[type='date'] {
+.reg-doc-form__field input[type='tel'],
+.reg-doc-form__field input[type='date'],
+.reg-doc-form__field input[type='number'],
+.reg-doc-form__field select {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
@@ -279,13 +283,33 @@
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--gray-300);
   border-radius: 8px;
+  font: inherit;
   font-size: 0.88rem;
   color: var(--blue-dark);
+  background: var(--white);
 }
 
-.reg-doc-form__field input:focus {
+.reg-doc-form__field select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236b7280' d='M1.4 1.4 6 6l4.6-4.6L12 2.8 6 8 0 2.8z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 12px 8px;
+  padding-right: 2.25rem;
+  cursor: pointer;
+}
+
+.reg-doc-form__field input:focus,
+.reg-doc-form__field select:focus {
   outline: 2px solid rgba(61, 143, 212, 0.35);
   border-color: var(--blue-light);
+}
+
+.reg-doc-form__field input:disabled,
+.reg-doc-form__field select:disabled {
+  background: var(--gray-100);
+  color: var(--gray-600);
+  cursor: not-allowed;
 }
 
 .reg-doc-form__field--file input[type='file'] {
@@ -424,11 +448,26 @@
   .reg-docs-page__add-btn {
     grid-column: 1;
     grid-row: auto;
-    justify-self: end;
+    justify-self: stretch;
+    width: 100%;
   }
 
   .reg-docs-page__header p {
     white-space: normal;
+  }
+
+  .reg-doc-modal__dialog {
+    width: calc(100% - 1rem);
+    max-height: calc(100dvh - 1rem);
+    margin: 0.5rem;
+    border-radius: 14px;
+  }
+
+  .reg-doc-preview__dialog {
+    width: calc(100% - 0.5rem);
+    height: calc(100dvh - 0.5rem);
+    max-height: none;
+    border-radius: 12px;
   }
 }
 
