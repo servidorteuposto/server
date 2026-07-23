@@ -357,13 +357,14 @@
   }
 
   .ws-profile-modal {
-    padding: 0.5rem;
-    align-items: flex-start;
+    padding: 0.75rem;
+    align-items: center;
+    justify-content: center;
   }
 
   .ws-profile-modal__dialog {
     width: 100%;
-    max-height: calc(100dvh - 1rem);
+    max-height: calc(100dvh - 1.5rem);
     border-radius: 14px;
   }
 
