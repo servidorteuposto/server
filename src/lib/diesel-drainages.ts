@@ -29,6 +29,11 @@ export type DieselDrainageReport = {
   drained_volume_liters: number | null
   measure_taken: string | null
   signature_storage_path: string
+  photo_storage_path: string | null
+  photo_file_name: string | null
+  photo_latitude: number | null
+  photo_longitude: number | null
+  photo_captured_at: string | null
   created_at: string
   tank?: DieselTank | null
 }
@@ -45,6 +50,10 @@ export type SaveDieselDrainageInput = {
   drainedVolumeLiters: number
   measureTaken: string
   signatureBlob: Blob
+  photoFile: File
+  photoLatitude: number
+  photoLongitude: number
+  photoCapturedAt: string
 }
 
 export { getMyPostoId }
@@ -170,6 +179,15 @@ export async function getDrainageSignatureUrl(path: string) {
   return data.signedUrl
 }
 
+export async function getDrainagePhotoUrl(path: string) {
+  const { data, error } = await supabase.storage
+    .from(DIESEL_DRAINAGES_STORAGE_BUCKET)
+    .createSignedUrl(path, 60 * 60)
+
+  if (error) throw error
+  return data.signedUrl
+}
+
 export async function saveDieselDrainageReport(input: SaveDieselDrainageInput) {
   if (!input.residuesConfirmed) {
     throw new Error('residues_not_confirmed')
@@ -177,40 +195,66 @@ export async function saveDieselDrainageReport(input: SaveDieselDrainageInput) {
 
   const reportId = crypto.randomUUID()
   const signaturePath = `${input.postoId}/${reportId}/signature.png`
+  const photoExt = input.photoFile.name.includes('.')
+    ? input.photoFile.name.split('.').pop()!.toLowerCase()
+    : 'jpg'
+  const safeExt = ['jpg', 'jpeg', 'png', 'webp'].includes(photoExt)
+    ? photoExt === 'jpeg'
+      ? 'jpg'
+      : photoExt
+    : 'jpg'
+  const photoPath = `${input.postoId}/${reportId}/photo.${safeExt}`
+  const uploadedPaths = [signaturePath]
 
-  const { error: uploadError } = await supabase.storage
-    .from(DIESEL_DRAINAGES_STORAGE_BUCKET)
-    .upload(signaturePath, input.signatureBlob, {
-      upsert: true,
-      contentType: input.signatureBlob.type || 'image/png',
-    })
+  try {
+    const { error: signatureUploadError } = await supabase.storage
+      .from(DIESEL_DRAINAGES_STORAGE_BUCKET)
+      .upload(signaturePath, input.signatureBlob, {
+        upsert: true,
+        contentType: input.signatureBlob.type || 'image/png',
+      })
 
-  if (uploadError) throw uploadError
+    if (signatureUploadError) throw signatureUploadError
 
-  const { data, error } = await supabase
-    .from('diesel_drainage_reports')
-    .insert({
-      id: reportId,
-      posto_id: input.postoId,
-      tank_id: input.tankId,
-      drained_at: input.drainedAt,
-      operator_full_name: input.operatorFullName.trim(),
-      operator_cpf: null,
-      observations: input.observations.trim() || null,
-      residues_confirmed: true,
-      water_present: input.waterPresent,
-      impurities_present: input.impuritiesPresent,
-      drained_volume_liters: input.drainedVolumeLiters,
-      measure_taken: input.measureTaken.trim(),
-      signature_storage_path: signaturePath,
-    })
-    .select('*, tank:diesel_tanks(*)')
-    .single()
+    const { error: photoUploadError } = await supabase.storage
+      .from(DIESEL_DRAINAGES_STORAGE_BUCKET)
+      .upload(photoPath, input.photoFile, {
+        upsert: true,
+        contentType: input.photoFile.type || `image/${safeExt === 'jpg' ? 'jpeg' : safeExt}`,
+      })
 
-  if (error) {
-    await supabase.storage.from(DIESEL_DRAINAGES_STORAGE_BUCKET).remove([signaturePath])
+    if (photoUploadError) throw photoUploadError
+    uploadedPaths.push(photoPath)
+
+    const { data, error } = await supabase
+      .from('diesel_drainage_reports')
+      .insert({
+        id: reportId,
+        posto_id: input.postoId,
+        tank_id: input.tankId,
+        drained_at: input.drainedAt,
+        operator_full_name: input.operatorFullName.trim(),
+        operator_cpf: null,
+        observations: input.observations.trim() || null,
+        residues_confirmed: true,
+        water_present: input.waterPresent,
+        impurities_present: input.impuritiesPresent,
+        drained_volume_liters: input.drainedVolumeLiters,
+        measure_taken: input.measureTaken.trim(),
+        signature_storage_path: signaturePath,
+        photo_storage_path: photoPath,
+        photo_file_name: input.photoFile.name || `photo.${safeExt}`,
+        photo_latitude: input.photoLatitude,
+        photo_longitude: input.photoLongitude,
+        photo_captured_at: input.photoCapturedAt,
+      })
+      .select('*, tank:diesel_tanks(*)')
+      .single()
+
+    if (error) throw error
+    return data as DieselDrainageReport
+  } catch (error) {
+    await supabase.storage.from(DIESEL_DRAINAGES_STORAGE_BUCKET).remove(uploadedPaths)
     throw error
   }
-
-  return data as DieselDrainageReport
 }

@@ -299,10 +299,6 @@ function buildAnalysisRows(item: PublicPostoBoard['analysis_items'][number]): Ar
     ['ME a 20 °C', textOrDash(item.massa_especifica_convertida)],
   ]
 
-  if (item.densidade_formula) {
-    rows.push(['Cálculo densidade', textOrDash(item.densidade_formula)])
-  }
-
   if (item.teor_alcool_gasolina) {
     const label = item.product_key.startsWith('etanol-')
       ? 'Teor alcoólico (INPM)'

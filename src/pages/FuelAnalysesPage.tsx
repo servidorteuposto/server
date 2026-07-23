@@ -1063,23 +1063,6 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
 
                         {supportsDensityCorrection(product.key) && (
                           <div className="fuel-density">
-                            <p className="fuel-density__formula">
-                              D20 = Dt + γ × (t − 20)
-                              {draft.coeficienteGamma != null && (
-                                <>
-                                  {' '}
-                                  · γ = {draft.coeficienteGamma.toFixed(2)} kg/m³/°C
-                                </>
-                              )}
-                            </p>
-                            {alcoholKind === 'ethanol' && (
-                              <p className="fuel-density__formula">
-                                °INPM ≈ −758,31·d² + 882,02·d − 124,99 (d = D20 em g/cm³)
-                              </p>
-                            )}
-                            {draft.densidadeFormula && (
-                              <p className="fuel-density__calc">{draft.densidadeFormula}</p>
-                            )}
                             {draft.densidadeLimitLabel && (
                               <p className="fuel-density__limit">
                                 Densidade esperada: {draft.densidadeLimitLabel}
@@ -1354,7 +1337,6 @@ function ReportDetailsModal({
             <p>Temperatura: {item.temperatura_observada}</p>
             <p>ME observada: {item.massa_especifica_observada}</p>
             <p>ME convertida 20 °C: {item.massa_especifica_convertida}</p>
-            {item.densidade_formula && <p>Cálculo: {item.densidade_formula}</p>}
             {item.densidade_status && (
               <p>
                 Conformidade ANP:{' '}

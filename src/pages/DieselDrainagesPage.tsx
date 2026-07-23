@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import LiveCameraCapture from '../components/fuel-analyses/LiveCameraCapture'
 import SignaturePad from '../components/fuel-analyses/SignaturePad'
 import {
   buildTankDrainageSchedules,
@@ -7,9 +8,14 @@ import {
   RESIDUES_CONFIRMATION_LABEL,
   type DrainageSchedule,
 } from '../config/diesel-drainages'
-import { formatDateTimePtBr } from '../config/fuel-analyses'
+import {
+  FUEL_ANALYSES_MAX_FILE_BYTES,
+  formatCoords,
+  formatDateTimePtBr,
+} from '../config/fuel-analyses'
 import {
   ensureStandardDieselTanks,
+  getDrainagePhotoUrl,
   getDrainageSignatureUrl,
   getMyPostoId,
   listDieselDrainageReports,
@@ -23,6 +29,20 @@ import './DieselDrainagesPage.css'
 
 type DieselDrainagesPageProps = {
   isReadOnly: boolean
+}
+
+function readGeolocation(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocalização não disponível neste dispositivo.'))
+      return
+    }
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0,
+    })
+  })
 }
 
 export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageProps) {
@@ -44,6 +64,12 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
   const [residuesConfirmed, setResiduesConfirmed] = useState(false)
   const [signatureBlob, setSignatureBlob] = useState<Blob | null>(null)
   const [signatureKey, setSignatureKey] = useState(0)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
+  const [photoLatitude, setPhotoLatitude] = useState<number | null>(null)
+  const [photoLongitude, setPhotoLongitude] = useState<number | null>(null)
+  const [photoCapturedAt, setPhotoCapturedAt] = useState<string | null>(null)
+  const [photoError, setPhotoError] = useState<string | null>(null)
   const [drainedAtPreview, setDrainedAtPreview] = useState(() => new Date().toISOString())
   const [viewReport, setViewReport] = useState<DieselDrainageReport | null>(null)
 
@@ -99,6 +125,16 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
     return () => window.clearInterval(timer)
   }, [])
 
+  function clearLivePhoto() {
+    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
+    setPhotoFile(null)
+    setPhotoPreviewUrl(null)
+    setPhotoLatitude(null)
+    setPhotoLongitude(null)
+    setPhotoCapturedAt(null)
+    setPhotoError(null)
+  }
+
   function resetDrainageForm() {
     setOperatorName('')
     setWaterPresent(null)
@@ -109,8 +145,38 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
     setResiduesConfirmed(false)
     setSignatureBlob(null)
     setSignatureKey((key) => key + 1)
+    clearLivePhoto()
     setFormError(null)
     setDrainedAtPreview(new Date().toISOString())
+  }
+
+  async function handleLivePhotoCapture(file: File) {
+    if (file.size > FUEL_ANALYSES_MAX_FILE_BYTES) {
+      setPhotoError('A foto deve ter no máximo 10 MB.')
+      return
+    }
+
+    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
+    const previewUrl = URL.createObjectURL(file)
+    setPhotoFile(file)
+    setPhotoPreviewUrl(previewUrl)
+    setPhotoCapturedAt(new Date().toISOString())
+    setPhotoLatitude(null)
+    setPhotoLongitude(null)
+    setPhotoError('Obtendo coordenadas GPS...')
+    setFormError(null)
+
+    try {
+      const position = await readGeolocation()
+      setPhotoLatitude(position.coords.latitude)
+      setPhotoLongitude(position.coords.longitude)
+      setPhotoCapturedAt(new Date().toISOString())
+      setPhotoError(null)
+    } catch {
+      setPhotoLatitude(null)
+      setPhotoLongitude(null)
+      setPhotoError('Não foi possível obter a localização. Permita o GPS e tire a foto novamente.')
+    }
   }
 
   async function handleSubmitDrainage(event: FormEvent) {
@@ -147,6 +213,10 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
       setFormError('Confirme a eliminação de resíduos e a pureza do produto na saída do dreno.')
       return
     }
+    if (!photoFile || photoLatitude == null || photoLongitude == null || !photoCapturedAt) {
+      setFormError('Tire a foto do local e aguarde as coordenadas GPS antes de lançar.')
+      return
+    }
     if (!signatureBlob) {
       setFormError('Assine no campo em branco antes de lançar o relatório.')
       return
@@ -169,6 +239,10 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
         drainedVolumeLiters: volume,
         measureTaken,
         signatureBlob,
+        photoFile,
+        photoLatitude,
+        photoLongitude,
+        photoCapturedAt,
       })
       setReports((current) => [saved, ...current])
       resetDrainageForm()
@@ -189,8 +263,9 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
         <div className="reg-docs-page__header-text">
           <h1>Relatórios de Drenagens de Tanques de Óleo Diesel</h1>
           <p>
-            Selecione o tipo de tanque (S10 ou S500), registre a drenagem com data/hora automática,
-            operador e assinatura. O ciclo é semanal: há aviso 1 dia antes e no dia do vencimento.
+            Selecione o tipo de tanque (S10 ou S500), registre a drenagem com foto do local
+            (data/hora e coordenadas), operador e assinatura. O ciclo é semanal: há aviso 1 dia
+            antes e no dia do vencimento.
           </p>
         </div>
       </header>
@@ -349,6 +424,30 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
                 <span>{RESIDUES_CONFIRMATION_LABEL}</span>
               </label>
 
+              <div className="fuel-photo">
+                <LiveCameraCapture
+                  disabled={busy}
+                  previewUrl={photoPreviewUrl}
+                  onCapture={handleLivePhotoCapture}
+                  onClear={clearLivePhoto}
+                />
+                <dl className="fuel-photo__meta">
+                  <div>
+                    <dt>Data e hora da foto</dt>
+                    <dd>{photoCapturedAt ? formatDateTimePtBr(photoCapturedAt) : '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Coordenadas</dt>
+                    <dd>
+                      {photoLatitude != null && photoLongitude != null
+                        ? formatCoords(photoLatitude, photoLongitude)
+                        : '—'}
+                    </dd>
+                  </div>
+                </dl>
+                {photoError && <p className="reg-doc-form__error">{photoError}</p>}
+              </div>
+
               <label className="reg-doc-form__field">
                 <span>Assinatura do operador *</span>
               </label>
@@ -462,6 +561,7 @@ function DrainageDetailsModal({
   onClose: () => void
 }) {
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -476,6 +576,26 @@ function DrainageDetailsModal({
       active = false
     }
   }, [report.signature_storage_path])
+
+  useEffect(() => {
+    let active = true
+    if (!report.photo_storage_path) {
+      setPhotoUrl(null)
+      return
+    }
+
+    getDrainagePhotoUrl(report.photo_storage_path)
+      .then((url) => {
+        if (active) setPhotoUrl(url)
+      })
+      .catch(() => {
+        if (active) setPhotoUrl(null)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [report.photo_storage_path])
 
   return (
     <div className="reg-doc-modal" role="dialog" aria-modal="true">
@@ -528,7 +648,28 @@ function DrainageDetailsModal({
             <dt>Observações</dt>
             <dd>{report.observations || '—'}</dd>
           </div>
+          <div>
+            <dt>Data e hora da foto</dt>
+            <dd>
+              {report.photo_captured_at ? formatDateTimePtBr(report.photo_captured_at) : '—'}
+            </dd>
+          </div>
+          <div>
+            <dt>Coordenadas da foto</dt>
+            <dd>
+              {report.photo_latitude != null && report.photo_longitude != null
+                ? formatCoords(report.photo_latitude, report.photo_longitude)
+                : '—'}
+            </dd>
+          </div>
         </dl>
+
+        {photoUrl && (
+          <div className="diesel-details__signature">
+            <h3>Foto do local</h3>
+            <img src={photoUrl} alt="Foto comprovando o local da drenagem" />
+          </div>
+        )}
 
         {signatureUrl && (
           <div className="diesel-details__signature">
