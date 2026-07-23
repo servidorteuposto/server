@@ -631,7 +631,7 @@
     grid-row: auto;
     width: 100%;
     max-width: 100%;
-    padding: 0.5rem 1rem 1.25rem;
+    padding: 1.15rem 1rem 1.5rem;
     align-items: stretch;
     justify-content: flex-start;
     box-sizing: border-box;
@@ -676,7 +676,7 @@
   }
 
   .login-form-section {
-    padding: 0.35rem 0.85rem 1rem;
+    padding: 1rem 0.85rem 1.35rem;
   }
 
   .login-branding {
@@ -691,5 +691,49 @@
     margin-top: -1.45rem;
     font-size: 0.6rem;
     letter-spacing: 0.08em;
+  }
+}
+
+/* PWA / app instalado: centraliza o card e desce a logo */
+@media (max-width: 960px) and (display-mode: standalone),
+  (max-width: 960px) and (display-mode: fullscreen),
+  (max-width: 960px) and (display-mode: minimal-ui) {
+  .login-page__layout {
+    min-height: 100dvh;
+    min-height: 100svh;
+    justify-content: flex-start;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .login-branding {
+    padding-top: 2.75rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .login-form-section {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 0.85rem;
+    padding-bottom: 1.75rem;
+  }
+
+  .login-page__layout--focused .login-branding {
+    padding-top: 2rem;
+  }
+}
+
+@media (max-width: 480px) and (display-mode: standalone),
+  (max-width: 480px) and (display-mode: fullscreen),
+  (max-width: 480px) and (display-mode: minimal-ui) {
+  .login-branding {
+    padding-top: 3.25rem;
+  }
+
+  .login-form-section {
+    padding-top: 1rem;
+    padding-bottom: 2rem;
   }
 }
