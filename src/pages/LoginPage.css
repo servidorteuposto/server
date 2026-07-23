@@ -631,7 +631,7 @@
     grid-row: auto;
     width: 100%;
     max-width: 100%;
-    padding: 1.15rem 1rem 1.5rem;
+    padding: 1.85rem 1rem 1.5rem;
     align-items: stretch;
     justify-content: flex-start;
     box-sizing: border-box;
@@ -676,7 +676,7 @@
   }
 
   .login-form-section {
-    padding: 1rem 0.85rem 1.35rem;
+    padding: 1.65rem 0.85rem 1.35rem;
   }
 
   .login-branding {
