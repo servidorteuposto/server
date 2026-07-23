@@ -1,5 +1,13 @@
+.support-form--login {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
 .support-form__input {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 0.75rem 0.9rem;
   border: 1.5px solid var(--gray-300);
   border-radius: 10px;
@@ -22,6 +30,8 @@
 .support-form select.support-form__input,
 .support-form--app select {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--gray-300);
   border-radius: 8px;
@@ -33,6 +43,8 @@
 
 .support-form__textarea {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   min-height: 120px;
   padding: 0.75rem 0.9rem;
   border: 1px solid var(--gray-300);
@@ -90,10 +102,14 @@
 .support-form__photos {
   display: grid;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .support-form__photos input[type='file'] {
+  display: block;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   font-size: 0.85rem;
 }
 
@@ -129,4 +145,18 @@
   cursor: pointer;
   padding: 0;
   text-align: left;
+}
+
+@media (max-width: 960px) {
+  .support-form--login .form-field {
+    min-width: 0;
+  }
+
+  .support-form__actions {
+    width: 100%;
+  }
+
+  .support-form__actions .btn {
+    width: 100%;
+  }
 }

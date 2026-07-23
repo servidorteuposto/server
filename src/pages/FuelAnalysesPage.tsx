@@ -574,9 +574,8 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
         <div className="reg-docs-page__header-text">
           <h1>Análises de Combustíveis</h1>
           <p>
-            Lançamentos são imutáveis. Em cada RAQ, marque só os combustíveis que chegaram. Se depois
-            vier só etanol, lance só ele. Na página pública atualiza aquele produto e os outros
-            permanecem com os dados anteriores.
+            Lançamentos são imutáveis. Em cada RAQ, marque só os combustíveis que chegaram. Na página
+            pública, cada produto mostra sempre o RAQ mais recente.
           </p>
         </div>
         {!formOpen && (

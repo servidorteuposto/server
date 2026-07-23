@@ -63,8 +63,10 @@
 
 .reg-docs-page__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
   gap: 1rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .reg-docs-page__custom-wrap {
@@ -105,11 +107,15 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   background: var(--white);
   border: 1px solid rgba(61, 143, 212, 0.22);
   border-radius: 14px;
   padding: 1.15rem 1.2rem;
   box-shadow: var(--shadow-card);
+  box-sizing: border-box;
 }
 
 .reg-doc-card__header {
@@ -251,6 +257,8 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 0.75rem;
+  min-width: 0;
+  width: 100%;
 }
 
 .reg-doc-form__field {
@@ -259,6 +267,7 @@
   gap: 0.35rem;
   margin-bottom: 0.75rem;
   min-width: 0;
+  max-width: 100%;
 }
 
 .reg-doc-form__grid > .reg-doc-form__field {
@@ -275,8 +284,11 @@
 .reg-doc-form__field input[type='tel'],
 .reg-doc-form__field input[type='date'],
 .reg-doc-form__field input[type='number'],
-.reg-doc-form__field select {
+.reg-doc-form__field input[type='email'],
+.reg-doc-form__field select,
+.reg-doc-form__field textarea {
   box-sizing: border-box;
+  display: block;
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -287,6 +299,17 @@
   font-size: 0.88rem;
   color: var(--blue-dark);
   background: var(--white);
+}
+
+.reg-doc-form__field input[type='date'] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 2.6rem;
+}
+
+.reg-doc-form__field input[type='date']::-webkit-date-and-time-value {
+  text-align: left;
+  min-width: 0;
 }
 
 .reg-doc-form__field select {
@@ -300,19 +323,29 @@
 }
 
 .reg-doc-form__field input:focus,
-.reg-doc-form__field select:focus {
+.reg-doc-form__field select:focus,
+.reg-doc-form__field textarea:focus {
   outline: 2px solid rgba(61, 143, 212, 0.35);
   border-color: var(--blue-light);
 }
 
 .reg-doc-form__field input:disabled,
-.reg-doc-form__field select:disabled {
+.reg-doc-form__field select:disabled,
+.reg-doc-form__field textarea:disabled {
   background: var(--gray-100);
   color: var(--gray-600);
   cursor: not-allowed;
 }
 
+.reg-doc-form__field--file {
+  min-width: 0;
+}
+
 .reg-doc-form__field--file input[type='file'] {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
   font-size: 0.82rem;
   color: var(--gray-600);
 }
@@ -402,10 +435,20 @@
 
 .reg-doc-modal__dialog {
   width: min(480px, 100%);
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--white);
   border-radius: 16px;
   box-shadow: var(--shadow-card);
   padding: 1.25rem 1.35rem 1.35rem;
+}
+
+.reg-doc-modal__form {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .reg-doc-modal__header {
@@ -450,17 +493,47 @@
     grid-row: auto;
     justify-self: stretch;
     width: 100%;
+    max-width: none;
   }
 
   .reg-docs-page__header p {
     white-space: normal;
   }
 
+  .reg-doc-card {
+    padding: 1rem 0.9rem;
+  }
+
+  .reg-doc-card__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reg-doc-card__actions .btn {
+    width: 100%;
+  }
+
+  .reg-doc-modal {
+    padding: 0.5rem;
+    align-items: flex-start;
+  }
+
   .reg-doc-modal__dialog {
-    width: calc(100% - 1rem);
+    width: 100%;
+    max-width: 100%;
     max-height: calc(100dvh - 1rem);
-    margin: 0.5rem;
+    margin: 0;
+    padding: 1rem 0.9rem 1.1rem;
     border-radius: 14px;
+  }
+
+  .reg-doc-modal__actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .reg-doc-modal__actions .btn {
+    width: 100%;
   }
 
   .reg-doc-preview__dialog {
@@ -468,6 +541,12 @@
     height: calc(100dvh - 0.5rem);
     max-height: none;
     border-radius: 12px;
+  }
+}
+
+@media (min-width: 641px) {
+  .reg-doc-form__grid {
+    grid-template-columns: 1fr 1fr;
   }
 }
 

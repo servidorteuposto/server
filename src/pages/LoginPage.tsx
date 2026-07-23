@@ -502,7 +502,9 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-page__bg" aria-hidden="true" />
 
-      <div className="login-page__layout">
+      <div
+        className={`login-page__layout${view !== 'login' ? ' login-page__layout--focused' : ''}`}
+      >
         <aside className="login-branding">
           <div className="login-branding__header">
             <img
@@ -511,30 +513,6 @@ export default function LoginPage() {
               className="login-branding__logo"
             />
             <p className="login-branding__tagline">MENOS PAPEL, MAIS EFICIÊNCIA</p>
-          </div>
-
-          <div className="feature-bar">
-            <div className="feature-bar__item">
-              <ShieldIcon />
-              <div className="feature-bar__text">
-                <span>Conformidade</span>
-                <span>Regulatória</span>
-              </div>
-            </div>
-            <div className="feature-bar__item">
-              <ChartIcon />
-              <div className="feature-bar__text">
-                <span>Gestão</span>
-                <span>Inteligente</span>
-              </div>
-            </div>
-            <div className="feature-bar__item">
-              <DropIcon />
-              <div className="feature-bar__text">
-                <span>Combustível</span>
-                <span>em Conformidade</span>
-              </div>
-            </div>
           </div>
         </aside>
 
@@ -932,6 +910,30 @@ export default function LoginPage() {
             )}
           </div>
         </main>
+
+        <div className="feature-bar">
+          <div className="feature-bar__item">
+            <ShieldIcon />
+            <div className="feature-bar__text">
+              <span>Conformidade</span>
+              <span>Regulatória</span>
+            </div>
+          </div>
+          <div className="feature-bar__item">
+            <ChartIcon />
+            <div className="feature-bar__text">
+              <span>Gestão</span>
+              <span>Inteligente</span>
+            </div>
+          </div>
+          <div className="feature-bar__item">
+            <DropIcon />
+            <div className="feature-bar__text">
+              <span>Combustível</span>
+              <span>em Conformidade</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

@@ -1,9 +1,17 @@
+.ws-page {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 .ws-page__header p {
   white-space: normal;
 }
 
 .ws-section {
   margin-bottom: 2.5rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .ws-section__header {
@@ -41,10 +49,12 @@
 
 .ws-table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid rgba(61, 143, 212, 0.22);
   border-radius: 14px;
   background: var(--white);
   box-shadow: var(--shadow-card);
+  max-width: 100%;
 }
 
 .ws-table {
@@ -99,7 +109,6 @@
   flex-wrap: wrap;
   gap: 0.5rem;
   justify-content: flex-end;
-  white-space: nowrap;
 }
 
 .ws-table__verify {
@@ -129,13 +138,17 @@
 
 .ws-profile-modal__dialog {
   width: min(760px, 100%);
+  max-width: 100%;
+  min-width: 0;
   max-height: min(90vh, 900px);
+  max-height: min(90dvh, 900px);
   display: flex;
   flex-direction: column;
   background: var(--white);
   border-radius: 16px;
   box-shadow: var(--shadow-card);
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .ws-profile-modal__header {
@@ -144,12 +157,14 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 1.1rem 1.25rem 0.75rem;
+  min-width: 0;
 }
 
 .ws-profile-modal__header h2 {
   font-size: 1.15rem;
   font-weight: 700;
   color: var(--blue-dark);
+  word-break: break-word;
 }
 
 .ws-profile-modal__subtitle {
@@ -186,17 +201,24 @@
 .ws-profile-modal__body {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   overflow: auto;
   padding: 1rem 1.25rem 1.25rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 .ws-profile-modal__stack {
   display: grid;
   gap: 1rem;
+  min-width: 0;
 }
 
 .ws-profile-modal__actions {
   margin-top: 0.5rem;
+}
+
+.ws-profile-modal__actions .btn {
+  max-width: 100%;
 }
 
 .ws-profile-modal__error {
@@ -210,7 +232,11 @@
 
 .ws-profile-modal__textarea,
 .ws-profile-modal__select {
+  box-sizing: border-box;
+  display: block;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--gray-300);
   border-radius: 8px;
@@ -232,6 +258,10 @@
   border: 1px solid rgba(61, 143, 212, 0.18);
   border-radius: 12px;
   background: rgba(61, 143, 212, 0.03);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .ws-training-section__header {
@@ -240,6 +270,7 @@
   justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .ws-training-section__header h3,
@@ -252,6 +283,7 @@
 .ws-training-section__file-actions,
 .ws-identity-section__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
 }
 
@@ -276,12 +308,14 @@
   border: 1px solid var(--gray-300);
   border-radius: 10px;
   background: var(--white);
+  min-width: 0;
 }
 
 .ws-aso-list__item strong {
   display: block;
   color: var(--blue-dark);
   font-size: 0.9rem;
+  word-break: break-word;
 }
 
 .ws-aso-list__item span {
@@ -292,7 +326,9 @@
 .ws-aso-list__actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.35rem;
+  flex-shrink: 0;
 }
 
 .ws-aso-list__remove {
@@ -315,6 +351,64 @@
   }
 
   .ws-section__header--row .reg-docs-page__add-btn {
-    align-self: flex-end;
+    align-self: stretch;
+    width: 100%;
+    max-width: none;
+  }
+
+  .ws-profile-modal {
+    padding: 0.5rem;
+    align-items: flex-start;
+  }
+
+  .ws-profile-modal__dialog {
+    width: 100%;
+    max-height: calc(100dvh - 1rem);
+    border-radius: 14px;
+  }
+
+  .ws-profile-modal__header,
+  .ws-profile-modal__tabs,
+  .ws-profile-modal__body {
+    padding-left: 0.9rem;
+    padding-right: 0.9rem;
+  }
+
+  .ws-profile-modal__body form,
+  .ws-training-section form,
+  .ws-aso-form,
+  .ws-identity-section form {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .ws-profile-modal__body .reg-doc-form__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ws-profile-modal__actions .btn,
+  .ws-training-section .btn,
+  .ws-aso-form .btn,
+  .ws-identity-section .btn {
+    width: 100%;
+  }
+
+  .ws-training-section,
+  .ws-aso-form,
+  .ws-identity-section {
+    padding: 0.85rem;
+  }
+
+  .ws-aso-list__item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ws-aso-list__actions {
+    width: 100%;
+  }
+
+  .ws-aso-list__actions .btn {
+    flex: 1;
   }
 }

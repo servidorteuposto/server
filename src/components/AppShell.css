@@ -425,11 +425,14 @@
   }
 
   .app-content {
-    padding-top: calc(3.75rem + env(safe-area-inset-top, 0));
+    padding-top: calc(4.25rem + env(safe-area-inset-top, 0));
+    padding-left: 0.85rem;
+    padding-right: 0.85rem;
+    padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0));
   }
 
   .app-content[data-home='true'] {
-    padding-top: calc(3.75rem + env(safe-area-inset-top, 0));
+    padding-top: calc(4.25rem + env(safe-area-inset-top, 0));
   }
 }
 

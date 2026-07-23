@@ -1,6 +1,21 @@
 .fuel-page {
   display: grid;
   gap: 1rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.fuel-page .reg-docs-page__header {
+  align-items: start;
+}
+
+.fuel-page .reg-docs-page__header-text {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.fuel-page .reg-docs-page__header-text p {
+  max-width: 42rem;
 }
 
 .fuel-header-actions {
@@ -59,6 +74,10 @@
   border-radius: 14px;
   padding: 1.15rem 1.2rem;
   box-shadow: var(--shadow-card);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .fuel-panel h2 {
@@ -195,6 +214,8 @@
 .fuel-accordion {
   display: grid;
   gap: 0.65rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .fuel-accordion__item {
@@ -202,6 +223,8 @@
   border-radius: 12px;
   overflow: hidden;
   background: rgba(61, 143, 212, 0.03);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .fuel-accordion__trigger {
@@ -224,17 +247,55 @@
 .fuel-accordion__body {
   padding: 0 1rem 1rem;
   border-top: 1px solid rgba(61, 143, 212, 0.12);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .fuel-fields {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
   padding-top: 0.85rem;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .fuel-fields .reg-doc-form__field {
   margin-bottom: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.fuel-fields .reg-doc-form__field input,
+.fuel-fields .reg-doc-form__field select,
+.fuel-fields .reg-doc-form__field textarea {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.fuel-fields .reg-doc-form__field input[type='date'] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 2.6rem;
+}
+
+.fuel-fields .reg-doc-form__field input[type='date']::-webkit-date-and-time-value {
+  text-align: left;
+  min-width: 0;
+}
+
+.fuel-fields .reg-doc-form__field--file input[type='file'] {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
 }
 
 .fuel-fields--author {
@@ -243,11 +304,11 @@
 
 @media (min-width: 720px) {
   .fuel-fields {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .fuel-fields--author {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -557,6 +618,34 @@
 }
 
 @media (max-width: 640px) {
+  .fuel-page .reg-docs-page__header {
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+
+  .fuel-page .reg-docs-page__header-text p {
+    max-width: none;
+    font-size: 0.88rem;
+    line-height: 1.45;
+  }
+
+  .fuel-header-actions {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: stretch;
+    width: 100%;
+  }
+
+  .fuel-header-actions .reg-docs-page__add-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-width: 0;
+    max-width: none;
+    width: auto;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
   .fuel-panel__header,
   .fuel-history__card {
     flex-direction: column;
