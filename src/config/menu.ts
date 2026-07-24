@@ -2,6 +2,7 @@ export type MenuId =
   | 'documentos-regulatorios'
   | 'seguranca-trabalho'
   | 'analises-combustiveis'
+  | 'equipamentos-obrigatorios'
   | 'verificacao-metrologica-bicos'
   | 'relatorios-drenagens-diesel'
   | 'cadastro-direto'
@@ -32,9 +33,14 @@ export const MENU_ITEMS: MenuItem[] = [
     description: 'Laudos, amostras e histórico de análises de combustíveis.',
   },
   {
+    id: 'equipamentos-obrigatorios',
+    label: 'Equipamentos Obrigatórios',
+    description: 'Cadastro de termômetros, densímetros, balde aferidor e proveta.',
+  },
+  {
     id: 'verificacao-metrologica-bicos',
     label: 'Verificação Metrológica de Bicos',
-    description: 'Controle de verificações metrológicas dos bicos de abastecimento.',
+    description: 'Controle conforme Portaria 227/2022 — INMETRO.',
   },
   {
     id: 'relatorios-drenagens-diesel',

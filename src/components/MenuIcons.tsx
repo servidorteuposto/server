@@ -45,6 +45,14 @@ const icons: Record<MenuId, (props: IconProps) => ReactNode> = {
       <path d="M7 16h1" />
     </IconBase>
   ),
+  'equipamentos-obrigatorios': ({ className }) => (
+    <IconBase className={className}>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </IconBase>
+  ),
   'verificacao-metrologica-bicos': ({ className }) => (
     <IconBase className={className}>
       <path d="M12 2v4" />

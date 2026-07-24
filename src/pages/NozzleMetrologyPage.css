@@ -1,0 +1,308 @@
+.nozzle-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.nozzle-regulation {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 0.45rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(12, 59, 122, 0.22);
+  background: #e8f1fb;
+  color: #0c3b7a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.nozzle-regulation--inline {
+  margin-bottom: 0.55rem;
+}
+
+.nozzle-composer {
+  display: grid;
+  gap: 1rem;
+}
+
+.nozzle-qty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.85rem 1rem;
+}
+
+.nozzle-qty .reg-doc-form__field {
+  min-width: min(220px, 100%);
+}
+
+.nozzle-meta {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  align-items: end;
+}
+
+.nozzle-meta__datetime {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid rgba(61, 143, 212, 0.18);
+  background: #f8fbff;
+}
+
+.nozzle-meta__datetime span {
+  font-size: 0.82rem;
+  color: var(--gray-600, #4b5563);
+}
+
+.nozzle-meta__datetime strong {
+  font-size: 0.95rem;
+  color: var(--blue-dark, #0c3b7a);
+}
+
+.nozzle-overall {
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-size: 0.95rem;
+}
+
+.nozzle-overall--aprovado {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+.nozzle-overall--reprovado {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.nozzle-overall--pendente {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.nozzle-cards {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.nozzle-card {
+  border: 1px solid rgba(61, 143, 212, 0.22);
+  border-radius: 14px;
+  padding: 0.95rem 1rem;
+  background: #f8fbff;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.nozzle-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.nozzle-card__header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--blue-dark, #0c3b7a);
+}
+
+.nozzle-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.nozzle-badge--aprovado {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.nozzle-badge--reprovado {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.nozzle-badge--pendente {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.nozzle-card__grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.nozzle-vol-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.nozzle-vol-col {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.nozzle-choice {
+  margin: 0;
+  border: 1px solid rgba(61, 143, 212, 0.18);
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+}
+
+.nozzle-choice legend {
+  padding: 0 0.25rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--gray-700, #374151);
+}
+
+.nozzle-choice label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+}
+
+.nozzle-reasons {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: #991b1b;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.nozzle-evidence {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.nozzle-photo-preview {
+  margin-top: 0.65rem;
+}
+
+.nozzle-photo-preview img,
+.nozzle-photo-preview__img {
+  display: block;
+  width: min(100%, 360px);
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid rgba(61, 143, 212, 0.22);
+}
+
+.nozzle-photo-preview p,
+.nozzle-inline-error {
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+}
+
+.nozzle-inline-error {
+  color: #991b1b;
+}
+
+.nozzle-signature {
+  display: block;
+  width: min(100%, 320px);
+  max-height: 140px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid rgba(61, 143, 212, 0.22);
+  border-radius: 10px;
+}
+
+.nozzle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.nozzle-detail-list {
+  margin: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.nozzle-detail-list > div {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 0.4rem;
+  font-size: 0.86rem;
+}
+
+.nozzle-detail-list dt {
+  color: var(--gray-600, #4b5563);
+}
+
+.nozzle-detail-list dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.nozzle-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.nozzle-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgba(12, 59, 122, 0.45);
+}
+
+.nozzle-modal__panel {
+  position: relative;
+  z-index: 1;
+  width: min(920px, 100%);
+  max-height: min(90vh, 900px);
+  overflow: auto;
+  background: var(--white, #fff);
+  border-radius: 16px;
+  padding: 1.1rem 1.2rem 1.25rem;
+  box-shadow: var(--shadow-card);
+  display: grid;
+  gap: 1rem;
+}
+
+.nozzle-vol-suggest {
+  position: relative;
+}
+
+@media (max-width: 760px) {
+  .nozzle-card__grid,
+  .nozzle-vol-grid,
+  .nozzle-evidence,
+  .nozzle-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .nozzle-detail-list > div {
+    grid-template-columns: 1fr;
+  }
+}

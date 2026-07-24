@@ -14,6 +14,8 @@ import { MenuIcon } from './MenuIcons'
 import DieselDrainagesPage from '../pages/DieselDrainagesPage'
 import DirectRegisterPage from '../pages/DirectRegisterPage'
 import FuelAnalysesPage from '../pages/FuelAnalysesPage'
+import MandatoryEquipmentsPage from '../pages/MandatoryEquipmentsPage'
+import NozzleMetrologyPage from '../pages/NozzleMetrologyPage'
 import ModulePage from '../pages/ModulePage'
 import RegulatoryDocumentsPage from '../pages/RegulatoryDocumentsPage'
 import SettingsPage from '../pages/SettingsPage'
@@ -224,6 +226,12 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
     }
     if (activeMenuId === 'analises-combustiveis') {
       return <FuelAnalysesPage isReadOnly={isReadOnly} />
+    }
+    if (activeMenuId === 'equipamentos-obrigatorios') {
+      return <MandatoryEquipmentsPage isReadOnly={isReadOnly} />
+    }
+    if (activeMenuId === 'verificacao-metrologica-bicos') {
+      return <NozzleMetrologyPage isReadOnly={isReadOnly} />
     }
     if (activeMenuId === 'relatorios-drenagens-diesel') {
       return <DieselDrainagesPage isReadOnly={isReadOnly} />

@@ -1,0 +1,78 @@
+.equip-page .equip-card__desc {
+  margin: 0.25rem 0 0;
+  font-size: 0.84rem;
+  color: var(--gray-600, #4b5563);
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.equip-card__badge--de_acordo {
+  background: #d1fae5 !important;
+  color: #065f46 !important;
+}
+
+.equip-card__badge--nao_de_acordo {
+  background: #fee2e2 !important;
+  color: #991b1b !important;
+}
+
+.equip-card__summary {
+  display: grid;
+  gap: 0.65rem;
+  font-size: 0.9rem;
+}
+
+.equip-card__summary p {
+  margin: 0;
+}
+
+.equip-card__media {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.equip-card__media img {
+  width: min(100%, 280px);
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid rgba(61, 143, 212, 0.22);
+}
+
+.equip-card__thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.equip-card__thumbs img {
+  width: 96px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(61, 143, 212, 0.22);
+}
+
+.equip-card__meta {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--gray-600, #4b5563);
+}
+
+.equip-card .reg-doc-card__header {
+  align-items: flex-start;
+}
+
+.equip-card .reg-doc-card__header-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.equip-card .reg-doc-card__badge {
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+  max-width: 11rem;
+}
