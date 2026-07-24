@@ -27,6 +27,36 @@
   animation: public-posto-enter 0.55s ease both;
 }
 
+.public-posto__export {
+  position: absolute;
+  top: 0.85rem;
+  right: 0;
+  z-index: 2;
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.92);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.public-posto__export:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.public-posto__export:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @keyframes public-posto-enter {
   from {
     opacity: 0;
@@ -317,6 +347,122 @@
   color: var(--gray-600);
 }
 
+.public-posto__fuel-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.public-posto__fuel-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.05rem 1.05rem 1.15rem;
+  border-radius: 16px;
+  border: 1px solid rgba(12, 59, 122, 0.1);
+  background: #f8fbfe;
+}
+
+.public-posto__fuel-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.public-posto__fuel-card-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--blue-dark);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.public-posto__fuel-stamp {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--blue-medium);
+}
+
+.public-posto__fuel-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.public-posto__fuel-grid h4,
+.public-posto__media h4,
+.public-posto__signoff h4 {
+  margin: 0 0 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+}
+
+.public-posto__fuel-grid dl {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.public-posto__fuel-grid dl div {
+  display: grid;
+  grid-template-columns: minmax(7rem, 38%) 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.public-posto__fuel-grid dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+}
+
+.public-posto__fuel-grid dd {
+  font-size: 0.86rem;
+  color: var(--gray-600);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.public-posto__muted {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--gray-500);
+}
+
+.public-posto__media {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.public-posto__signoff {
+  display: grid;
+  gap: 0.85rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(12, 59, 122, 0.08);
+}
+
+.public-posto__signoff p {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--blue-dark);
+}
+
+.public-posto__signature img {
+  display: block;
+  width: min(100%, 280px);
+  max-height: 110px;
+  object-fit: contain;
+  padding: 0.55rem;
+  border-radius: 12px;
+  border: 1px solid var(--gray-300);
+  background: var(--white);
+}
+
 .public-posto__status,
 .public-posto__error {
   padding: 1rem 1.1rem;
@@ -357,6 +503,15 @@
   .public-posto__grid {
     grid-template-columns: 1fr 1fr;
   }
+
+  .public-posto__fuel-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .public-posto__signoff {
+    grid-template-columns: 1fr auto;
+    align-items: end;
+  }
 }
 
 @media (max-width: 640px) {
@@ -377,7 +532,13 @@
     width: 100%;
   }
 
-  .public-posto__item dl div {
+  .public-posto__export {
+    top: 0.65rem;
+    right: 0.15rem;
+  }
+
+  .public-posto__item dl div,
+  .public-posto__fuel-grid dl div {
     grid-template-columns: 1fr;
     gap: 0.12rem;
   }

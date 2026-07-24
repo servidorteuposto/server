@@ -28,6 +28,10 @@ export type FuelAnalysisRaqItem = {
   driver_name: string | null
   distributor_name: string | null
   distributor_cnpj: string | null
+  /** Presente na página pública (join do relatório dono do item). */
+  author_full_name?: string | null
+  signature_storage_path?: string | null
+  report_submitted_at?: string | null
 }
 
 export type FuelAnalysisItem = {
@@ -48,6 +52,10 @@ export type FuelAnalysisItem = {
   photo_latitude: number | null
   photo_longitude: number | null
   photo_captured_at: string | null
+  /** Presente na página pública (join do relatório dono do item). */
+  author_full_name?: string | null
+  signature_storage_path?: string | null
+  report_submitted_at?: string | null
 }
 
 export type FuelAnalysisReport = {
