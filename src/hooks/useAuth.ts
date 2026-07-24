@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { isAdminUser } from '../lib/admin'
 import { getMySubscription, type SubscriptionStatus } from '../lib/subscription'
-import { supabase } from '../lib/supabase'
+import { isImpersonating, supabase } from '../lib/supabase'
 import { shouldExpireSessionAfterAbsence, startTabSession } from '../lib/session'
 
 export function useAuth() {
@@ -26,7 +26,7 @@ export function useAuth() {
     try {
       const subscription = await getMySubscription()
       if (subscription.found && subscription.subscription_status) {
-        if (subscription.subscription_status === 'pending_payment') {
+        if (subscription.subscription_status === 'pending_payment' && !isImpersonating()) {
           await supabase.auth.signOut()
           setSession(null)
           setUser(null)
@@ -36,7 +36,7 @@ export function useAuth() {
         }
 
         setSubscriptionStatus(subscription.subscription_status)
-        setIsReadOnly(Boolean(subscription.is_read_only))
+        setIsReadOnly(isImpersonating() ? false : Boolean(subscription.is_read_only))
       } else {
         setSubscriptionStatus(null)
         setIsReadOnly(false)
@@ -55,7 +55,7 @@ export function useAuth() {
         data: { session: currentSession },
       } = await supabase.auth.getSession()
 
-      if (currentSession && shouldExpireSessionAfterAbsence()) {
+      if (currentSession && shouldExpireSessionAfterAbsence() && !isImpersonating()) {
         await supabase.auth.signOut()
         setSession(null)
         setUser(null)

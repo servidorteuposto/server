@@ -7,6 +7,7 @@ export type MenuId =
   | 'cadastro-direto'
   | 'suporte'
   | 'painel-suporte'
+  | 'contas-usuarios'
   | 'configuracoes'
 
 export type MenuItem = {
@@ -26,11 +27,6 @@ export const MENU_ITEMS: MenuItem[] = [
     description: 'Gestão de documentos exigidos pela regulação do setor.',
   },
   {
-    id: 'seguranca-trabalho',
-    label: 'Segurança do Trabalho',
-    description: 'Registros e controles de segurança ocupacional do posto.',
-  },
-  {
     id: 'analises-combustiveis',
     label: 'Análises de Combustíveis',
     description: 'Laudos, amostras e histórico de análises de combustíveis.',
@@ -44,6 +40,11 @@ export const MENU_ITEMS: MenuItem[] = [
     id: 'relatorios-drenagens-diesel',
     label: 'Relatórios de Drenagens de Tanques de Óleo Diesel',
     description: 'Relatórios e registros de drenagens dos tanques de óleo diesel.',
+  },
+  {
+    id: 'seguranca-trabalho',
+    label: 'Segurança do Trabalho',
+    description: 'Registros e controles de segurança ocupacional do posto.',
   },
   {
     id: 'cadastro-direto',
@@ -61,6 +62,13 @@ export const MENU_ITEMS: MenuItem[] = [
     id: 'painel-suporte',
     label: 'Painel de Suporte',
     description: 'Visualize chamados de usuários com e sem cadastro.',
+    adminOnly: true,
+    pinned: true,
+  },
+  {
+    id: 'contas-usuarios',
+    label: 'Contas dos Usuários',
+    description: 'Liberar acesso e entrar no sistema de cada posto.',
     adminOnly: true,
     pinned: true,
   },

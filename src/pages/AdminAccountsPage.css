@@ -1,0 +1,112 @@
+.admin-accounts-page .reg-docs-page__header {
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.admin-accounts-toolbar {
+  margin-bottom: 1rem;
+}
+
+.admin-accounts-search {
+  max-width: 360px;
+}
+
+.admin-accounts-empty {
+  margin: 0;
+  padding: 1.25rem;
+  border-radius: 12px;
+  background: var(--white);
+  border: 1px dashed rgba(61, 143, 212, 0.28);
+  color: var(--gray-600);
+}
+
+.admin-accounts-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.admin-accounts-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem 1.2rem;
+  border-radius: 14px;
+  background: var(--white);
+  border: 1px solid rgba(61, 143, 212, 0.22);
+  box-shadow: var(--shadow-card);
+}
+
+.admin-accounts-card__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-accounts-card__title h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--blue-dark);
+}
+
+.admin-accounts-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.admin-accounts-badge--active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.admin-accounts-badge--pending_payment {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.admin-accounts-badge--expired {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.admin-accounts-card__meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.admin-accounts-card__meta dt {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--gray-500);
+}
+
+.admin-accounts-card__meta dd {
+  margin: 0.15rem 0 0;
+  color: var(--blue-dark);
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.admin-accounts-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+@media (min-width: 900px) {
+  .admin-accounts-card {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+
+  .admin-accounts-card__actions {
+    flex-direction: column;
+    min-width: 180px;
+  }
+}

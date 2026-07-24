@@ -24,6 +24,35 @@
   text-align: center;
 }
 
+.impersonate-banner {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem 1rem;
+  padding: 0.75rem 1rem;
+  background: #eff6ff;
+  border-bottom: 1px solid #bfdbfe;
+  color: #1e3a8a;
+  font-size: clamp(0.82rem, 2.4vw, 0.9rem);
+  line-height: 1.45;
+  text-align: center;
+}
+
+.impersonate-banner__btn {
+  appearance: none;
+  border: 1px solid rgba(30, 58, 138, 0.28);
+  border-radius: 8px;
+  padding: 0.35rem 0.75rem;
+  background: var(--white);
+  color: #1e3a8a;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .app-shell__body {
   flex: 1;
   min-height: 0;
@@ -330,6 +359,16 @@
   width: min(640px, 90vw);
   height: auto;
   opacity: 0.92;
+}
+
+.home-chooser__logo--photo {
+  width: min(420px, 78vw);
+  max-height: min(420px, 48vh);
+  object-fit: cover;
+  border-radius: 18px;
+  border: 1px solid rgba(61, 143, 212, 0.22);
+  box-shadow: var(--shadow-card);
+  opacity: 1;
 }
 
 .home-chooser__status {

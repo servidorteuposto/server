@@ -12,7 +12,8 @@
     "supabase:deploy-auth": "npx supabase functions deploy secure-auth --project-ref jilzklxnejztpphbryti --no-verify-jwt --use-api",
     "supabase:deploy-alerts": "npx supabase functions deploy send-security-alert --project-ref jilzklxnejztpphbryti --use-api",
     "supabase:deploy-drainage-reminders": "npx supabase functions deploy diesel-drainage-reminders --project-ref jilzklxnejztpphbryti --no-verify-jwt --use-api",
-    "supabase:deploy-functions": "npm run supabase:deploy-auth && npm run supabase:deploy-alerts && npm run supabase:deploy-drainage-reminders"
+    "supabase:deploy-admin-ops": "npx supabase functions deploy admin-ops --project-ref jilzklxnejztpphbryti --use-api",
+    "supabase:deploy-functions": "npm run supabase:deploy-auth && npm run supabase:deploy-alerts && npm run supabase:deploy-drainage-reminders && npm run supabase:deploy-admin-ops"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",

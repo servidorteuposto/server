@@ -6,8 +6,10 @@ import {
   getPinnedMenuItems,
   type MenuId,
 } from '../config/menu'
+import { formatCoords } from '../config/fuel-analyses'
 import { formatCnpj } from '../lib/cnpj'
 import { getMyPostoProfile } from '../lib/fuel-analyses'
+import { getMyPostoSettings, getPostoPhotoUrl } from '../lib/posto-profile'
 import { MenuIcon } from './MenuIcons'
 import DieselDrainagesPage from '../pages/DieselDrainagesPage'
 import DirectRegisterPage from '../pages/DirectRegisterPage'
@@ -15,9 +17,11 @@ import FuelAnalysesPage from '../pages/FuelAnalysesPage'
 import ModulePage from '../pages/ModulePage'
 import RegulatoryDocumentsPage from '../pages/RegulatoryDocumentsPage'
 import SettingsPage from '../pages/SettingsPage'
+import AdminAccountsPage from '../pages/AdminAccountsPage'
 import AdminSupportPage from '../pages/AdminSupportPage'
 import SupportPage from '../pages/SupportPage'
 import WorkSafetyPage from '../pages/WorkSafetyPage'
+import { endImpersonateMode, getImpersonateLabel, isImpersonating } from '../lib/supabase'
 import { supabase } from '../lib/supabase'
 import './AppShell.css'
 
@@ -27,6 +31,14 @@ type AppShellProps = {
   user: User
   isReadOnly: boolean
   isAdmin: boolean
+}
+
+type HomePostoInfo = {
+  nome: string | null
+  cnpj: string | null
+  latitude: number | null
+  longitude: number | null
+  photoUrl: string | null
 }
 
 function useDrawerLayout() {
@@ -45,66 +57,25 @@ function useDrawerLayout() {
   return isDrawer
 }
 
-function capitalizePt(value: string) {
-  if (!value) return value
-  return value.charAt(0).toUpperCase() + value.slice(1)
-}
-
-function HomeStatusFooter() {
-  const [now, setNow] = useState(() => new Date())
-  const [ip, setIp] = useState<string | null>(null)
-  const [ipError, setIpError] = useState(false)
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    fetch('https://api.ipify.org?format=json')
-      .then((response) => {
-        if (!response.ok) throw new Error('ip_failed')
-        return response.json() as Promise<{ ip: string }>
-      })
-      .then((data) => {
-        if (!cancelled) setIp(data.ip)
-      })
-      .catch(() => {
-        if (!cancelled) setIpError(true)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const dateLabel = capitalizePt(
-    now.toLocaleDateString('pt-BR', {
-      weekday: 'long',
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-    }),
-  )
-  const timeLabel = now.toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
+function HomePostoFooter({ info }: { info: HomePostoInfo }) {
+  const coords =
+    info.latitude != null && info.longitude != null
+      ? formatCoords(info.latitude, info.longitude)
+      : 'Não informadas'
 
   return (
     <footer className="home-chooser__status" aria-live="polite">
       <div className="home-chooser__status-item">
-        <span className="home-chooser__status-label">Horário</span>
-        <strong>{timeLabel}</strong>
+        <span className="home-chooser__status-label">Razão social</span>
+        <strong>{info.nome ?? 'Não informada'}</strong>
       </div>
       <div className="home-chooser__status-item">
-        <span className="home-chooser__status-label">Data</span>
-        <strong>{dateLabel}</strong>
+        <span className="home-chooser__status-label">CNPJ</span>
+        <strong>{info.cnpj ?? 'Não informado'}</strong>
       </div>
       <div className="home-chooser__status-item">
-        <span className="home-chooser__status-label">IP conectado</span>
-        <strong>{ip ?? (ipError ? 'Indisponível' : 'Consultando...')}</strong>
+        <span className="home-chooser__status-label">Coordenadas</span>
+        <strong>{coords}</strong>
       </div>
     </footer>
   )
@@ -117,6 +88,13 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [postoNome, setPostoNome] = useState<string | null>(null)
   const [postoCnpj, setPostoCnpj] = useState<string | null>(null)
+  const [homePosto, setHomePosto] = useState<HomePostoInfo>({
+    nome: null,
+    cnpj: null,
+    latitude: null,
+    longitude: null,
+    photoUrl: null,
+  })
 
   const mainMenuItems = getMainMenuItems(isAdmin)
   const pinnedMenuItems = getPinnedMenuItems(isAdmin)
@@ -124,17 +102,66 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
 
   useEffect(() => {
     let cancelled = false
-    void getMyPostoProfile()
-      .then((profile) => {
+
+    async function loadHomePosto() {
+      try {
+        const settings = await getMyPostoSettings()
         if (cancelled) return
-        setPostoNome(profile.nome?.trim() || null)
-        setPostoCnpj(profile.cnpj ? formatCnpj(profile.cnpj) : null)
-      })
-      .catch(() => {
+
+        const nome = settings.nome?.trim() || null
+        const cnpj = settings.cnpj ? formatCnpj(settings.cnpj) : null
+        setPostoNome(nome)
+        setPostoCnpj(cnpj)
+
+        let photoUrl: string | null = null
+        if (settings.foto_storage_path) {
+          try {
+            photoUrl = await getPostoPhotoUrl(settings.foto_storage_path)
+          } catch {
+            photoUrl = null
+          }
+        }
+
         if (cancelled) return
-        setPostoNome(null)
-        setPostoCnpj(null)
-      })
+        setHomePosto({
+          nome,
+          cnpj,
+          latitude: settings.latitude,
+          longitude: settings.longitude,
+          photoUrl,
+        })
+      } catch {
+        if (cancelled) return
+        try {
+          const profile = await getMyPostoProfile()
+          if (cancelled) return
+          const nome = profile.nome?.trim() || null
+          const cnpj = profile.cnpj ? formatCnpj(profile.cnpj) : null
+          setPostoNome(nome)
+          setPostoCnpj(cnpj)
+          setHomePosto({
+            nome,
+            cnpj,
+            latitude: null,
+            longitude: null,
+            photoUrl: null,
+          })
+        } catch {
+          if (cancelled) return
+          setPostoNome(null)
+          setPostoCnpj(null)
+          setHomePosto({
+            nome: null,
+            cnpj: null,
+            latitude: null,
+            longitude: null,
+            photoUrl: null,
+          })
+        }
+      }
+    }
+
+    void loadHomePosto()
     return () => {
       cancelled = true
     }
@@ -175,12 +202,16 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
           </header>
           <div className="home-chooser__logo-wrap">
             <img
-              src="/imagens/logo_teuposto.png"
-              alt="Teu Posto"
-              className="home-chooser__logo"
+              src={homePosto.photoUrl || '/imagens/logo_teuposto.png'}
+              alt={homePosto.photoUrl ? 'Foto do posto' : 'Teu Posto'}
+              className={
+                homePosto.photoUrl
+                  ? 'home-chooser__logo home-chooser__logo--photo'
+                  : 'home-chooser__logo'
+              }
             />
           </div>
-          <HomeStatusFooter />
+          <HomePostoFooter info={homePosto} />
         </section>
       )
     }
@@ -206,6 +237,9 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
     if (activeMenuId === 'painel-suporte' && isAdmin) {
       return <AdminSupportPage />
     }
+    if (activeMenuId === 'contas-usuarios' && isAdmin) {
+      return <AdminAccountsPage />
+    }
     if (activeMenuId === 'configuracoes') {
       return <SettingsPage isReadOnly={isReadOnly} />
     }
@@ -214,6 +248,16 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
 
   return (
     <div className="app-shell" data-menu-ready={activeMenuId !== null}>
+      {isImpersonating() && (
+        <div className="impersonate-banner" role="status">
+          <span>
+            Você está acessando como <strong>{getImpersonateLabel() || 'usuário'}</strong>
+          </span>
+          <button type="button" className="impersonate-banner__btn" onClick={() => void endImpersonateMode()}>
+            Sair desta conta
+          </button>
+        </div>
+      )}
       {isReadOnly && (
         <div className="readonly-banner" role="status">
           Sua assinatura venceu. O sistema está em modo visualização — você pode consultar os dados,
