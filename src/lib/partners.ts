@@ -1,5 +1,4 @@
 import { PARTNER_TYPE_LABELS, type PartnerType } from '../config/partners'
-import { buildEnderecoCompleto } from '../config/posto-settings'
 import { cnpjDigits, isValidCnpj } from './cnpj'
 import { getMyPostoId } from './regulatory-documents'
 import { supabase } from './supabase'
@@ -18,6 +17,8 @@ export type PostoPartner = {
   bairro: string | null
   cidade: string | null
   uf: string | null
+  motorista: string | null
+  placa: string | null
   created_at: string
   updated_at: string
 }
@@ -27,13 +28,8 @@ export type SavePartnerInput = {
   partnerType: PartnerType
   razaoSocial: string
   cnpj: string
-  telefone: string
-  cep: string
-  logradouro: string
-  numero: string
-  bairro: string
-  cidade: string
-  uf: string
+  motorista?: string
+  placa?: string
   existingId?: string
 }
 
@@ -61,30 +57,15 @@ export async function savePartner(input: SavePartnerInput) {
     throw new Error('invalid_cnpj')
   }
 
-  const cep = input.cep.replace(/\D/g, '').slice(0, 8)
-  const uf = input.uf.trim().toUpperCase().slice(0, 2)
-  const endereco = buildEnderecoCompleto({
-    logradouro: input.logradouro,
-    numero: input.numero,
-    bairro: input.bairro,
-    cidade: input.cidade,
-    uf,
-    cep,
-  })
+  const isTransporter = input.partnerType === 'transporter'
 
   const row = {
     posto_id: input.postoId,
     partner_type: input.partnerType,
     razao_social: input.razaoSocial.trim(),
     cnpj,
-    telefone: input.telefone.replace(/\D/g, '') || null,
-    cep: cep || null,
-    logradouro: input.logradouro.trim() || null,
-    numero: input.numero.trim() || null,
-    bairro: input.bairro.trim() || null,
-    cidade: input.cidade.trim() || null,
-    uf: uf || null,
-    endereco: endereco || null,
+    motorista: isTransporter ? input.motorista?.trim() || null : null,
+    placa: isTransporter ? input.placa?.trim().toUpperCase() || null : null,
   }
 
   if (input.existingId) {

@@ -1,12 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { formatCnpj, isValidCnpj } from '../config/fuel-analyses'
 import { PARTNER_TYPE_LABELS, type PartnerType } from '../config/partners'
-import {
-  fetchAddressByCep,
-  formatCep,
-  stripCep,
-} from '../config/posto-settings'
-import { formatPhone } from '../config/work-safety'
 import ConfirmDialog from '../components/regulatory/ConfirmDialog'
 import {
   deletePartner,
@@ -29,7 +23,6 @@ export default function DirectRegisterPage({ isReadOnly }: DirectRegisterPagePro
   const [tab, setTab] = useState<PartnerType>('transporter')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [cepLoading, setCepLoading] = useState(false)
   const [pageError, setPageError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -37,13 +30,8 @@ export default function DirectRegisterPage({ isReadOnly }: DirectRegisterPagePro
 
   const [razaoSocial, setRazaoSocial] = useState('')
   const [cnpj, setCnpj] = useState('')
-  const [telefone, setTelefone] = useState('')
-  const [cep, setCep] = useState('')
-  const [logradouro, setLogradouro] = useState('')
-  const [numero, setNumero] = useState('')
-  const [bairro, setBairro] = useState('')
-  const [cidade, setCidade] = useState('')
-  const [uf, setUf] = useState('')
+  const [motorista, setMotorista] = useState('')
+  const [placa, setPlaca] = useState('')
 
   const filteredPartners = useMemo(
     () => partners.filter((partner) => partner.partner_type === tab),
@@ -73,13 +61,8 @@ export default function DirectRegisterPage({ isReadOnly }: DirectRegisterPagePro
     setEditingId(null)
     setRazaoSocial('')
     setCnpj('')
-    setTelefone('')
-    setCep('')
-    setLogradouro('')
-    setNumero('')
-    setBairro('')
-    setCidade('')
-    setUf('')
+    setMotorista('')
+    setPlaca('')
     setFormError(null)
   }
 
@@ -88,45 +71,9 @@ export default function DirectRegisterPage({ isReadOnly }: DirectRegisterPagePro
     setEditingId(partner.id)
     setRazaoSocial(partner.razao_social)
     setCnpj(formatCnpj(partner.cnpj))
-    setTelefone(partner.telefone ? formatPhone(partner.telefone) : '')
-    setCep(partner.cep ? formatCep(partner.cep) : '')
-    setLogradouro(partner.logradouro ?? '')
-    setNumero(partner.numero ?? '')
-    setBairro(partner.bairro ?? '')
-    setCidade(partner.cidade ?? '')
-    setUf(partner.uf ?? '')
+    setMotorista(partner.motorista ?? '')
+    setPlaca(partner.placa ?? '')
     setFormError(null)
-  }
-
-  async function lookupCep(value: string) {
-    const digits = stripCep(value)
-    if (digits.length !== 8) return
-
-    setCepLoading(true)
-    setFormError(null)
-    try {
-      const address = await fetchAddressByCep(digits)
-      if (!address) {
-        setFormError('CEP não encontrado. Você pode preencher o endereço manualmente.')
-        return
-      }
-      setLogradouro(address.logradouro || '')
-      setBairro(address.bairro || '')
-      setCidade(address.localidade || '')
-      setUf(address.uf || '')
-    } catch {
-      setFormError('Não foi possível consultar o CEP. Tente novamente ou preencha manualmente.')
-    } finally {
-      setCepLoading(false)
-    }
-  }
-
-  function handleCepChange(value: string) {
-    const formatted = formatCep(value)
-    setCep(formatted)
-    if (stripCep(formatted).length === 8) {
-      void lookupCep(formatted)
-    }
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -142,12 +89,6 @@ export default function DirectRegisterPage({ isReadOnly }: DirectRegisterPagePro
       return
     }
 
-    const cepDigits = stripCep(cep)
-    if (cepDigits && cepDigits.length !== 8) {
-      setFormError('Informe um CEP válido com 8 dígitos.')
-      return
-    }
-
     setBusy(true)
     setFormError(null)
 
@@ -157,13 +98,8 @@ export default function DirectRegisterPage({ isReadOnly }: DirectRegisterPagePro
         partnerType: tab,
         razaoSocial,
         cnpj,
-        telefone,
-        cep,
-        logradouro,
-        numero,
-        bairro,
-        cidade,
-        uf,
+        motorista: tab === 'transporter' ? motorista : undefined,
+        placa: tab === 'transporter' ? placa : undefined,
         existingId: editingId ?? undefined,
       })
 
@@ -208,7 +144,7 @@ export default function DirectRegisterPage({ isReadOnly }: DirectRegisterPagePro
           <h1>Cadastro Direto</h1>
           <p>
             Cadastre transportadores e distribuidores para agilizar o lançamento do RAQ com
-            sugestões automáticas de razão social e CNPJ.
+            sugestões automáticas.
           </p>
         </div>
       </header>
@@ -247,7 +183,7 @@ export default function DirectRegisterPage({ isReadOnly }: DirectRegisterPagePro
                 type="text"
                 value={razaoSocial}
                 onChange={(event) => setRazaoSocial(event.target.value)}
-                disabled={busy || cepLoading}
+                disabled={busy}
                 required
               />
             </label>
@@ -258,96 +194,45 @@ export default function DirectRegisterPage({ isReadOnly }: DirectRegisterPagePro
                 inputMode="numeric"
                 value={cnpj}
                 onChange={(event) => setCnpj(formatCnpj(event.target.value))}
-                disabled={busy || cepLoading}
+                disabled={busy}
                 required
                 placeholder="00.000.000/0000-00"
               />
             </label>
-            <label className="reg-doc-form__field">
-              <span>Telefone</span>
-              <input
-                type="tel"
-                value={telefone}
-                onChange={(event) => setTelefone(formatPhone(event.target.value))}
-                disabled={busy || cepLoading}
-                placeholder="(00) 00000-0000"
-              />
-            </label>
-            <label className="reg-doc-form__field">
-              <span>CEP</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={cep}
-                onChange={(event) => handleCepChange(event.target.value)}
-                disabled={busy || cepLoading}
-                placeholder="00000-000"
-              />
-              {cepLoading && <small className="direct-register-hint">Consultando CEP...</small>}
-            </label>
-            <label className="reg-doc-form__field direct-register-grid__full">
-              <span>Logradouro</span>
-              <input
-                type="text"
-                value={logradouro}
-                onChange={(event) => setLogradouro(event.target.value)}
-                disabled={busy || cepLoading}
-                placeholder="Rua, avenida..."
-              />
-            </label>
-            <label className="reg-doc-form__field">
-              <span>Número</span>
-              <input
-                type="text"
-                value={numero}
-                onChange={(event) => setNumero(event.target.value)}
-                disabled={busy || cepLoading}
-              />
-            </label>
-            <label className="reg-doc-form__field">
-              <span>Bairro</span>
-              <input
-                type="text"
-                value={bairro}
-                onChange={(event) => setBairro(event.target.value)}
-                disabled={busy || cepLoading}
-              />
-            </label>
-            <label className="reg-doc-form__field">
-              <span>Cidade</span>
-              <input
-                type="text"
-                value={cidade}
-                onChange={(event) => setCidade(event.target.value)}
-                disabled={busy || cepLoading}
-              />
-            </label>
-            <label className="reg-doc-form__field">
-              <span>UF</span>
-              <input
-                type="text"
-                value={uf}
-                onChange={(event) => setUf(event.target.value.toUpperCase().slice(0, 2))}
-                disabled={busy || cepLoading}
-                maxLength={2}
-                placeholder="UF"
-              />
-            </label>
+            {tab === 'transporter' && (
+              <>
+                <label className="reg-doc-form__field">
+                  <span>Nome do motorista</span>
+                  <input
+                    type="text"
+                    value={motorista}
+                    onChange={(event) => setMotorista(event.target.value)}
+                    disabled={busy}
+                    placeholder="Opcional"
+                  />
+                </label>
+                <label className="reg-doc-form__field">
+                  <span>Placa do caminhão</span>
+                  <input
+                    type="text"
+                    value={placa}
+                    onChange={(event) => setPlaca(event.target.value.toUpperCase())}
+                    disabled={busy}
+                    placeholder="Opcional"
+                  />
+                </label>
+              </>
+            )}
           </div>
 
           {formError && <p className="reg-doc-form__error">{formError}</p>}
 
           <div className="reg-doc-card__actions">
-            <button type="submit" className="btn btn--primary" disabled={busy || cepLoading}>
+            <button type="submit" className="btn btn--primary" disabled={busy}>
               {busy ? 'Salvando...' : editingId ? 'Salvar alteração' : 'Cadastrar'}
             </button>
             {editingId && (
-              <button
-                type="button"
-                className="btn btn--secondary"
-                onClick={resetForm}
-                disabled={busy || cepLoading}
-              >
+              <button type="button" className="btn btn--secondary" onClick={resetForm} disabled={busy}>
                 Cancelar edição
               </button>
             )}
@@ -366,8 +251,12 @@ export default function DirectRegisterPage({ isReadOnly }: DirectRegisterPagePro
                 <div>
                   <h3>{partner.razao_social}</h3>
                   <p>CNPJ {formatCnpj(partner.cnpj)}</p>
-                  {partner.telefone && <p>Tel. {formatPhone(partner.telefone)}</p>}
-                  {partner.endereco && <p>{partner.endereco}</p>}
+                  {partner.partner_type === 'transporter' && partner.motorista && (
+                    <p>Motorista: {partner.motorista}</p>
+                  )}
+                  {partner.partner_type === 'transporter' && partner.placa && (
+                    <p>Placa: {partner.placa}</p>
+                  )}
                 </div>
                 {!isReadOnly && (
                   <div className="direct-register-list__actions">

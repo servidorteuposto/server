@@ -84,6 +84,12 @@ export default function PartnerSuggestField({
               >
                 <strong>{partner.razao_social}</strong>
                 <span>CNPJ {formatCnpj(partner.cnpj)}</span>
+                {partner.partner_type === 'transporter' &&
+                  (partner.motorista || partner.placa) && (
+                    <span>
+                      {[partner.motorista, partner.placa].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
               </button>
             </li>
           ))}

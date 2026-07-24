@@ -802,6 +802,8 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                               updateRaq(product.key, {
                                 transporterName: partner.razao_social,
                                 transporterCnpj: formatCnpj(partner.cnpj),
+                                ...(partner.motorista ? { driverName: partner.motorista } : {}),
+                                ...(partner.placa ? { truckPlate: partner.placa } : {}),
                               })
                             }
                           />
@@ -819,6 +821,8 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                               updateRaq(product.key, {
                                 transporterName: partner.razao_social,
                                 transporterCnpj: formatCnpj(partner.cnpj),
+                                ...(partner.motorista ? { driverName: partner.motorista } : {}),
+                                ...(partner.placa ? { truckPlate: partner.placa } : {}),
                               })
                             }
                           />
