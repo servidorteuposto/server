@@ -320,22 +320,22 @@
 }
 
 .app-shell__mobile-menu {
-  display: none;
+  display: flex;
   position: relative;
   z-index: 2;
   flex-direction: column;
   justify-content: center;
   gap: 4px;
   flex-shrink: 0;
-  width: 42px;
-  height: 42px;
-  margin: 0 0 0.85rem;
+  width: 40px;
+  height: 40px;
+  margin: 0;
   padding: 0;
   border: 1px solid var(--gray-300);
   border-radius: 10px;
   background: var(--white);
   cursor: pointer;
-  box-shadow: 0 2px 10px rgba(12, 59, 122, 0.14);
+  box-shadow: none;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
@@ -349,7 +349,11 @@
   border-radius: 1px;
 }
 
-.app-shell:has(.reg-doc-modal) .app-shell__mobile-menu {
+.app-topbar {
+  display: none;
+}
+
+.app-shell:has(.reg-doc-modal) .app-topbar {
   display: none !important;
 }
 
@@ -506,19 +510,67 @@
     transform: translateX(0);
   }
 
-  .app-shell__mobile-menu {
+  .app-topbar {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    width: 100%;
+    box-sizing: border-box;
+    padding:
+      calc(0.55rem + env(safe-area-inset-top, 0))
+      0.85rem
+      0.55rem;
+    background: var(--white);
+    border-bottom: 1px solid rgba(61, 143, 212, 0.16);
+    z-index: 15;
+  }
+
+  .app-topbar__brand {
     display: flex;
+    align-items: center;
+    justify-content: center;
+    justify-self: center;
+    width: auto;
+    max-width: min(160px, 46vw);
+    margin: 0;
+    padding: 0.15rem 0.35rem;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .app-topbar__brand:focus-visible {
+    outline: 2px solid rgba(61, 143, 212, 0.45);
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+
+  .app-topbar__logo {
+    display: block;
+    width: min(148px, 42vw);
+    height: auto;
+    max-height: 34px;
+    object-fit: contain;
+  }
+
+  .app-topbar__spacer {
+    width: 40px;
+    height: 40px;
   }
 
   .app-content {
-    padding-top: calc(0.85rem + env(safe-area-inset-top, 0));
+    padding-top: 0.85rem;
     padding-left: 0.85rem;
     padding-right: 0.85rem;
     padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0));
   }
 
   .app-content[data-home='true'] {
-    padding-top: calc(0.85rem + env(safe-area-inset-top, 0));
+    padding-top: 0.85rem;
   }
 }
 

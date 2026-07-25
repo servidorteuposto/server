@@ -333,20 +333,40 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
         </aside>
 
         <div className="app-main">
-          <main className="app-content" data-home={activeMenuId === null}>
-            {isDrawerLayout && !sidebarOpen && (
+          {isDrawerLayout && (
+            <header className="app-topbar">
+              {!sidebarOpen ? (
+                <button
+                  type="button"
+                  className="app-shell__mobile-menu"
+                  aria-label="Abrir menu"
+                  aria-expanded={sidebarOpen}
+                  onClick={() => setSidebarOpen(true)}
+                >
+                  <span />
+                  <span />
+                  <span />
+                </button>
+              ) : (
+                <span className="app-topbar__spacer" aria-hidden="true" />
+              )}
               <button
                 type="button"
-                className="app-shell__mobile-menu"
-                aria-label="Abrir menu"
-                aria-expanded={sidebarOpen}
-                onClick={() => setSidebarOpen(true)}
+                className="app-topbar__brand"
+                onClick={goHome}
+                aria-label="Voltar ao início"
+                title="Voltar ao início"
               >
-                <span />
-                <span />
-                <span />
+                <img
+                  src="/imagens/logo_teuposto.png"
+                  alt="Teu Posto"
+                  className="app-topbar__logo"
+                />
               </button>
-            )}
+              <span className="app-topbar__spacer" aria-hidden="true" />
+            </header>
+          )}
+          <main className="app-content" data-home={activeMenuId === null}>
             {renderActivePage()}
           </main>
         </div>
