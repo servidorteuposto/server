@@ -494,6 +494,20 @@
 /* ── Responsive ── */
 
 @media (max-width: 960px) {
+  .app-shell {
+    padding-top: 0;
+  }
+
+  .app-shell:has(.readonly-banner) .readonly-banner,
+  .app-shell:has(.impersonate-banner):not(:has(.readonly-banner)) .impersonate-banner {
+    padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+  }
+
+  .app-shell:has(.readonly-banner) .app-topbar,
+  .app-shell:has(.impersonate-banner) .app-topbar {
+    padding-top: 0.35rem;
+  }
+
   .app-sidebar {
     position: fixed;
     top: 0;
@@ -518,10 +532,11 @@
     flex-shrink: 0;
     width: 100%;
     box-sizing: border-box;
+    min-height: 3rem;
     padding:
-      calc(0.55rem + env(safe-area-inset-top, 0))
-      0.85rem
-      0.55rem;
+      max(0.35rem, env(safe-area-inset-top, 0px))
+      0.75rem
+      0.35rem;
     background: var(--white);
     border-bottom: 1px solid rgba(61, 143, 212, 0.16);
     z-index: 15;
@@ -533,9 +548,9 @@
     justify-content: center;
     justify-self: center;
     width: auto;
-    max-width: min(220px, 58vw);
+    max-width: min(240px, 62vw);
     margin: 0;
-    padding: 0.2rem 0.35rem;
+    padding: 0;
     border: none;
     background: transparent;
     cursor: pointer;
@@ -550,10 +565,10 @@
   }
 
   .app-topbar__wordmark {
-    font-family: 'Outfit', var(--font-family);
-    font-size: 1.28rem;
-    font-weight: 700;
-    letter-spacing: -0.03em;
+    font-family: 'Grand Hotel', cursive;
+    font-size: 2rem;
+    font-weight: 400;
+    letter-spacing: 0.01em;
     line-height: 1;
     color: var(--blue-dark, #0c3b7a);
     white-space: nowrap;
