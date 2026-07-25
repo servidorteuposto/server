@@ -184,7 +184,7 @@ export default function DocumentUploadCard({
               </label>
 
               <label className="reg-doc-form__field">
-                <span>Data de validade (opcional)</span>
+                <span>Data de validade</span>
                 <input
                   type="date"
                   value={expiresAt}

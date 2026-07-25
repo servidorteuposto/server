@@ -13,11 +13,22 @@ export const VOLUMETRY_STEP = 20
 export const VOLUMETRY_TOLERANCE_MIN = -100
 export const VOLUMETRY_TOLERANCE_MAX = 100
 
-/** Vazão mínima: 5 L em pelo menos 60 s. */
-export const FLOW_MIN_SECONDS_REQUIRED = 60
+/**
+ * Diferença máxima permitida entre volumetria mínima e máxima do mesmo bico.
+ * Cada passo de 20 = 0,1%; acima de 0,5% reprova.
+ * Ex.: +100 e −20 → 0,6% → fora.
+ */
+export const VOLUMETRY_PERCENT_PER_STEP = 0.1
+export const VOLUMETRY_SPREAD_MAX_PERCENT = 0.5
 
-/** Vazão máxima: 5 L em no máximo 12 s. */
-export const FLOW_MAX_SECONDS_REQUIRED = 12
+/** Vazão mínima: em 1 minuto, no máximo 5 L (5 L em pelo menos 60 s). */
+export const FLOW_MIN_LITERS_LIMIT = 5
+
+/** Vazão máxima: em 12 segundos, no mínimo 5 L. */
+export const FLOW_MAX_LITERS_REQUIRED = 5
+
+export const FLOW_MIN_TIME_LABEL = '1 minuto'
+export const FLOW_MAX_TIME_LABEL = '12 segundos'
 
 export type MetrologyStatus = 'aprovado' | 'reprovado'
 
@@ -80,12 +91,25 @@ export function isVolumetryApproved(value: number) {
   return value >= VOLUMETRY_TOLERANCE_MIN && value <= VOLUMETRY_TOLERANCE_MAX
 }
 
-export function isFlowMinApproved(seconds: number) {
-  return Number.isFinite(seconds) && seconds >= FLOW_MIN_SECONDS_REQUIRED
+/** Diferença percentual entre dois valores de volumetria (20 = 0,1%). */
+export function volumetryDifferencePercent(a: number, b: number) {
+  return (Math.abs(a - b) / VOLUMETRY_STEP) * VOLUMETRY_PERCENT_PER_STEP
 }
 
-export function isFlowMaxApproved(seconds: number) {
-  return Number.isFinite(seconds) && seconds > 0 && seconds <= FLOW_MAX_SECONDS_REQUIRED
+export function formatPercentPt(value: number) {
+  return `${value.toFixed(1).replace('.', ',')}%`
+}
+
+export function isVolumetrySpreadApproved(a: number, b: number) {
+  return volumetryDifferencePercent(a, b) <= VOLUMETRY_SPREAD_MAX_PERCENT
+}
+
+export function isFlowMinApproved(liters: number) {
+  return Number.isFinite(liters) && liters > 0 && liters <= FLOW_MIN_LITERS_LIMIT
+}
+
+export function isFlowMaxApproved(liters: number) {
+  return Number.isFinite(liters) && liters >= FLOW_MAX_LITERS_REQUIRED
 }
 
 export type NozzleDraftEvaluation = {
@@ -98,8 +122,8 @@ export type NozzleDraftInput = {
   fuelOtherLabel: string
   volumetryMin: number | null
   volumetryMax: number | null
-  flowMinSeconds: number | null
-  flowMaxSeconds: number | null
+  flowMinLiters: number | null
+  flowMaxLiters: number | null
   sealsOk: boolean | null
   leakage: boolean | null
 }
@@ -111,8 +135,8 @@ export function evaluateNozzleDraft(input: NozzleDraftInput): NozzleDraftEvaluat
     (input.fuelProductKey === 'outro' && !input.fuelOtherLabel.trim()) ||
     input.volumetryMin == null ||
     input.volumetryMax == null ||
-    input.flowMinSeconds == null ||
-    input.flowMaxSeconds == null ||
+    input.flowMinLiters == null ||
+    input.flowMaxLiters == null ||
     input.sealsOk == null ||
     input.leakage == null
 
@@ -130,14 +154,21 @@ export function evaluateNozzleDraft(input: NozzleDraftInput): NozzleDraftEvaluat
       `Volumetria máxima fora da tolerância (${VOLUMETRY_TOLERANCE_MIN} a ${VOLUMETRY_TOLERANCE_MAX}).`,
     )
   }
-  if (!isFlowMinApproved(input.flowMinSeconds!)) {
+  if (!isVolumetrySpreadApproved(input.volumetryMin!, input.volumetryMax!)) {
+    const percent = volumetryDifferencePercent(input.volumetryMin!, input.volumetryMax!)
     reasons.push(
-      `Vazão mínima: 5 L devem levar pelo menos ${FLOW_MIN_SECONDS_REQUIRED} s (1 minuto).`,
+      `Diferença entre volumetria mínima e máxima acima de ${formatPercentPt(VOLUMETRY_SPREAD_MAX_PERCENT)} ` +
+        `(${formatPercentPt(percent)} entre ${formatVolumetryLabel(input.volumetryMin!)} e ${formatVolumetryLabel(input.volumetryMax!)}).`,
     )
   }
-  if (!isFlowMaxApproved(input.flowMaxSeconds!)) {
+  if (!isFlowMinApproved(input.flowMinLiters!)) {
     reasons.push(
-      `Vazão máxima: 5 L devem ser entregues em até ${FLOW_MAX_SECONDS_REQUIRED} s.`,
+      `Vazão mínima: em ${FLOW_MIN_TIME_LABEL} deve entregar no máximo ${FLOW_MIN_LITERS_LIMIT} L.`,
+    )
+  }
+  if (!isFlowMaxApproved(input.flowMaxLiters!)) {
+    reasons.push(
+      `Vazão máxima: em ${FLOW_MAX_TIME_LABEL} deve entregar no mínimo ${FLOW_MAX_LITERS_REQUIRED} L.`,
     )
   }
   if (input.sealsOk === false) {

@@ -3,7 +3,6 @@ import type { User } from '@supabase/supabase-js'
 import {
   getMainMenuItems,
   getMenuItem,
-  getPinnedMenuItems,
   type MenuId,
 } from '../config/menu'
 import { formatCoords } from '../config/fuel-analyses'
@@ -99,7 +98,6 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
   })
 
   const mainMenuItems = getMainMenuItems(isAdmin)
-  const pinnedMenuItems = getPinnedMenuItems(isAdmin)
   const activeModule = activeMenuId ? getMenuItem(activeMenuId) : null
 
   useEffect(() => {
@@ -323,45 +321,17 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
             </ul>
           </nav>
 
-          <div className="app-sidebar__bottom">
-            <nav className="app-sidebar__pinned" aria-label="Atalhos">
-              <ul>
-                {pinnedMenuItems.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      className="app-sidebar__link"
-                      data-active={activeMenuId === item.id}
-                      onClick={() => selectMenu(item.id)}
-                    >
-                      <MenuIcon id={item.id} className="app-sidebar__icon" />
-                      <span>{item.label}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-
-            <div className="app-sidebar__footer">
-              <div className="app-sidebar__posto">
-                <strong className="app-sidebar__razao">
-                  {postoNome ?? (isAdmin ? 'Administrador' : 'Carregando...')}
-                </strong>
-                {postoCnpj && <span className="app-sidebar__cnpj">CNPJ {postoCnpj}</span>}
-              </div>
-              <div className="app-sidebar__footer-links">
-                <button type="button" className="app-sidebar__logout" onClick={handleSignOut}>
-                  Sair
-                </button>
-                <span className="app-sidebar__footer-sep" aria-hidden="true" />
-                <button
-                  type="button"
-                  className="app-sidebar__support"
-                  onClick={() => selectMenu(isAdmin ? 'painel-suporte' : 'suporte')}
-                >
-                  Suporte
-                </button>
-              </div>
+          <div className="app-sidebar__footer">
+            <div className="app-sidebar__posto">
+              <strong className="app-sidebar__razao">
+                {postoNome ?? (isAdmin ? 'Administrador' : 'Carregando...')}
+              </strong>
+              {postoCnpj && <span className="app-sidebar__cnpj">CNPJ {postoCnpj}</span>}
+            </div>
+            <div className="app-sidebar__footer-links">
+              <button type="button" className="app-sidebar__logout" onClick={handleSignOut}>
+                Sair
+              </button>
             </div>
           </div>
         </aside>

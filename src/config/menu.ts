@@ -17,8 +17,6 @@ export type MenuItem = {
   description: string
   adminOnly?: boolean
   hideForAdmin?: boolean
-  /** Itens fixos na base da sidebar (sem scroll). */
-  pinned?: boolean
 }
 
 export const MENU_ITEMS: MenuItem[] = [
@@ -44,7 +42,7 @@ export const MENU_ITEMS: MenuItem[] = [
   },
   {
     id: 'relatorios-drenagens-diesel',
-    label: 'Relatórios de Drenagens de Tanques de Óleo Diesel',
+    label: 'Drenagens de Tanques de Diesel',
     description: 'Relatórios e registros de drenagens dos tanques de óleo diesel.',
   },
   {
@@ -58,31 +56,27 @@ export const MENU_ITEMS: MenuItem[] = [
     description: 'Cadastro de transportadores e distribuidores para agilizar o RAQ.',
   },
   {
-    id: 'suporte',
-    label: 'Suporte',
-    description: 'Envie dúvida, sugestão ou reclamação para a equipe do teu posto.',
-    hideForAdmin: true,
-    pinned: true,
+    id: 'configuracoes',
+    label: 'Configurações do Sistema',
+    description: 'Preferências, usuários e parâmetros gerais do sistema.',
   },
   {
     id: 'painel-suporte',
     label: 'Painel de Suporte',
     description: 'Visualize chamados de usuários com e sem cadastro.',
     adminOnly: true,
-    pinned: true,
   },
   {
     id: 'contas-usuarios',
     label: 'Contas dos Usuários',
     description: 'Liberar acesso e entrar no sistema de cada posto.',
     adminOnly: true,
-    pinned: true,
   },
   {
-    id: 'configuracoes',
-    label: 'Configurações do Sistema',
-    description: 'Preferências, usuários e parâmetros gerais do sistema.',
-    pinned: true,
+    id: 'suporte',
+    label: 'Suporte',
+    description: 'Envie dúvida, sugestão ou reclamação para a equipe do teu posto.',
+    hideForAdmin: true,
   },
 ]
 
@@ -101,9 +95,5 @@ export function getVisibleMenuItems(isAdmin: boolean) {
 }
 
 export function getMainMenuItems(isAdmin: boolean) {
-  return getVisibleMenuItems(isAdmin).filter((item) => !item.pinned)
-}
-
-export function getPinnedMenuItems(isAdmin: boolean) {
-  return getVisibleMenuItems(isAdmin).filter((item) => item.pinned)
+  return getVisibleMenuItems(isAdmin)
 }

@@ -33,37 +33,37 @@ export const MANDATORY_EQUIPMENT_TEMPLATES: MandatoryEquipmentTemplate[] = [
   {
     key: 'densimetro-1-gasolina',
     title: 'Densímetro 1 de Gasolina',
-    description: 'Escala de 700 a 750',
+    description: 'Escala de 700°C a 750°C',
     kind: 'standard',
   },
   {
     key: 'densimetro-2-gasolina',
     title: 'Densímetro 2 de Gasolina',
-    description: 'Escala de 750 a 800',
+    description: 'Escala de 750°C a 800°C',
     kind: 'standard',
   },
   {
     key: 'densimetro-1-diesel',
     title: 'Densímetro 1 de Diesel',
-    description: 'Escala de 800 a 850',
+    description: 'Escala de 800°C a 850°C',
     kind: 'standard',
   },
   {
     key: 'densimetro-2-diesel',
     title: 'Densímetro 2 de Diesel',
-    description: 'Escala de 850 a 900',
+    description: 'Escala de 850°C a 900°C',
     kind: 'standard',
   },
   {
     key: 'densimetro-1-etanol',
     title: 'Densímetro 1 de Etanol',
-    description: 'Escala de 750 a 800',
+    description: 'Escala de 750°C a 800°C',
     kind: 'standard',
   },
   {
     key: 'densimetro-2-etanol',
     title: 'Densímetro 2 de Etanol',
-    description: 'Escala de 800 a 850',
+    description: 'Escala de 800°C a 850°C',
     kind: 'standard',
   },
   {
@@ -80,11 +80,12 @@ export const MANDATORY_EQUIPMENT_TEMPLATES: MandatoryEquipmentTemplate[] = [
   },
 ]
 
-export type EquipmentComplianceStatus = 'de_acordo' | 'nao_de_acordo'
+export type EquipmentComplianceStatus = 'pendente' | 'nao_apto' | 'de_acordo'
 
 export const EQUIPMENT_STATUS_LABELS: Record<EquipmentComplianceStatus, string> = {
-  de_acordo: 'EQUIPAMENTO DE ACORDO',
-  nao_de_acordo: 'EQUIPAMENTO NÃO DE ACORDO',
+  pendente: 'PENDENTE',
+  nao_apto: 'NÃO APTO',
+  de_acordo: 'DE ACORDO',
 }
 
 export type EquipmentPhotoMeta = {

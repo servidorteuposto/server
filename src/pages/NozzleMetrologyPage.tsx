@@ -9,8 +9,10 @@ import {
 } from '../config/fuel-analyses'
 import {
   evaluateNozzleDraft,
-  FLOW_MAX_SECONDS_REQUIRED,
-  FLOW_MIN_SECONDS_REQUIRED,
+  FLOW_MAX_LITERS_REQUIRED,
+  FLOW_MAX_TIME_LABEL,
+  FLOW_MIN_LITERS_LIMIT,
+  FLOW_MIN_TIME_LABEL,
   formatNozzleLabel,
   formatVolumetryLabel,
   fuelLabel,
@@ -18,6 +20,7 @@ import {
   NOZZLE_METROLOGY_MAX_NOZZLES,
   NOZZLE_METROLOGY_REGULATION,
   statusLabel,
+  VOLUMETRY_SPREAD_MAX_PERCENT,
   VOLUMETRY_TOLERANCE_MAX,
   VOLUMETRY_TOLERANCE_MIN,
   type MetrologyStatus,
@@ -47,8 +50,8 @@ type NozzleDraft = {
   fuelOtherLabel: string
   volumetryMin: number | null
   volumetryMax: number | null
-  flowMinSeconds: string
-  flowMaxSeconds: string
+  flowMinLiters: string
+  flowMaxLiters: string
   sealsOk: boolean | null
   leakage: boolean | null
 }
@@ -67,7 +70,7 @@ function readGeolocation(): Promise<GeolocationPosition> {
   })
 }
 
-function parseSeconds(raw: string): number | null {
+function parseLiters(raw: string): number | null {
   const cleaned = raw.trim().replace(',', '.')
   if (!cleaned) return null
   const value = Number(cleaned)
@@ -83,8 +86,8 @@ function createEmptyNozzle(nozzleNumber: number): NozzleDraft {
     fuelOtherLabel: '',
     volumetryMin: null,
     volumetryMax: null,
-    flowMinSeconds: '',
-    flowMaxSeconds: '',
+    flowMinLiters: '',
+    flowMaxLiters: '',
     sealsOk: null,
     leakage: null,
   }
@@ -150,8 +153,8 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
           fuelOtherLabel: nozzle.fuelOtherLabel,
           volumetryMin: nozzle.volumetryMin,
           volumetryMax: nozzle.volumetryMax,
-          flowMinSeconds: parseSeconds(nozzle.flowMinSeconds),
-          flowMaxSeconds: parseSeconds(nozzle.flowMaxSeconds),
+          flowMinLiters: parseLiters(nozzle.flowMinLiters),
+          flowMaxLiters: parseLiters(nozzle.flowMaxLiters),
           sealsOk: nozzle.sealsOk,
           leakage: nozzle.leakage,
         }),
@@ -289,8 +292,8 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
               nozzle.fuelProductKey === 'outro' ? nozzle.fuelOtherLabel.trim() : null,
             volumetryMin: nozzle.volumetryMin!,
             volumetryMax: nozzle.volumetryMax!,
-            flowMinSeconds: parseSeconds(nozzle.flowMinSeconds)!,
-            flowMaxSeconds: parseSeconds(nozzle.flowMaxSeconds)!,
+            flowMinLiters: parseLiters(nozzle.flowMinLiters)!,
+            flowMaxLiters: parseLiters(nozzle.flowMaxLiters)!,
             sealsOk: nozzle.sealsOk!,
             leakage: nozzle.leakage!,
             itemStatus: evaluation.status as MetrologyStatus,
@@ -345,9 +348,11 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
                 <strong>{formatDateTimePtBr(verifiedAtPreview)}</strong>
               </p>
               <p className="fuel-panel__hint">
-                Volumetria em passos de 20 (−200 a +200). Tolerância: {VOLUMETRY_TOLERANCE_MIN} a{' '}
-                {VOLUMETRY_TOLERANCE_MAX}. Vazão mínima ≥ {FLOW_MIN_SECONDS_REQUIRED}s para 5 L;
-                máxima ≤ {FLOW_MAX_SECONDS_REQUIRED}s para 5 L.
+                Volumetria em passos de 20 (−200 a +200). Tolerância individual: {VOLUMETRY_TOLERANCE_MIN}{' '}
+                a {VOLUMETRY_TOLERANCE_MAX}. Diferença entre mínima e máxima do bico: no máximo{' '}
+                {String(VOLUMETRY_SPREAD_MAX_PERCENT).replace('.', ',')}% (cada 20 = 0,1%). Vazão
+                mínima: até {FLOW_MIN_LITERS_LIMIT} L em {FLOW_MIN_TIME_LABEL}; máxima: pelo menos{' '}
+                {FLOW_MAX_LITERS_REQUIRED} L em {FLOW_MAX_TIME_LABEL}.
               </p>
             </div>
             <button type="button" className="btn btn--secondary" onClick={closeComposer} disabled={busy}>
@@ -404,10 +409,16 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
                     required
                   />
                 </label>
-                <div className="nozzle-meta__datetime">
+                <label className="reg-doc-form__field">
                   <span>Data e horário</span>
-                  <strong>{formatDateTimePtBr(verifiedAtPreview)}</strong>
-                </div>
+                  <input
+                    type="text"
+                    value={formatDateTimePtBr(verifiedAtPreview)}
+                    readOnly
+                    tabIndex={-1}
+                    className="nozzle-meta__datetime-input"
+                  />
+                </label>
               </div>
 
               <div className={`nozzle-overall nozzle-overall--${overallStatus}`}>
@@ -426,7 +437,7 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
                         </span>
                       </header>
 
-                      <div className="nozzle-card__grid">
+                      <div className="nozzle-card__fuel">
                         <label className="reg-doc-form__field">
                           <span>Combustível</span>
                           <select
@@ -466,98 +477,98 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
                       </div>
 
                       <div className="nozzle-vol-grid">
-                        <div className="nozzle-vol-col">
-                          <VolumetrySuggestField
-                            label="Volumetria mínima"
-                            value={nozzle.volumetryMin}
+                        <VolumetrySuggestField
+                          label="Vol. mínima"
+                          value={nozzle.volumetryMin}
+                          disabled={isReadOnly || busy}
+                          onChange={(value) => updateNozzle(nozzle.id, { volumetryMin: value })}
+                        />
+                        <label className="reg-doc-form__field">
+                          <span>Vazão (1 min)</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={nozzle.flowMinLiters}
                             disabled={isReadOnly || busy}
-                            onChange={(value) => updateNozzle(nozzle.id, { volumetryMin: value })}
+                            onChange={(event) =>
+                              updateNozzle(nozzle.id, { flowMinLiters: event.target.value })
+                            }
+                            placeholder={`≤ ${FLOW_MIN_LITERS_LIMIT} L`}
                           />
-                          <label className="reg-doc-form__field">
-                            <span>Tempo de vazão (s)</span>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={nozzle.flowMinSeconds}
-                              disabled={isReadOnly || busy}
-                              onChange={(event) =>
-                                updateNozzle(nozzle.id, { flowMinSeconds: event.target.value })
-                              }
-                              placeholder={`≥ ${FLOW_MIN_SECONDS_REQUIRED}`}
-                            />
-                          </label>
-                        </div>
-                        <div className="nozzle-vol-col">
-                          <VolumetrySuggestField
-                            label="Volumetria máxima"
-                            value={nozzle.volumetryMax}
+                        </label>
+                        <VolumetrySuggestField
+                          label="Vol. máxima"
+                          value={nozzle.volumetryMax}
+                          disabled={isReadOnly || busy}
+                          onChange={(value) => updateNozzle(nozzle.id, { volumetryMax: value })}
+                        />
+                        <label className="reg-doc-form__field">
+                          <span>Vazão (12 s)</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={nozzle.flowMaxLiters}
                             disabled={isReadOnly || busy}
-                            onChange={(value) => updateNozzle(nozzle.id, { volumetryMax: value })}
+                            onChange={(event) =>
+                              updateNozzle(nozzle.id, { flowMaxLiters: event.target.value })
+                            }
+                            placeholder={`≥ ${FLOW_MAX_LITERS_REQUIRED} L`}
                           />
-                          <label className="reg-doc-form__field">
-                            <span>Tempo de vazão (s)</span>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={nozzle.flowMaxSeconds}
-                              disabled={isReadOnly || busy}
-                              onChange={(event) =>
-                                updateNozzle(nozzle.id, { flowMaxSeconds: event.target.value })
-                              }
-                              placeholder={`≤ ${FLOW_MAX_SECONDS_REQUIRED}`}
-                            />
-                          </label>
-                        </div>
+                        </label>
                       </div>
 
-                      <div className="nozzle-card__grid">
-                        <fieldset className="nozzle-choice">
-                          <legend>Lacres</legend>
-                          <label>
-                            <input
-                              type="radio"
-                              name={`seals-${nozzle.id}`}
-                              checked={nozzle.sealsOk === true}
-                              disabled={isReadOnly || busy}
-                              onChange={() => updateNozzle(nozzle.id, { sealsOk: true })}
-                            />
-                            OK
-                          </label>
-                          <label>
-                            <input
-                              type="radio"
-                              name={`seals-${nozzle.id}`}
-                              checked={nozzle.sealsOk === false}
-                              disabled={isReadOnly || busy}
-                              onChange={() => updateNozzle(nozzle.id, { sealsOk: false })}
-                            />
-                            Não OK
-                          </label>
-                        </fieldset>
+                      <div className="nozzle-card__choices">
+                        <div className="reg-doc-form__field">
+                          <span>Lacres</span>
+                          <div className="nozzle-choice-row">
+                            <label>
+                              <input
+                                type="radio"
+                                name={`seals-${nozzle.id}`}
+                                checked={nozzle.sealsOk === true}
+                                disabled={isReadOnly || busy}
+                                onChange={() => updateNozzle(nozzle.id, { sealsOk: true })}
+                              />
+                              OK
+                            </label>
+                            <label>
+                              <input
+                                type="radio"
+                                name={`seals-${nozzle.id}`}
+                                checked={nozzle.sealsOk === false}
+                                disabled={isReadOnly || busy}
+                                onChange={() => updateNozzle(nozzle.id, { sealsOk: false })}
+                              />
+                              Não OK
+                            </label>
+                          </div>
+                        </div>
 
-                        <fieldset className="nozzle-choice">
-                          <legend>Vazamento</legend>
-                          <label>
-                            <input
-                              type="radio"
-                              name={`leak-${nozzle.id}`}
-                              checked={nozzle.leakage === false}
-                              disabled={isReadOnly || busy}
-                              onChange={() => updateNozzle(nozzle.id, { leakage: false })}
-                            />
-                            Não
-                          </label>
-                          <label>
-                            <input
-                              type="radio"
-                              name={`leak-${nozzle.id}`}
-                              checked={nozzle.leakage === true}
-                              disabled={isReadOnly || busy}
-                              onChange={() => updateNozzle(nozzle.id, { leakage: true })}
-                            />
-                            Sim
-                          </label>
-                        </fieldset>
+                        <div className="reg-doc-form__field">
+                          <span>Vazamento</span>
+                          <div className="nozzle-choice-row">
+                            <label>
+                              <input
+                                type="radio"
+                                name={`leak-${nozzle.id}`}
+                                checked={nozzle.leakage === false}
+                                disabled={isReadOnly || busy}
+                                onChange={() => updateNozzle(nozzle.id, { leakage: false })}
+                              />
+                              Não
+                            </label>
+                            <label>
+                              <input
+                                type="radio"
+                                name={`leak-${nozzle.id}`}
+                                checked={nozzle.leakage === true}
+                                disabled={isReadOnly || busy}
+                                onChange={() => updateNozzle(nozzle.id, { leakage: true })}
+                              />
+                              Sim
+                            </label>
+                          </div>
+                        </div>
                       </div>
 
                       {evaluation.status === 'reprovado' && evaluation.reasons.length > 0 && (
@@ -601,6 +612,7 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
                   <SignaturePad
                     key={signatureKey}
                     disabled={isReadOnly || busy}
+                    height={110}
                     onChange={setSignatureBlob}
                   />
                 </div>
@@ -772,9 +784,9 @@ function VerificationDetailModal({
                   </dd>
                 </div>
                 <div>
-                  <dt>Vazão mín / máx (s)</dt>
+                  <dt>Vazão mín / máx (L)</dt>
                   <dd>
-                    {item.flow_min_seconds} / {item.flow_max_seconds}
+                    {item.flow_min_liters} / {item.flow_max_liters}
                   </dd>
                 </div>
                 <div>

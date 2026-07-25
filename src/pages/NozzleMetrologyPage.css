@@ -40,35 +40,27 @@
 
 .nozzle-meta {
   display: grid;
-  gap: 0.85rem;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  align-items: end;
+  gap: 0.65rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
 }
 
-.nozzle-meta__datetime {
-  display: grid;
-  gap: 0.35rem;
-  padding: 0.7rem 0.85rem;
-  border-radius: 10px;
-  border: 1px solid rgba(61, 143, 212, 0.18);
-  background: #f8fbff;
+.nozzle-meta .reg-doc-form__field {
+  margin-bottom: 0;
 }
 
-.nozzle-meta__datetime span {
-  font-size: 0.82rem;
-  color: var(--gray-600, #4b5563);
-}
-
-.nozzle-meta__datetime strong {
-  font-size: 0.95rem;
-  color: var(--blue-dark, #0c3b7a);
+.nozzle-meta__datetime-input {
+  cursor: default;
+  background: #f8fbff !important;
+  color: var(--blue-dark, #0c3b7a) !important;
+  font-weight: 600;
 }
 
 .nozzle-overall {
-  padding: 0.75rem 1rem;
-  border-radius: 12px;
+  padding: 0.55rem 0.85rem;
+  border-radius: 10px;
   border: 1px solid transparent;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
 }
 
 .nozzle-overall--aprovado {
@@ -91,28 +83,28 @@
 
 .nozzle-cards {
   display: grid;
-  gap: 0.85rem;
+  gap: 0.55rem;
 }
 
 .nozzle-card {
   border: 1px solid rgba(61, 143, 212, 0.22);
-  border-radius: 14px;
-  padding: 0.95rem 1rem;
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
   background: #f8fbff;
   display: grid;
-  gap: 0.75rem;
+  gap: 0.4rem;
 }
 
 .nozzle-card__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .nozzle-card__header h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.88rem;
   color: var(--blue-dark, #0c3b7a);
 }
 
@@ -120,9 +112,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.2rem 0.55rem;
+  padding: 0.12rem 0.45rem;
   border-radius: 999px;
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.02em;
 }
@@ -142,72 +134,158 @@
   color: #92400e;
 }
 
-.nozzle-card__grid {
+.nozzle-card__fuel {
   display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: end;
+}
+
+.nozzle-card__fuel:not(:has(.reg-doc-form__field:nth-child(2))) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.nozzle-card .reg-doc-form__field {
+  margin-bottom: 0;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.nozzle-card .reg-doc-form__field span {
+  font-size: 0.72rem;
+  line-height: 1.2;
+  min-height: 1.05rem;
+  display: block;
+}
+
+.nozzle-card .reg-doc-form__field input[type='text'],
+.nozzle-card .reg-doc-form__field select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.15rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.82rem;
+  border-radius: 6px;
 }
 
 .nozzle-vol-grid {
   display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
 }
 
-.nozzle-vol-col {
+.nozzle-card__choices {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.4rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
 }
 
-.nozzle-choice {
-  margin: 0;
-  border: 1px solid rgba(61, 143, 212, 0.18);
-  border-radius: 10px;
-  padding: 0.65rem 0.75rem;
+.nozzle-choice-row {
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.65rem 1rem;
+  align-items: center;
+  gap: 0.55rem 0.85rem;
+  min-height: 2.15rem;
+  padding: 0 0.55rem;
+  border: 1px solid var(--gray-300, #d1d5db);
+  border-radius: 6px;
+  background: var(--white, #fff);
 }
 
-.nozzle-choice legend {
-  padding: 0 0.25rem;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--gray-700, #374151);
-}
-
-.nozzle-choice label {
+.nozzle-choice-row label {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.88rem;
+  gap: 0.28rem;
+  font-size: 0.8rem;
+  color: var(--blue-dark, #0c3b7a);
 }
 
 .nozzle-reasons {
   margin: 0;
-  padding-left: 1.1rem;
+  padding-left: 1rem;
   color: #991b1b;
-  font-size: 0.82rem;
-  line-height: 1.4;
+  font-size: 0.75rem;
+  line-height: 1.35;
 }
 
 .nozzle-evidence {
   display: grid;
-  gap: 1rem;
+  gap: 0.75rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.nozzle-evidence > .reg-doc-form__field {
+  margin-bottom: 0;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.nozzle-evidence .fuel-camera {
+  display: grid;
+  gap: 0.35rem;
+  width: 100%;
+  max-width: 260px;
+  min-width: 0;
+}
+
+.nozzle-evidence .fuel-camera__label,
+.nozzle-evidence .fuel-camera__hint {
+  display: none;
+}
+
+.nozzle-evidence .fuel-camera__viewport {
+  width: 100%;
+  max-width: none;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+}
+
+.nozzle-evidence .fuel-camera__placeholder {
+  font-size: 0.78rem;
+}
+
+.nozzle-evidence .fuel-camera__actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.nozzle-evidence .fuel-camera__actions .btn,
+.nozzle-evidence .fuel-signature .btn {
+  width: 100%;
+  max-width: 260px;
+  justify-content: center;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.78rem;
+}
+
+.nozzle-evidence .fuel-signature {
+  width: 100%;
+  max-width: 260px;
+  gap: 0.35rem;
+}
+
+.nozzle-evidence .fuel-signature__canvas {
+  height: 110px;
+  border-radius: 8px;
 }
 
 .nozzle-photo-preview {
-  margin-top: 0.65rem;
+  margin-top: 0.35rem;
 }
 
 .nozzle-photo-preview img,
 .nozzle-photo-preview__img {
   display: block;
-  width: min(100%, 360px);
-  max-height: 240px;
+  width: min(100%, 260px);
+  max-height: 130px;
   object-fit: cover;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(61, 143, 212, 0.22);
 }
 
@@ -294,8 +372,15 @@
   position: relative;
 }
 
+@media (max-width: 900px) {
+  .nozzle-vol-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 760px) {
-  .nozzle-card__grid,
+  .nozzle-card__fuel,
+  .nozzle-card__choices,
   .nozzle-vol-grid,
   .nozzle-evidence,
   .nozzle-meta {

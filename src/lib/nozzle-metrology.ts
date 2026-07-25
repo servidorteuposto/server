@@ -15,8 +15,8 @@ export type NozzleMetrologyItem = {
   fuel_other_label: string | null
   volumetry_min: number
   volumetry_max: number
-  flow_min_seconds: number
-  flow_max_seconds: number
+  flow_min_liters: number
+  flow_max_liters: number
   seals_ok: boolean
   leakage: boolean
   item_status: MetrologyStatus
@@ -46,8 +46,8 @@ export type SaveNozzleMetrologyItemInput = {
   fuelOtherLabel: string | null
   volumetryMin: number
   volumetryMax: number
-  flowMinSeconds: number
-  flowMaxSeconds: number
+  flowMinLiters: number
+  flowMaxLiters: number
   sealsOk: boolean
   leakage: boolean
   itemStatus: MetrologyStatus
@@ -166,8 +166,8 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
           item.fuelProductKey === 'outro' ? item.fuelOtherLabel?.trim() || null : null,
         volumetry_min: item.volumetryMin,
         volumetry_max: item.volumetryMax,
-        flow_min_seconds: item.flowMinSeconds,
-        flow_max_seconds: item.flowMaxSeconds,
+        flow_min_liters: item.flowMinLiters,
+        flow_max_liters: item.flowMaxLiters,
         seals_ok: item.sealsOk,
         leakage: item.leakage,
         item_status: item.itemStatus,

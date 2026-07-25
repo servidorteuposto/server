@@ -420,6 +420,7 @@ export default function EquipmentCard({
               <div className="reg-doc-form__field">
                 <span>Foto do equipamento</span>
                 <LiveCameraCapture
+                  label="Câmera ao vivo"
                   disabled={isReadOnly || busy}
                   previewUrl={equipmentPhoto.previewUrl ?? existingUrls.equipment}
                   onCapture={(file) =>
@@ -483,6 +484,7 @@ export default function EquipmentCard({
                 <div key={index} className="reg-doc-form__field">
                   <span>Foto {index + 1}</span>
                   <LiveCameraCapture
+                    label={`Foto ${index + 1}`}
                     disabled={isReadOnly || busy}
                     previewUrl={
                       bucketPhotos[index].previewUrl ?? existingUrls.bucket?.[index] ?? null
@@ -518,6 +520,7 @@ export default function EquipmentCard({
               <div className="reg-doc-form__field">
                 <span>Foto do número de série</span>
                 <LiveCameraCapture
+                  label="Câmera ao vivo"
                   disabled={isReadOnly || busy}
                   previewUrl={serialPhoto.previewUrl ?? existingUrls.serial}
                   onCapture={(file) =>

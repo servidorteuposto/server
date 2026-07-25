@@ -103,7 +103,7 @@ export function evaluateEquipmentCompliance(
   key: MandatoryEquipmentKey,
 ): EquipmentComplianceStatus {
   const template = getEquipmentTemplate(key)
-  if (!template || !equipment) return 'nao_de_acordo'
+  if (!template || !equipment) return 'pendente'
 
   if (template.kind === 'standard') {
     const ok =
@@ -113,7 +113,7 @@ export function evaluateEquipmentCompliance(
       equipment.equipment_photo_longitude != null &&
       Boolean(equipment.equipment_photo_captured_at) &&
       Boolean(equipment.certificate_path)
-    return ok ? 'de_acordo' : 'nao_de_acordo'
+    return ok ? 'de_acordo' : 'nao_apto'
   }
 
   if (template.kind === 'bucket') {
@@ -123,7 +123,7 @@ export function evaluateEquipmentCompliance(
       Boolean(equipment.brand?.trim()) &&
       photos.length >= 3 &&
       photos.every((photo) => Boolean(photo.path))
-    return ok ? 'de_acordo' : 'nao_de_acordo'
+    return ok ? 'de_acordo' : 'nao_apto'
   }
 
   const ok =
@@ -132,7 +132,7 @@ export function evaluateEquipmentCompliance(
     equipment.serial_photo_longitude != null &&
     Boolean(equipment.serial_photo_captured_at) &&
     Boolean(equipment.certificate_path)
-  return ok ? 'de_acordo' : 'nao_de_acordo'
+  return ok ? 'de_acordo' : 'nao_apto'
 }
 
 export async function listMandatoryEquipments(postoId: string) {

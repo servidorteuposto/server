@@ -1,25 +1,84 @@
+.equip-page .reg-docs-page__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+  align-items: start;
+  width: 100%;
+}
+
+.equip-card.reg-doc-card {
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  min-height: 0;
+  padding: 0.85rem 0.95rem;
+  margin: 0;
+  align-self: start;
+}
+
 .equip-page .equip-card__desc {
-  margin: 0.25rem 0 0;
-  font-size: 0.84rem;
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
   color: var(--gray-600, #4b5563);
-  line-height: 1.4;
+  line-height: 1.35;
   font-weight: 500;
+  min-height: 1.1rem;
+}
+
+.equip-card .reg-doc-card__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+  min-height: 3.6rem;
+}
+
+.equip-card .reg-doc-card__header > div:first-child {
+  min-width: 0;
+}
+
+.equip-card .reg-doc-card__header h3 {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.25;
+  min-height: 2.5rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.equip-card .reg-doc-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: 100%;
+}
+
+.equip-card .reg-doc-form__field span {
+  font-size: 0.8rem;
+}
+
+.equip-card__badge--pendente {
+  background: #f3f4f6 !important;
+  color: #4b5563 !important;
 }
 
 .equip-card__badge--de_acordo {
-  background: #d1fae5 !important;
-  color: #065f46 !important;
+  background: #ecfdf5 !important;
+  color: #047857 !important;
 }
 
-.equip-card__badge--nao_de_acordo {
-  background: #fee2e2 !important;
-  color: #991b1b !important;
+.equip-card__badge--nao_apto {
+  background: #fff7ed !important;
+  color: #9a3412 !important;
 }
 
 .equip-card__summary {
   display: grid;
-  gap: 0.65rem;
-  font-size: 0.9rem;
+  gap: 0.5rem;
+  font-size: 0.84rem;
 }
 
 .equip-card__summary p {
@@ -28,51 +87,145 @@
 
 .equip-card__media {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
 
 .equip-card__media img {
-  width: min(100%, 280px);
-  max-height: 180px;
+  width: 100%;
+  max-height: 110px;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid rgba(61, 143, 212, 0.22);
 }
 
 .equip-card__thumbs {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .equip-card__thumbs img {
-  width: 96px;
-  height: 72px;
+  width: 72px;
+  height: 54px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid rgba(61, 143, 212, 0.22);
 }
 
 .equip-card__meta {
   display: block;
-  margin-top: 0.35rem;
-  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  font-size: 0.74rem;
   color: var(--gray-600, #4b5563);
 }
 
-.equip-card .reg-doc-card__header {
-  align-items: flex-start;
-}
-
 .equip-card .reg-doc-card__header-actions {
+  display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 0.45rem;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding-top: 0.1rem;
 }
 
 .equip-card .reg-doc-card__badge {
-  white-space: normal;
+  white-space: nowrap;
   text-align: center;
   line-height: 1.2;
-  max-width: 11rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.18rem 0.45rem;
+  letter-spacing: 0.01em;
+}
+
+.equip-card .fuel-camera {
+  display: grid;
+  gap: 0.4rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.equip-card .fuel-camera__label,
+.equip-card .fuel-camera__hint {
+  display: none;
+}
+
+.equip-card .fuel-camera__viewport {
+  width: 100%;
+  max-width: none;
+  aspect-ratio: 16 / 10;
+  border-radius: 8px;
+}
+
+.equip-card .fuel-camera__placeholder {
+  font-size: 0.78rem;
+}
+
+.equip-card .fuel-camera__actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.equip-card .fuel-camera__actions .btn {
+  width: 100%;
+  justify-content: center;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+.equip-card .fuel-photo__preview {
+  width: 100%;
+  max-height: 140px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.equip-card .reg-doc-form__field {
+  width: 100%;
+  min-width: 0;
+}
+
+.equip-card .reg-doc-form__field input[type='text'],
+.equip-card .reg-doc-form__field input[type='file'] {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.equip-card .reg-doc-card__actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  padding-top: 0;
+  width: 100%;
+}
+
+.equip-card .reg-doc-card__actions .btn {
+  width: 100%;
+  justify-content: center;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 1100px) {
+  .equip-page .reg-docs-page__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .equip-page .reg-docs-page__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .equip-card .reg-doc-card__header {
+    min-height: 0;
+  }
+
+  .equip-card .reg-doc-card__header h3 {
+    min-height: 0;
+  }
 }

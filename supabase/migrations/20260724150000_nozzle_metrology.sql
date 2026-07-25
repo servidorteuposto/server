@@ -63,8 +63,8 @@ CREATE TABLE public.nozzle_metrology_items (
   fuel_other_label text,
   volumetry_min integer NOT NULL,
   volumetry_max integer NOT NULL,
-  flow_min_seconds numeric(10, 2) NOT NULL,
-  flow_max_seconds numeric(10, 2) NOT NULL,
+  flow_min_liters numeric(10, 2) NOT NULL,
+  flow_max_liters numeric(10, 2) NOT NULL,
   seals_ok boolean NOT NULL,
   leakage boolean NOT NULL,
   item_status text NOT NULL,
@@ -84,7 +84,7 @@ CREATE TABLE public.nozzle_metrology_items (
       AND mod(volumetry_max, 20) = 0
     ),
   CONSTRAINT nozzle_metrology_items_flow_check
-    CHECK (flow_min_seconds > 0 AND flow_max_seconds > 0),
+    CHECK (flow_min_liters > 0 AND flow_max_liters > 0),
   CONSTRAINT nozzle_metrology_items_status_check
     CHECK (item_status IN ('aprovado', 'reprovado')),
   CONSTRAINT nozzle_metrology_items_unique_nozzle

@@ -56,9 +56,9 @@ export default function MandatoryEquipmentsPage({ isReadOnly }: MandatoryEquipme
         <div className="reg-docs-page__header-text">
           <h1>Equipamentos Obrigatórios</h1>
           <p>
-            Cadastre termômetros, densímetros, balde aferidor e proveta. Se faltar foto, certificado
-            ou identificação, o status fica como EQUIPAMENTO NÃO DE ACORDO. Ao substituir, os arquivos
-            antigos são removidos.
+            Cadastre termômetros, densímetros, balde aferidor e proveta. Sem cadastro o status fica
+            PENDENTE; se já houver anexo incompleto, fica NÃO APTO. Ao substituir, os arquivos antigos
+            são removidos.
           </p>
         </div>
       </header>
