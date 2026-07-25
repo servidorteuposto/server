@@ -188,6 +188,10 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
     setSidebarOpen(false)
   }
 
+  function goHome() {
+    setActiveMenuId(null)
+  }
+
   function renderActivePage() {
     if (!activeMenuId || !activeModule) {
       return (
@@ -280,28 +284,20 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
           onClick={() => setSidebarOpen(false)}
         />
 
-        {isDrawerLayout && !sidebarOpen && (
-          <button
-            type="button"
-            className="app-shell__mobile-menu"
-            aria-label="Abrir menu"
-            aria-expanded={sidebarOpen}
-            onClick={() => setSidebarOpen(true)}
-          >
-            <span />
-            <span />
-            <span />
-          </button>
-        )}
-
         <aside
           className="app-sidebar"
           data-open={!isDrawerLayout || sidebarOpen}
           aria-hidden={isDrawerLayout && !sidebarOpen}
         >
-          <div className="app-sidebar__brand">
+          <button
+            type="button"
+            className="app-sidebar__brand"
+            onClick={goHome}
+            aria-label="Voltar ao início"
+            title="Voltar ao início"
+          >
             <img src="/imagens/logo_teuposto.png" alt="Teu Posto" className="app-sidebar__logo" />
-          </div>
+          </button>
 
           <nav className="app-sidebar__nav" aria-label="Menu principal">
             <ul>
@@ -338,6 +334,19 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
 
         <div className="app-main">
           <main className="app-content" data-home={activeMenuId === null}>
+            {isDrawerLayout && !sidebarOpen && (
+              <button
+                type="button"
+                className="app-shell__mobile-menu"
+                aria-label="Abrir menu"
+                aria-expanded={sidebarOpen}
+                onClick={() => setSidebarOpen(true)}
+              >
+                <span />
+                <span />
+                <span />
+              </button>
+            )}
             {renderActivePage()}
           </main>
         </div>
