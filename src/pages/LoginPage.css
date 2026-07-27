@@ -1,9 +1,8 @@
 .login-page {
   position: relative;
-  min-height: 100vh;
-  min-height: 100dvh;
-  overflow-x: hidden;
-  overflow-y: auto;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .login-page__bg {
@@ -31,8 +30,9 @@
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   grid-template-rows: 1fr auto;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ── Branding (left) ── */
@@ -131,6 +131,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  min-height: 0;
+  overflow: hidden;
   padding: 2rem 3rem 2rem 1rem;
 }
 
@@ -146,11 +148,25 @@
 }
 
 .login-card--register {
-  max-height: calc(100vh - 3rem);
-  max-height: calc(100dvh - 3rem);
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 420px;
+  min-height: 0;
+  max-height: min(720px, calc(100dvh - 5.5rem));
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.login-page--focused .login-form-section {
+  justify-content: center;
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
+.login-page--focused .login-legal-links {
+  flex-shrink: 0;
 }
 
 .login-card__header {
@@ -646,15 +662,17 @@
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    min-height: auto;
+    height: 100%;
+    min-height: 0;
     width: 100%;
     max-width: 100%;
-    overflow-x: hidden;
-    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0));
+    overflow: hidden;
+    padding-bottom: 0;
   }
 
   .login-branding {
     order: 1;
+    flex-shrink: 0;
     min-height: auto;
     padding: 1.75rem 1.25rem 0.15rem;
     align-items: center;
@@ -684,13 +702,16 @@
 
   .login-form-section {
     order: 2;
+    flex: 1 1 auto;
     grid-column: auto;
     grid-row: auto;
     width: 100%;
     max-width: 100%;
-    padding: 1.85rem 1rem 1.5rem;
+    min-height: 0;
+    padding: 1.25rem 1rem 1rem;
     align-items: stretch;
     justify-content: flex-start;
+    overflow: hidden;
     box-sizing: border-box;
   }
 
@@ -703,8 +724,13 @@
   }
 
   .login-card--register {
+    flex: 1 1 auto;
     max-height: none;
-    overflow: visible;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .feature-bar {
@@ -722,6 +748,10 @@
 
   .login-page__layout--focused .login-branding__tagline {
     margin-top: -1.2rem;
+  }
+
+  .login-page--focused .login-legal-links {
+    padding-bottom: 0.35rem;
   }
 }
 
@@ -756,11 +786,11 @@
   (max-width: 960px) and (display-mode: fullscreen),
   (max-width: 960px) and (display-mode: minimal-ui) {
   .login-page__layout {
-    min-height: 100dvh;
-    min-height: 100svh;
+    height: 100%;
+    min-height: 0;
     justify-content: flex-start;
     padding-top: env(safe-area-inset-top, 0px);
-    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .login-branding {

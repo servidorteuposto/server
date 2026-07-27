@@ -492,7 +492,7 @@ export default function LoginPage() {
   }, [cnpj])
 
   return (
-    <div className="login-page">
+    <div className={`login-page${view !== 'login' ? ' login-page--focused' : ''}`}>
       <div className="login-page__bg" aria-hidden="true" />
 
       <div
