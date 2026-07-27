@@ -56,6 +56,110 @@ async function hashValue(value: string) {
     .join('')
 }
 
+const APP_URL = Deno.env.get('APP_PUBLIC_URL') ?? 'https://www.appteuposto.com.br'
+const LOGO_URL = `${APP_URL}/imagens/logo_teuposto.png`
+
+async function sendResendEmail(to: string, subject: string, html: string) {
+  const resendKey = Deno.env.get('RESEND_API_KEY')
+  const from =
+    Deno.env.get('AUTH_EMAIL_FROM') ??
+    Deno.env.get('SECURITY_EMAIL_FROM') ??
+    'Teu Posto <noreply@appteuposto.com.br>'
+
+  if (!resendKey) {
+    console.warn('RESEND_API_KEY not configured, skipping email')
+    return false
+  }
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resendKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from, to, subject, html }),
+  })
+
+  if (!response.ok) {
+    console.error('Failed to send email', await response.text())
+    return false
+  }
+
+  return true
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+}
+
+function buildWelcomeEmailHtml(postoName: string) {
+  const name = escapeHtml(postoName.trim() || 'posto')
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+<body style="margin:0;padding:0;background-color:#eef2f7;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#eef2f7;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background-color:#ffffff;border-radius:18px;overflow:hidden;border:1px solid rgba(61,143,212,0.18);">
+        <tr>
+          <td style="padding:28px 32px 24px;background:linear-gradient(135deg,#0c3b7a 0%,#1a5fad 55%,#3d8fd4 100%);text-align:center;">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 14px;">
+              <tr><td style="padding:12px 22px;background-color:#ffffff;border-radius:14px;">
+                <img src="${LOGO_URL}" alt="Teu Posto" width="168" style="display:block;max-width:168px;width:100%;height:auto;border:0;" />
+              </td></tr>
+            </table>
+            <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.88);">Gestão do seu posto</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 32px 8px;">
+            <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;font-weight:700;color:#0c3b7a;">Bem-vindo ao Teu Posto</h1>
+            <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#4b5563;">Olá, <strong style="color:#0c3b7a;">${name}</strong>!</p>
+            <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#4b5563;">
+              Sua conta foi criada com sucesso. Finalize o pagamento da assinatura para liberar o acesso completo ao sistema.
+            </p>
+            <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#4b5563;">
+              Com o Teu Posto você organiza documentos regulatórios, análises de combustíveis, metrologia, drenagens e muito mais — tudo em um só lugar.
+            </p>
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 24px;">
+              <tr><td align="center" style="border-radius:10px;background-color:#0c3b7a;">
+                <a href="${APP_URL}" target="_blank" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">
+                  Acessar o Teu Posto
+                </a>
+              </td></tr>
+            </table>
+            <p style="margin:0 0 24px;font-size:13px;line-height:1.55;color:#6b7280;">
+              Se precisar de ajuda, use o menu <strong>Suporte</strong> dentro do app.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 32px 28px;">
+            <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 18px;" />
+            <p style="margin:0;font-size:12px;line-height:1.5;color:#9ca3af;text-align:center;">
+              © Teu Posto · <a href="${APP_URL}" style="color:#3d8fd4;text-decoration:none;">appteuposto.com.br</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
+}
+
+async function sendWelcomeEmail(email: string, postoName: string) {
+  return sendResendEmail(
+    email,
+    'Bem-vindo ao Teu Posto',
+    buildWelcomeEmailHtml(postoName),
+  )
+}
+
 async function processPendingAlerts(admin: ReturnType<typeof createClient>, supabaseUrl: string) {
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   const { data: alerts } = await admin.rpc('security_get_pending_alerts', { p_limit: 5 })
@@ -327,6 +431,13 @@ async function handleRegister(
       code: 'signup_failed',
       message: 'Não foi possível concluir o cadastro. Tente novamente.',
     }
+  }
+
+  // Conta já nasce confirmada (sem e-mail de verificação). Envia só boas-vindas.
+  try {
+    await sendWelcomeEmail(payload.email, payload.postoName)
+  } catch (error) {
+    console.error('Failed to send welcome email', error)
   }
 
   return { ok: true, needs_payment: true }

@@ -182,27 +182,6 @@ function DocumentIcon() {
   )
 }
 
-function PhoneIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M6.5 4H9L10.5 8.5L8.5 10C9.57 12.16 11.84 14.43 14 15.5L15.5 13.5L20 15V17.5C20 18.33 19.33 19 18.5 19C10.16 19 3 11.84 3 3.5C3 2.67 3.67 2 4.5 2H6.5V4Z"
-        stroke="var(--gray-400)"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function formatPhone(value: string) {
-  const digits = value.replace(/\D/g, '').slice(0, 11)
-  if (digits.length <= 10) {
-    return digits.replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{4})(\d)/, '$1-$2')
-  }
-  return digits.replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2')
-}
-
 type AuthView = 'login' | 'register' | 'forgot-password' | 'payment' | 'support'
 
 export default function LoginPage() {
@@ -213,7 +192,6 @@ export default function LoginPage() {
   const [postoName, setPostoName] = useState('')
   const [cnpj, setCnpj] = useState('')
   const [forgotCnpj, setForgotCnpj] = useState('')
-  const [phone, setPhone] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -250,14 +228,13 @@ export default function LoginPage() {
     setPostoName(access.nome ?? '')
     setCnpj(access.cnpj ?? '')
     setEmail(access.email ?? '')
-    setPhone(access.telefone ?? '')
     setPassword('')
 
     if (access.cnpj) {
       savePreRegistration(access.cnpj, {
         postoName: access.nome ?? '',
         email: access.email ?? '',
-        phone: access.telefone ?? '',
+        phone: '',
         reachedPayment: true,
       })
     }
@@ -294,7 +271,7 @@ export default function LoginPage() {
     savePreRegistration(cnpj, {
       postoName,
       email,
-      phone,
+      phone: '',
       reachedPayment,
     })
   }
@@ -316,7 +293,6 @@ export default function LoginPage() {
 
     setPostoName(saved.postoName)
     setEmail(saved.email)
-    setPhone(saved.phone)
     setPassword('')
     setPreRegisterHint(true)
   }
@@ -328,9 +304,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (view === 'payment' && isValidCnpjLength(cnpj)) {
-      savePreRegistration(cnpj, { postoName, email, phone, reachedPayment: true })
+      savePreRegistration(cnpj, { postoName, email, phone: '', reachedPayment: true })
     }
-  }, [view, cnpj, postoName, email, phone])
+  }, [view, cnpj, postoName, email])
 
   async function handleLogin(event: FormEvent) {
     event.preventDefault()
@@ -435,7 +411,7 @@ export default function LoginPage() {
         password,
         postoName,
         cnpj,
-        phone,
+        phone: '',
         website: honeypot,
       })
 
@@ -817,25 +793,6 @@ export default function LoginPage() {
                         onChange={(e) => handleRegisterCnpjChange(e.target.value)}
                         required
                         inputMode="numeric"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-field">
-                    <label htmlFor="phone">Telefone</label>
-                    <div className="form-field__input-wrap">
-                      <span className="form-field__icon">
-                        <PhoneIcon />
-                      </span>
-                      <input
-                        id="phone"
-                        type="tel"
-                        placeholder="(00) 00000-0000"
-                        value={phone}
-                        onChange={(e) => setPhone(formatPhone(e.target.value))}
-                        required
-                        autoComplete="tel"
-                        inputMode="tel"
                       />
                     </div>
                   </div>

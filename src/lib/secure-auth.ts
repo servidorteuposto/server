@@ -112,12 +112,13 @@ export async function secureRegister(input: {
   password: string
   postoName: string
   cnpj: string
-  phone: string
+  phone?: string
   website?: string
 }): Promise<SecureRegisterResult> {
   const { payload, invokeFailed } = await invokeSecureAuth<SecureRegisterResult>({
     action: 'register',
     ...input,
+    phone: input.phone ?? '',
   })
 
   if (invokeFailed || !payload) {

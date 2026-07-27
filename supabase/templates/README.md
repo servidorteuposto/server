@@ -1,29 +1,41 @@
-# Templates de e-mail (Supabase Auth)
+# Templates de e-mail
 
-## Recuperação de senha
+## Desativar verificação de e-mail (obrigatório)
 
-1. Abra o [Supabase Dashboard](https://supabase.com/dashboard) → **Authentication** → **Email Templates**.
-2. Selecione **Reset password** (Recuperação de senha).
-3. **Subject:**
-   ```
-   Recuperação de senha — Teu Posto
-   ```
-4. Cole o conteúdo de `recovery.html` no corpo da mensagem.
-5. Salve.
+O cadastro já cria a conta **confirmada** (`email_confirm: true`). Para o Supabase não mandar e-mail de verificação:
 
-### Logo no e-mail
+1. **Authentication → Providers → Email**
+2. Desative **Confirm email**
+3. Salve
 
-O template usa:
+## Recuperação de senha (Supabase Auth)
+
+1. **Authentication → Email Templates → Reset password**
+2. **Subject:** `Recuperação de senha — Teu Posto`
+3. Cole o conteúdo de `recovery.html`
+4. Salve
+
+Variáveis: `{{ .ConfirmationURL }}`, `{{ .Email }}`
+
+## Boas-vindas (Resend via secure-auth)
+
+Enviado automaticamente ao concluir o cadastro pela Edge Function `secure-auth`.
+Referência visual: `welcome.html`.
+
+Secrets / env da function:
+
+- `RESEND_API_KEY` — obrigatório
+- `AUTH_EMAIL_FROM` — ex.: `Teu Posto <noreply@appteuposto.com.br>` (fallback: `SECURITY_EMAIL_FROM`)
+- `APP_PUBLIC_URL` — opcional, padrão `https://www.appteuposto.com.br`
+
+Após alterar a function:
+
+```bash
+npm run supabase:deploy-auth
+```
+
+### Logo
 
 ```
 https://www.appteuposto.com.br/imagens/logo_teuposto.png
 ```
-
-Confirme que `public/imagens/logo_teuposto.png` está publicado na Vercel.
-
-### Variáveis Supabase
-
-- `{{ .ConfirmationURL }}` — link de redefinição (obrigatório no botão)
-- `{{ .Email }}` — e-mail do destinatário
-
-Não remova `{{ .ConfirmationURL }}` ou o link deixa de funcionar.
