@@ -128,6 +128,7 @@
   grid-column: 2;
   grid-row: 1 / span 2;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 2rem 3rem 2rem 1rem;
@@ -362,6 +363,62 @@
 .login-card__footer a:hover,
 .login-card__link:hover {
   text-decoration: underline;
+}
+
+.login-terms {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0.25rem 0 0.85rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--gray-600);
+  cursor: pointer;
+}
+
+.login-terms input {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.login-terms a {
+  color: var(--blue-link);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-terms a:hover {
+  text-decoration: underline;
+}
+
+.login-legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  width: min(420px, 100%);
+  margin: 0.65rem auto 0;
+  padding: 0;
+}
+
+.login-legal-links a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(12, 59, 122, 0.2);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--blue-dark, #0c3b7a);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-decoration: none;
+  line-height: 1.2;
+}
+
+.login-legal-links a:hover {
+  border-color: var(--blue-light, #3d8fd4);
+  background: #f0f7ff;
 }
 
 /* ── Payment ── */

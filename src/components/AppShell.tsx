@@ -174,6 +174,18 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
   }, [isDrawerLayout, activeMenuId])
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('suporte') !== '1') return
+
+    setActiveMenuId(isAdmin ? 'painel-suporte' : 'suporte')
+    setSidebarOpen(false)
+    params.delete('suporte')
+    const next = params.toString()
+    const cleanUrl = `${window.location.pathname}${next ? `?${next}` : ''}${window.location.hash}`
+    window.history.replaceState({}, '', cleanUrl)
+  }, [isAdmin])
+
+  useEffect(() => {
     if (!isDrawerLayout) {
       setSidebarOpen(false)
     }

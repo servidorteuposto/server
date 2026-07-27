@@ -9,6 +9,7 @@ import {
   CNPJ_INVALID_MESSAGE,
   looksLikeEmail,
 } from '../lib/cnpj'
+import { buildLegalPath } from '../config/legal'
 import type { PaymentActivation, PaymentMethod } from '../lib/payment'
 import { getPaymentActivation } from '../lib/payment'
 import { isValidPassword, PASSWORD_RULE_MESSAGE } from '../lib/password'
@@ -204,12 +205,22 @@ export default function LoginPage() {
   const [preRegisterHint, setPreRegisterHint] = useState(false)
   const [pendingPaymentAlert, setPendingPaymentAlert] = useState(false)
   const [honeypot, setHoneypot] = useState('')
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
 
   useEffect(() => {
     const savedIdentifier = getRememberedIdentifier()
     if (savedIdentifier) {
       setIdentifier(savedIdentifier)
       setRememberMe(true)
+    }
+
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('suporte') === '1') {
+      setView('support')
+      params.delete('suporte')
+      const next = params.toString()
+      const cleanUrl = `${window.location.pathname}${next ? `?${next}` : ''}${window.location.hash}`
+      window.history.replaceState({}, '', cleanUrl)
     }
   }, [])
 
@@ -402,6 +413,12 @@ export default function LoginPage() {
     if (!isValidPassword(password)) {
       setLoading(false)
       setError(PASSWORD_RULE_MESSAGE)
+      return
+    }
+
+    if (!acceptedTerms) {
+      setLoading(false)
+      setError('Aceite os Termos de Uso e a Política de Privacidade para continuar.')
       return
     }
 
@@ -843,6 +860,33 @@ export default function LoginPage() {
                     <p className="form-field__hint">{PASSWORD_RULE_MESSAGE}</p>
                   </div>
 
+                  <label className="login-terms">
+                    <input
+                      type="checkbox"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    />
+                    <span>
+                      Li e aceito os{' '}
+                      <a href={buildLegalPath('termos-de-uso')} target="_blank" rel="noreferrer">
+                        Termos de Uso
+                      </a>
+                      , a{' '}
+                      <a href={buildLegalPath('privacidade')} target="_blank" rel="noreferrer">
+                        Política de Privacidade
+                      </a>
+                      , a{' '}
+                      <a href={buildLegalPath('cookies')} target="_blank" rel="noreferrer">
+                        Política de Cookies
+                      </a>{' '}
+                      e a{' '}
+                      <a href={buildLegalPath('seguranca')} target="_blank" rel="noreferrer">
+                        Política de Segurança
+                      </a>
+                      .
+                    </span>
+                  </label>
+
                   {pendingPaymentAlert ? (
                     <button
                       type="button"
@@ -873,6 +917,13 @@ export default function LoginPage() {
               </>
             )}
           </div>
+
+          <nav className="login-legal-links" aria-label="Documentos legais públicos">
+            <a href={buildLegalPath('termos-de-uso')}>Termos de Uso</a>
+            <a href={buildLegalPath('privacidade')}>Privacidade</a>
+            <a href={buildLegalPath('cookies')}>Cookies</a>
+            <a href={buildLegalPath('seguranca')}>Segurança</a>
+          </nav>
         </main>
 
         <div className="feature-bar">
