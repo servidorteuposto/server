@@ -622,7 +622,7 @@ export default function LoginPage() {
               <>
                 <header className="login-card__header">
                   <h1>Esqueci minha senha</h1>
-                  <p>Informe o CNPJ da sua conta para receber o e-mail de recuperação</p>
+                  <p>Informe o e-mail ou o CNPJ da sua conta para receber o e-mail de recuperação</p>
                 </header>
 
                 <form className="login-form" onSubmit={handleForgotPassword}>
@@ -647,11 +647,18 @@ export default function LoginPage() {
                       <input
                         id="forgot-cnpj"
                         type="text"
+                        inputMode="text"
                         placeholder="email@exemplo.com ou CNPJ"
                         value={forgotCnpj}
                         onChange={(e) => {
                           const value = e.target.value
-                          setForgotCnpj(looksLikeEmail(value) ? value : formatCnpj(value))
+                          // Só formata CNPJ se for só números/pontuação de CNPJ;
+                          // com letras ou @ deixa digitar e-mail livremente.
+                          const digitsOnly = value.replace(/\D/g, '')
+                          const looksLikeCnpjOnly =
+                            digitsOnly.length > 0 &&
+                            value.replace(/[\d.\s/-]/g, '') === ''
+                          setForgotCnpj(looksLikeCnpjOnly ? formatCnpj(value) : value)
                         }}
                         required
                         autoComplete="username"
