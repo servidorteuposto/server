@@ -76,7 +76,7 @@
   box-shadow: var(--shadow-card);
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
   box-sizing: border-box;
 }
 
@@ -221,7 +221,7 @@
 .fuel-accordion__item {
   border: 1px solid rgba(61, 143, 212, 0.18);
   border-radius: 12px;
-  overflow: hidden;
+  overflow: visible;
   background: rgba(61, 143, 212, 0.03);
   min-width: 0;
   max-width: 100%;
@@ -249,7 +249,7 @@
   border-top: 1px solid rgba(61, 143, 212, 0.12);
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
   box-sizing: border-box;
 }
 
@@ -296,6 +296,18 @@
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
+}
+
+.fuel-fields .partner-suggest {
+  z-index: 1;
+}
+
+.fuel-fields .partner-suggest:focus-within {
+  z-index: 40;
+}
+
+.fuel-fields .partner-suggest__list {
+  z-index: 50;
 }
 
 .fuel-fields--author {

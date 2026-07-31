@@ -10,7 +10,7 @@ type LiveCameraCaptureProps = {
 
 export default function LiveCameraCapture({
   disabled = false,
-  label = 'Foto comprovando o local *',
+  label = 'Foto comprovando o local (opcional)',
   onCapture,
   onClear,
   previewUrl = null,
@@ -125,7 +125,8 @@ export default function LiveCameraCapture({
     <div className="fuel-camera">
       <span className="fuel-camera__label">{label}</span>
       <p className="fuel-camera__hint">
-        A foto deve ser tirada agora com a câmera. Não é permitido escolher arquivo da galeria.
+        Opcional. Se capturar, a foto deve ser tirada agora com a câmera (não é permitido escolher
+        arquivo da galeria).
       </p>
 
       {!previewUrl && (

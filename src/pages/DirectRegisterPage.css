@@ -114,7 +114,7 @@
 
 .partner-suggest__list {
   position: absolute;
-  z-index: 20;
+  z-index: 50;
   top: calc(100% + 0.25rem);
   left: 0;
   right: 0;

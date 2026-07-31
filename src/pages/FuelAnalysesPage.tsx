@@ -1,6 +1,8 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   FUEL_ANALYSES_MAX_FILE_BYTES,
+  FUEL_ASPECTO_OPTIONS,
+  FUEL_COR_OPTIONS,
   FUEL_PRODUCTS,
   formatCnpj,
   formatCoords,
@@ -474,9 +476,8 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
           ? `${product.label}: não foi possível calcular o teor alcoólico (°INPM). Verifique a densidade.`
           : `${product.label}: informe o teor de álcool na gasolina.`
       }
-      if (!analysis.photoFile) return `${product.label}: tire a foto comprovando o local.`
-      if (analysis.photoLatitude == null || analysis.photoLongitude == null) {
-        return `${product.label}: a foto precisa conter coordenadas GPS válidas.`
+      if (analysis.photoFile && (analysis.photoLatitude == null || analysis.photoLongitude == null)) {
+        return `${product.label}: aguarde as coordenadas GPS da foto ou remova a foto para continuar sem ela.`
       }
     }
 
@@ -924,7 +925,8 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
           <section className="fuel-panel">
             <h2>2. Análise do combustível</h2>
             <p className="fuel-panel__hint">
-              Tire uma foto no local. As coordenadas GPS e data/hora serão registradas automaticamente.
+              A foto no local é opcional. Se tirar, as coordenadas GPS e data/hora serão registradas
+              automaticamente.
             </p>
             <div className="fuel-accordion">
               {launchProducts.map((product) => {
@@ -946,27 +948,39 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                         <div className="fuel-fields">
                           <label className="reg-doc-form__field">
                             <span>Aspecto *</span>
-                            <input
-                              type="text"
+                            <select
                               value={draft.aspecto}
                               onChange={(event) =>
                                 updateAnalysis(product.key, { aspecto: event.target.value })
                               }
                               disabled={busy}
                               required
-                            />
+                            >
+                              <option value="">Selecione</option>
+                              {FUEL_ASPECTO_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
                           </label>
                           <label className="reg-doc-form__field">
                             <span>Cor *</span>
-                            <input
-                              type="text"
+                            <select
                               value={draft.cor}
                               onChange={(event) =>
                                 updateAnalysis(product.key, { cor: event.target.value })
                               }
                               disabled={busy}
                               required
-                            />
+                            >
+                              <option value="">Selecione</option>
+                              {FUEL_COR_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
                           </label>
                           <label className="reg-doc-form__field">
                             <span>Temperatura Observada (°C) *</span>
@@ -1031,7 +1045,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                           </label>
                           {alcoholKind === 'gasoline' && (
                             <label className="reg-doc-form__field">
-                              <span>Teor de álcool na Gasolina * (29% a 31%)</span>
+                              <span>Teor de álcool na Gasolina * ({gasolineAlcoholLimitLabel()})</span>
                               <input
                                 type="text"
                                 inputMode="decimal"

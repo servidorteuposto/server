@@ -1,4 +1,4 @@
-import type { FuelProductKey } from './fuel-analyses'
+import { productAlcoholKind, type FuelProductKey } from './fuel-analyses'
 
 /**
  * Coeficientes da Tabela I (gasolina) para conversão à densidade relativa a 20 °C:
@@ -22,6 +22,7 @@ export const FUEL_DENSITY_GAMMA_KG_M3: Record<FuelProductKey, number | null> = {
   'gasolina-premium': 0.857,
   'etanol-comum': 0.86,
   'etanol-aditivado': 0.86,
+  'etanol-premium': 0.86,
   'diesel-s10-comum': 0.72,
   'diesel-s10-aditivado': 0.72,
   'diesel-s500-comum': 0.72,
@@ -54,6 +55,7 @@ export const OBSERVED_DENSITY_RANGE_KG_M3: Record<
   'gasolina-premium': { min: 700, max: 800 },
   'etanol-comum': { min: 790, max: 820 },
   'etanol-aditivado': { min: 790, max: 820 },
+  'etanol-premium': { min: 790, max: 820 },
   'diesel-s10-comum': { min: 700, max: 900 },
   'diesel-s10-aditivado': { min: 700, max: 900 },
   'diesel-s500-comum': { min: 700, max: 900 },
@@ -93,10 +95,10 @@ export type DensityLimit = {
 }
 
 /**
- * Teor alcoólico na gasolina C (% vol): somente 29 a 31 é conforme.
+ * Teor alcoólico na gasolina C (% vol): somente 31 a 33 é conforme.
  * Abaixo ou acima → luz vermelha (Fora das Especificações).
  */
-export const GASOLINE_ALCOHOL_PERCENT = { min: 29, max: 31 }
+export const GASOLINE_ALCOHOL_PERCENT = { min: 31, max: 33 }
 
 /**
  * Teor alcoólico do etanol hidratado combustível (% massa / °INPM).
@@ -239,6 +241,12 @@ export const FUEL_DENSITY_LIMITS_KG_M3: Record<FuelProductKey, DensityLimit | nu
     reference: 'Res. ANP nº 19/2015 — EHC, 802,9 a 811,2 kg/m³',
   },
   'etanol-aditivado': {
+    min: 802.9,
+    max: 811.2,
+    unit: 'kg/m³',
+    reference: 'Res. ANP nº 19/2015 — EHC, 802,9 a 811,2 kg/m³',
+  },
+  'etanol-premium': {
     min: 802.9,
     max: 811.2,
     unit: 'kg/m³',
@@ -437,15 +445,21 @@ export function evaluateDensityConformity(
 }
 
 function isGasolineProduct(productKey: FuelProductKey) {
-  return productKey.startsWith('gasolina-')
+  return productAlcoholKind(productKey) === 'gasoline'
 }
 
 function isDieselProduct(productKey: FuelProductKey) {
   return productKey.startsWith('diesel-')
 }
 
+/** Etanol Comum, Aditivado, Premium e qualquer novo tipo com alcoholKind ethanol. */
+function isEthanolProduct(productKey: FuelProductKey) {
+  return productAlcoholKind(productKey) === 'ethanol'
+}
+
 function assayTemperatureRange(productKey: FuelProductKey) {
   if (isGasolineProduct(productKey)) return GASOLINE_DENSITY_ASSAY_TEMPERATURE_C
+  if (isEthanolProduct(productKey)) return DENSITY_ASSAY_TEMPERATURE_C
   if (isDieselProduct(productKey)) return DIESEL_DENSITY_ASSAY_TEMPERATURE_C
   return DENSITY_ASSAY_TEMPERATURE_C
 }
@@ -501,7 +515,7 @@ function validateAssayInputs(
  * Demais: D20 = Dt + γ × (t − 20).
  *
  * Temperatura/Dt fora da faixa do ensaio → sempre Inapto (nunca Apto).
- * Gasolina: teor manual 29–31%. Etanol: teor °INPM calculado da densidade.
+ * Gasolina: teor manual 31–33%. Etanol: teor °INPM calculado da densidade.
  */
 export function correctDensityTo20C(
   productKey: FuelProductKey,
@@ -518,7 +532,7 @@ export function correctDensityTo20C(
 
   const isGasoline = isGasolineProduct(productKey)
   const isDiesel = isDieselProduct(productKey)
-  const isEthanol = productKey.startsWith('etanol-')
+  const isEthanol = isEthanolProduct(productKey)
 
   let rounded: number
   let d20Formatted: string

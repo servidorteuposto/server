@@ -7,6 +7,7 @@ export type FuelProductKey =
   | 'gasolina-premium'
   | 'etanol-comum'
   | 'etanol-aditivado'
+  | 'etanol-premium'
   | 'diesel-s10-comum'
   | 'diesel-s10-aditivado'
   | 'diesel-s500-comum'
@@ -26,6 +27,7 @@ export const FUEL_PRODUCTS: FuelProduct[] = [
   { key: 'gasolina-premium', label: 'Gasolina Premium', alcoholKind: 'gasoline' },
   { key: 'etanol-comum', label: 'Etanol Comum', alcoholKind: 'ethanol' },
   { key: 'etanol-aditivado', label: 'Etanol Aditivado', alcoholKind: 'ethanol' },
+  { key: 'etanol-premium', label: 'Etanol Premium', alcoholKind: 'ethanol' },
   { key: 'diesel-s10-comum', label: 'Diesel S-10 Comum', alcoholKind: 'none' },
   { key: 'diesel-s10-aditivado', label: 'Diesel S-10 Aditivado', alcoholKind: 'none' },
   { key: 'diesel-s500-comum', label: 'Diesel S-500 Comum', alcoholKind: 'none' },
@@ -36,6 +38,19 @@ export const FUEL_PRODUCT_LABELS: Record<FuelProductKey, string> = {
   ...Object.fromEntries(FUEL_PRODUCTS.map((product) => [product.key, product.label])),
   gnv: 'Gás Natural Veicular',
 } as Record<FuelProductKey, string>
+
+/** Opções de aspecto no ensaio do combustível (RAQ). */
+export const FUEL_ASPECTO_OPTIONS = [
+  'HLIMP - Homogênea, Límpida de Impurezas',
+  'Turva com Impurezas',
+] as const
+
+export type FuelAspectoOption = (typeof FUEL_ASPECTO_OPTIONS)[number]
+
+/** Opções de cor no ensaio do combustível (RAQ). */
+export const FUEL_COR_OPTIONS = ['Verde', 'Vermelho', 'Amarelo incolor'] as const
+
+export type FuelCorOption = (typeof FUEL_COR_OPTIONS)[number]
 
 export const FUEL_ANALYSES_STORAGE_BUCKET = 'fuel-analyses'
 export const FUEL_ANALYSES_MAX_FILE_BYTES = 10 * 1024 * 1024
