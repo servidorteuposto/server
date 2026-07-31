@@ -1,16 +1,31 @@
 import type { FuelProductKey } from './fuel-analyses'
 
-/** Coeficiente absoluto γ (kg/m³/°C) na fórmula D20 = Dt + γ × (t − 20). */
+/**
+ * Coeficientes da Tabela I (gasolina) para conversão à densidade relativa a 20 °C:
+ * d20 = dObs + 0,000857·(T−20) − 0,00000088·(T−20)²
+ */
+export const GASOLINE_DENSITY_POLY = {
+  c1: 0.000857,
+  c2: -0.00000088,
+} as const
+
+/**
+ * Coeficiente de expansão térmica do óleo diesel (Tabela I / ASTM) na densidade relativa:
+ * d20 = dObs + 0,00072·(T−20)
+ */
+export const DIESEL_DENSITY_ALPHA = 0.00072
+
+/** Coeficiente absoluto γ (kg/m³/°C) na fórmula linear D20 = Dt + γ × (t − 20). Gasolina/diesel têm modelos próprios. */
 export const FUEL_DENSITY_GAMMA_KG_M3: Record<FuelProductKey, number | null> = {
-  'gasolina-comum': 0.85,
-  'gasolina-aditivada': 0.85,
-  'gasolina-premium': 0.85,
-  'etanol-comum': 0.9,
-  'etanol-aditivado': 0.9,
-  'diesel-s10-comum': 0.7,
-  'diesel-s10-aditivado': 0.7,
-  'diesel-s500-comum': 0.7,
-  'diesel-s500-aditivado': 0.7,
+  'gasolina-comum': 0.857,
+  'gasolina-aditivada': 0.857,
+  'gasolina-premium': 0.857,
+  'etanol-comum': 0.86,
+  'etanol-aditivado': 0.86,
+  'diesel-s10-comum': 0.72,
+  'diesel-s10-aditivado': 0.72,
+  'diesel-s500-comum': 0.72,
+  'diesel-s500-aditivado': 0.72,
   gnv: null,
 }
 
@@ -19,6 +34,12 @@ export const FUEL_DENSITY_GAMMA_KG_M3: Record<FuelProductKey, number | null> = {
  * Temperatura fora disso invalida o ensaio — não pode ser Apto.
  */
 export const DENSITY_ASSAY_TEMPERATURE_C = { min: -10, max: 50 }
+
+/** Faixa da Tabela I para conversão de densidade da gasolina. */
+export const GASOLINE_DENSITY_ASSAY_TEMPERATURE_C = { min: 0, max: 50 }
+
+/** Faixa suportada para conversão de densidade do óleo diesel. */
+export const DIESEL_DENSITY_ASSAY_TEMPERATURE_C = { min: -10, max: 60 }
 
 /**
  * Faixa plausível de Dt lida no densímetro (kg/m³), por família de produto.
@@ -33,10 +54,10 @@ export const OBSERVED_DENSITY_RANGE_KG_M3: Record<
   'gasolina-premium': { min: 700, max: 800 },
   'etanol-comum': { min: 790, max: 820 },
   'etanol-aditivado': { min: 790, max: 820 },
-  'diesel-s10-comum': { min: 810, max: 880 },
-  'diesel-s10-aditivado': { min: 810, max: 880 },
-  'diesel-s500-comum': { min: 810, max: 880 },
-  'diesel-s500-aditivado': { min: 810, max: 880 },
+  'diesel-s10-comum': { min: 700, max: 900 },
+  'diesel-s10-aditivado': { min: 700, max: 900 },
+  'diesel-s500-comum': { min: 700, max: 900 },
+  'diesel-s500-aditivado': { min: 700, max: 900 },
 }
 
 /**
@@ -83,15 +104,107 @@ export const GASOLINE_ALCOHOL_PERCENT = { min: 29, max: 31 }
  */
 export const ETHANOL_ALCOHOL_PERCENT = { min: 92.5, max: 95.4 }
 
+/** Coeficiente γ (kg/m³/°C) da tabela alcoométrica de etanol hidratado. */
+export const ETHANOL_DENSITY_GAMMA_KG_M3 = 0.86
+
 /**
- * Correlação aproximada Massa Específica × °INPM (soluções hidroalcoólicas a 20 °C).
- * C = −758,31·d² + 882,02·d − 124,99  (d em g/cm³).
- * Útil para automação; referência oficial de ensaio: NBR 5992.
+ * Tabela alcoométrica a 20 °C: [ρ20 kg/m³, % m/m (INPM), % v/v].
+ * Fonte: tabela de conversão EHC / NBR 5992 (faixa comercial).
  */
+const ETHANOL_ALCOHOL_TABLE_20C: ReadonlyArray<readonly [number, number, number]> = [
+  [811.94, 92.2, 94.85],
+  [811.67, 92.3, 94.92],
+  [811.4, 92.4, 94.99],
+  [811.12, 92.5, 95.06],
+  [810.85, 92.6, 95.14],
+  [810.57, 92.7, 95.21],
+  [810.3, 92.8, 95.28],
+  [810.02, 92.9, 95.35],
+  [809.75, 93.0, 95.42],
+  [809.47, 93.1, 95.49],
+  [809.19, 93.2, 95.56],
+  [808.91, 93.3, 95.63],
+  [808.64, 93.4, 95.7],
+  [808.36, 93.5, 95.77],
+  [808.08, 93.6, 95.83],
+  [807.8, 93.7, 95.9],
+  [807.52, 93.8, 95.97],
+  [807.24, 93.9, 96.04],
+  [806.96, 94.0, 96.11],
+  [806.68, 94.1, 96.18],
+  [806.4, 94.2, 96.25],
+  [806.12, 94.3, 96.32],
+  [805.84, 94.4, 96.39],
+  [805.56, 94.5, 96.45],
+  [805.27, 94.6, 96.52],
+  [804.99, 94.7, 96.59],
+  [804.71, 94.8, 96.66],
+  [804.42, 94.9, 96.73],
+  [804.14, 95.0, 96.79],
+  [803.86, 95.1, 96.86],
+  [803.58, 95.2, 96.93],
+  [803.3, 95.3, 97.0],
+  [803.02, 95.4, 97.07],
+]
+
+export type EthanolConversionResult = {
+  rho20KgM3: number
+  massPercent: number
+  volumePercent: number
+  fcv: number
+}
+
+function interpolateEthanolAlcohol(d20KgM3: number): { massPercent: number; volumePercent: number } {
+  const table = ETHANOL_ALCOHOL_TABLE_20C
+  if (d20KgM3 >= table[0][0]) {
+    return { massPercent: table[0][1], volumePercent: table[0][2] }
+  }
+  const last = table[table.length - 1]
+  if (d20KgM3 <= last[0]) {
+    return { massPercent: last[1], volumePercent: last[2] }
+  }
+
+  for (let i = 0; i < table.length - 1; i += 1) {
+    const [rhoHi, massHi, volHi] = table[i]
+    const [rhoLo, massLo, volLo] = table[i + 1]
+    if (d20KgM3 <= rhoHi && d20KgM3 >= rhoLo) {
+      const t = (rhoHi - d20KgM3) / (rhoHi - rhoLo)
+      return {
+        massPercent: Number((massHi + t * (massLo - massHi)).toFixed(2)),
+        volumePercent: Number((volHi + t * (volLo - volHi)).toFixed(2)),
+      }
+    }
+  }
+
+  return { massPercent: last[1], volumePercent: last[2] }
+}
+
+/**
+ * Converte etanol hidratado (T lida + ρ lida) para parâmetros a 20 °C.
+ * ρ20 = ρlida + 0,86·(T−20); teor via tabela alcoométrica; FCV = ρlida/ρ20.
+ */
+export function convertHydratedEthanol(
+  temperatureC: number,
+  rhoObservedKgM3: number,
+): EthanolConversionResult {
+  const rho20KgM3 = Number(
+    (rhoObservedKgM3 + ETHANOL_DENSITY_GAMMA_KG_M3 * (temperatureC - 20)).toFixed(2),
+  )
+  const alcohol = interpolateEthanolAlcohol(rho20KgM3)
+  const fcv =
+    rho20KgM3 === 0 ? 1 : Number((rhoObservedKgM3 / rho20KgM3).toFixed(4))
+
+  return {
+    rho20KgM3,
+    massPercent: alcohol.massPercent,
+    volumePercent: alcohol.volumePercent,
+    fcv,
+  }
+}
+
+/** °INPM a partir da massa específica a 20 °C (tabela alcoométrica). */
 export function calculateEthanolInpmFromD20KgM3(d20KgM3: number): number {
-  const d = d20KgM3 / 1000
-  const c = -758.31 * d * d + 882.02 * d - 124.99
-  return Number(c.toFixed(1))
+  return interpolateEthanolAlcohol(d20KgM3).massPercent
 }
 
 /**
@@ -323,16 +436,51 @@ export function evaluateDensityConformity(
   }
 }
 
+function isGasolineProduct(productKey: FuelProductKey) {
+  return productKey.startsWith('gasolina-')
+}
+
+function isDieselProduct(productKey: FuelProductKey) {
+  return productKey.startsWith('diesel-')
+}
+
+function assayTemperatureRange(productKey: FuelProductKey) {
+  if (isGasolineProduct(productKey)) return GASOLINE_DENSITY_ASSAY_TEMPERATURE_C
+  if (isDieselProduct(productKey)) return DIESEL_DENSITY_ASSAY_TEMPERATURE_C
+  return DENSITY_ASSAY_TEMPERATURE_C
+}
+
+/**
+ * Converte densidade observada da gasolina para 20 °C (Tabela I / densidade relativa).
+ * Retorna d20 em g/cm³ com 4 casas; equivalente em kg/m³ com 1 casa.
+ */
+export function calculateGasolineDensity20C(dObsRelative: number, temperatureC: number): number {
+  const deltaT = temperatureC - 20
+  const d20 =
+    dObsRelative +
+    GASOLINE_DENSITY_POLY.c1 * deltaT +
+    GASOLINE_DENSITY_POLY.c2 * deltaT * deltaT
+  return Number(d20.toFixed(4))
+}
+
+/**
+ * Converte densidade observada do óleo diesel para 20 °C (expansão térmica / Tabela I).
+ * Retorna d20 em g/cm³ com 4 casas.
+ */
+export function calculateDieselDensity20C(dObsRelative: number, temperatureC: number): number {
+  const deltaT = temperatureC - 20
+  const d20 = dObsRelative + DIESEL_DENSITY_ALPHA * deltaT
+  return Number(d20.toFixed(4))
+}
+
 function validateAssayInputs(
   productKey: FuelProductKey,
   dtKgM3: number,
   temperatureC: number,
 ): string | null {
-  if (
-    temperatureC < DENSITY_ASSAY_TEMPERATURE_C.min ||
-    temperatureC > DENSITY_ASSAY_TEMPERATURE_C.max
-  ) {
-    return `Temperatura ${temperatureC.toFixed(1)} °C fora da faixa do ensaio (${DENSITY_ASSAY_TEMPERATURE_C.min} a ${DENSITY_ASSAY_TEMPERATURE_C.max} °C).`
+  const tempRange = assayTemperatureRange(productKey)
+  if (temperatureC < tempRange.min || temperatureC > tempRange.max) {
+    return `Temperatura ${temperatureC.toFixed(1)} °C fora da faixa do ensaio (${tempRange.min} a ${tempRange.max} °C).`
   }
 
   if (productKey === 'gnv') return null
@@ -346,8 +494,11 @@ function validateAssayInputs(
 }
 
 /**
- * Converte densidade observada para 20 °C:
- * D20 = Dt + γ × (t − 20)
+ * Converte densidade observada para 20 °C.
+ * Gasolina: polinômio da Tabela I.
+ * Diesel: expansão térmica α = 0,00072.
+ * Etanol: γ = 0,86 + tabela alcoométrica (°INPM / % v/v / FCV).
+ * Demais: D20 = Dt + γ × (t − 20).
  *
  * Temperatura/Dt fora da faixa do ensaio → sempre Inapto (nunca Apto).
  * Gasolina: teor manual 29–31%. Etanol: teor °INPM calculado da densidade.
@@ -365,24 +516,51 @@ export function correctDensityTo20C(
   const temperatureC = parseDecimalInput(temperatureInput)
   if (dtKgM3 == null || temperatureC == null) return null
 
-  const d20KgM3 = dtKgM3 + gamma * (temperatureC - 20)
-  const rounded = Number(d20KgM3.toFixed(1))
-  const formulaLabel = `D20 = ${dtKgM3.toFixed(1)} + ${gamma.toFixed(2)} × (${temperatureC.toFixed(1)} − 20)`
+  const isGasoline = isGasolineProduct(productKey)
+  const isDiesel = isDieselProduct(productKey)
+  const isEthanol = productKey.startsWith('etanol-')
+
+  let rounded: number
+  let d20Formatted: string
+  let formulaLabel: string
+  let alcoholFormatted: string | null = null
+
+  if (isGasoline) {
+    const dObsRelative = dtKgM3 / 1000
+    const d20Relative = calculateGasolineDensity20C(dObsRelative, temperatureC)
+    rounded = Number((d20Relative * 1000).toFixed(1))
+    d20Formatted = rounded.toFixed(1)
+    const deltaLabel = `(${temperatureC.toFixed(1)} − 20)`
+    formulaLabel = `D20 = ${dObsRelative.toFixed(4)} + 0,000857 × ${deltaLabel} − 0,00000088 × ${deltaLabel}²`
+  } else if (isDiesel) {
+    const dObsRelative = dtKgM3 / 1000
+    const d20Relative = calculateDieselDensity20C(dObsRelative, temperatureC)
+    rounded = Number((d20Relative * 1000).toFixed(1))
+    d20Formatted = rounded.toFixed(1)
+    formulaLabel = `D20 = ${dObsRelative.toFixed(4)} + 0,00072 × (${temperatureC.toFixed(1)} − 20)`
+  } else if (isEthanol) {
+    const ethanol = convertHydratedEthanol(temperatureC, dtKgM3)
+    rounded = ethanol.rho20KgM3
+    d20Formatted = ethanol.rho20KgM3.toFixed(2)
+    alcoholFormatted = ethanol.massPercent.toFixed(2)
+    formulaLabel = `D20 = ${dtKgM3.toFixed(2)} + 0,86 × (${temperatureC.toFixed(1)} − 20); ${ethanol.massPercent.toFixed(2)}% m/m; ${ethanol.volumePercent.toFixed(2)}% v/v; FCV ${ethanol.fcv.toFixed(4)}`
+  } else {
+    const d20KgM3 = dtKgM3 + gamma * (temperatureC - 20)
+    rounded = Number(d20KgM3.toFixed(1))
+    d20Formatted = rounded.toFixed(1)
+    formulaLabel = `D20 = ${dtKgM3.toFixed(1)} + ${gamma.toFixed(2)} × (${temperatureC.toFixed(1)} − 20)`
+  }
+
   const limits = FUEL_DENSITY_LIMITS_KG_M3[productKey]
   const limitLabel = limits ? formatLimitLabel(limits) : null
 
-  const isGasoline = productKey.startsWith('gasolina-')
-  const isEthanol = productKey.startsWith('etanol-')
-
-  let alcoholFormatted: string | null = null
   let alcohol: {
     status: DensityConformity | null
     limitLabel: string
     reason: string | null
   } | null = null
 
-  if (isEthanol) {
-    alcoholFormatted = calculateEthanolInpmFromD20KgM3(rounded).toFixed(1)
+  if (isEthanol && alcoholFormatted) {
     alcohol = evaluateEthanolAlcoholConformity(alcoholFormatted)
   } else if (isGasoline && alcoholInput != null && alcoholInput.trim() !== '') {
     alcohol = evaluateGasolineAlcoholConformity(alcoholInput)
@@ -397,7 +575,7 @@ export function correctDensityTo20C(
       temperatureC,
       gammaKgM3: gamma,
       d20KgM3: rounded,
-      d20Formatted: rounded.toFixed(1),
+      d20Formatted,
       status: 'inapto',
       limitLabel,
       formulaLabel,
@@ -418,7 +596,7 @@ export function correctDensityTo20C(
     temperatureC,
     gammaKgM3: gamma,
     d20KgM3: rounded,
-    d20Formatted: rounded.toFixed(1),
+    d20Formatted,
     status,
     limitLabel: conformity.limitLabel ?? limitLabel,
     formulaLabel,
