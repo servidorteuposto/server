@@ -83,9 +83,9 @@ export const FUEL_DENSITY_GAMMA_KG_M3: Record<FuelProductKey, number | null> = {
   'gasolina-comum': 0.857,
   'gasolina-aditivada': 0.857,
   'gasolina-premium': 0.857,
-  'etanol-comum': 0.86,
-  'etanol-aditivado': 0.86,
-  'etanol-premium': 0.86,
+  'etanol-comum': 0.85,
+  'etanol-aditivado': 0.85,
+  'etanol-premium': 0.85,
   'diesel-s10-comum': 0.72,
   'diesel-s10-aditivado': 0.72,
   'diesel-s500-comum': 0.72,
@@ -169,8 +169,11 @@ export const GASOLINE_ALCOHOL_PERCENT = { min: 31, max: 33 }
  */
 export const ETHANOL_ALCOHOL_PERCENT = { min: 92.5, max: 95.4 }
 
-/** Coeficiente γ (kg/m³/°C) da tabela alcoométrica de etanol hidratado. */
-export const ETHANOL_DENSITY_GAMMA_KG_M3 = 0.86
+/**
+ * Coeficiente γ (kg/m³/°C) do etanol hidratado: ρ20 = ρlida + γ·(T−20).
+ * 0,85 alinha com correção usual de EHC (ex.: 17 °C / 0,8080 → 0,8055).
+ */
+export const ETHANOL_DENSITY_GAMMA_KG_M3 = 0.85
 
 /**
  * Tabela alcoométrica a 20 °C: [ρ20 kg/m³, % m/m (INPM), % v/v].
@@ -246,16 +249,20 @@ function interpolateEthanolAlcohol(d20KgM3: number): { massPercent: number; volu
 
 /**
  * Converte etanol hidratado (T lida + ρ lida) para parâmetros a 20 °C.
- * ρ20 = ρlida + 0,86·(T−20) (correção linear usual de EHC / NBR 5992);
- * teor via tabela alcoométrica; FCV = ρlida/ρ20.
+ * Correção em densidade relativa (4 casas, half-up — igual ao densímetro):
+ * d20 = dObs + 0,00085·(T−20); kg/m³ com 1 casa.
+ * Teor via tabela alcoométrica; FCV = ρlida/ρ20.
  */
 export function convertHydratedEthanol(
   temperatureC: number,
   rhoObservedKgM3: number,
 ): EthanolConversionResult {
-  const rho20KgM3 = Number(
-    (rhoObservedKgM3 + ETHANOL_DENSITY_GAMMA_KG_M3 * (temperatureC - 20)).toFixed(1),
-  )
+  const dObsRelative = rhoObservedKgM3 / 1000
+  const alphaRelative = ETHANOL_DENSITY_GAMMA_KG_M3 / 1000
+  const d20Raw = dObsRelative + alphaRelative * (temperatureC - 20)
+  // Half-up em 4 casas (evita o viés do Number#toFixed em *.x5).
+  const d20Relative = Math.round((d20Raw + Number.EPSILON) * 10000) / 10000
+  const rho20KgM3 = Math.round((d20Relative * 1000 + Number.EPSILON) * 10) / 10
   const alcohol = interpolateEthanolAlcohol(rho20KgM3)
   const fcv =
     rho20KgM3 === 0 ? 1 : Number((rhoObservedKgM3 / rho20KgM3).toFixed(4))
@@ -567,7 +574,7 @@ function validateAssayInputs(
 /**
  * Converte densidade observada para 20 °C.
  * Gasolina e diesel: Tabela I (Res. ANP nº 894/2022), densímetro de vidro.
- * Etanol: γ = 0,86 kg/m³/°C + tabela alcoométrica (°INPM / % v/v / FCV).
+ * Etanol: γ = 0,85 kg/m³/°C + tabela alcoométrica (°INPM / % v/v / FCV).
  *
  * Temperatura/Dt fora da faixa do ensaio → sempre Inapto (nunca Apto).
  * Gasolina: teor manual 31–33%. Etanol: teor °INPM calculado da densidade.
@@ -605,7 +612,7 @@ export function correctDensityTo20C(
     rounded = ethanol.rho20KgM3
     d20Formatted = ethanol.rho20KgM3.toFixed(1)
     alcoholFormatted = ethanol.massPercent.toFixed(2)
-    formulaLabel = `D20 = ${dtKgM3.toFixed(1)} + 0,86 × (${temperatureC.toFixed(1)} − 20); ${ethanol.massPercent.toFixed(2)}% m/m; ${ethanol.volumePercent.toFixed(2)}% v/v; FCV ${ethanol.fcv.toFixed(4)}`
+    formulaLabel = `D20 = ${dtKgM3.toFixed(1)} + 0,85 × (${temperatureC.toFixed(1)} − 20); ${ethanol.massPercent.toFixed(2)}% m/m; ${ethanol.volumePercent.toFixed(2)}% v/v; FCV ${ethanol.fcv.toFixed(4)}`
   } else {
     const d20KgM3 = dtKgM3 + gamma * (temperatureC - 20)
     rounded = Number(d20KgM3.toFixed(1))
