@@ -17,6 +17,16 @@ function onlyDigits(value: string) {
   return value.replace(/\D/g, '')
 }
 
+function isAdminAccount(user: {
+  email?: string | null
+  app_metadata?: Record<string, unknown> | null
+}) {
+  if (user.app_metadata?.role === 'admin') return true
+  return String(user.email ?? '')
+    .trim()
+    .toLowerCase() === ADMIN_EMAIL
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -40,25 +50,25 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, message: 'Não autenticado.' }, 401)
     }
 
+    const accessToken = authHeader.slice('Bearer '.length).trim()
+    if (!accessToken || accessToken === anonKey) {
+      return jsonResponse({ ok: false, message: 'Não autenticado.' }, 401)
+    }
+
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.49.1')
 
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
+    const admin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     })
 
     const {
       data: { user },
       error: userError,
-    } = await userClient.auth.getUser()
+    } = await admin.auth.getUser(accessToken)
 
-    if (userError || !user || user.app_metadata?.role !== 'admin') {
+    if (userError || !user || !isAdminAccount(user)) {
       return jsonResponse({ ok: false, message: 'Acesso restrito ao administrador.' }, 403)
     }
-
-    const admin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
 
     const body = await req.json()
     const action = body?.action

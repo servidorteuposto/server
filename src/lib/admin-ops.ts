@@ -28,7 +28,26 @@ async function parsePayload<T>(data: T | null, error: unknown): Promise<T | null
 }
 
 async function invokeAdminOps<T>(body: Record<string, unknown>) {
-  const { data, error } = await supabase.functions.invoke('admin-ops', { body })
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  let accessToken = session?.access_token
+  if (!accessToken) {
+    const refreshed = await supabase.auth.refreshSession()
+    accessToken = refreshed.data.session?.access_token
+  }
+
+  if (!accessToken) {
+    return { payload: null as T | null, invokeFailed: true }
+  }
+
+  const { data, error } = await supabase.functions.invoke('admin-ops', {
+    body,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
   const payload = await parsePayload<T>(data as T | null, error)
   return { payload, invokeFailed: !payload && Boolean(error) }
 }
