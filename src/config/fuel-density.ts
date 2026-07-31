@@ -1,21 +1,84 @@
 import { productAlcoholKind, type FuelProductKey } from './fuel-analyses'
 
 /**
- * Coeficientes da Tabela I (gasolina) para conversão à densidade relativa a 20 °C:
- * d20 = dObs + 0,000857·(T−20) − 0,00000088·(T−20)²
+ * Modelo matemático da Tabela I (Res. ANP nº 894/2022 / CNP nº 6/70):
+ * densímetro de vidro — densidade observada → densidade relativa a 20 °C.
+ *
+ * Por faixa de d20: d20 = dObs − S·10⁻⁶·[(A1+A2·d)·ΔT + (B1+B2·d)·ΔT²],
+ * iterando em d (= d20). O fator S reproduz os valores publicados (4 casas).
  */
+const ANP_TABELA_I_SCALE = 1.74
+
+/** Faixas [dMaxExclusive, A1, A2, B1, B2] do modelo CNP (tese / Petrobras–INPM). */
+const ANP_TABELA_I_COEFF_RANGES: ReadonlyArray<readonly [number, number, number, number, number]> = [
+  [0.498, -2462, 3215, -10.14, 17.38],
+  [0.518, -2391, 3074, -8.41, 13.98],
+  [0.539, -2294, 2887, -8.39, 13.87],
+  [0.559, -2146, 2615, -5.46, 8.55],
+  [0.579, -1920, 2214, -5.51, 8.55],
+  [0.6, -2358, 2962, -12.25, 20.15],
+  [0.615, -1361, 1300, -0.49, 0.6],
+  [0.635, -1237, 1100, -0.49, 0.6],
+  [0.655, -1077, 850, -0.49, 0.6],
+  [0.675, -1011, 750, -0.49, 0.6],
+  [0.695, -977, 700, -0.49, 0.6],
+  [0.746, -1005, 740, -0.49, 0.6],
+  [0.766, -1238, 1050, -0.49, 0.6],
+  [0.786, -1084, 850, -0.49, 0.6],
+  [0.806, -965, 700, -0.49, 0.6],
+  [0.826, -843.5, 550, -0.49, 0.6],
+  [0.846, -719, 400, -0.49, 0.6],
+  [0.871, -617, 280, -0.49, 0.6],
+  [0.896, -512, 160, -0.49, 0.6],
+  [0.996, -394.8, 30, -0.49, 0.6],
+  [2, -542.6, 177.8, 2.31, -2.2],
+]
+
+function anpTabelaICoeffs(d20Relative: number): readonly [number, number, number, number] {
+  for (const [dMax, a1, a2, b1, b2] of ANP_TABELA_I_COEFF_RANGES) {
+    if (d20Relative < dMax) return [a1, a2, b1, b2]
+  }
+  const last = ANP_TABELA_I_COEFF_RANGES[ANP_TABELA_I_COEFF_RANGES.length - 1]
+  return [last[1], last[2], last[3], last[4]]
+}
+
+/**
+ * Converte densidade observada (densímetro de vidro) para densidade relativa a 20 °C
+ * conforme a Tabela I da Res. ANP nº 894/2022.
+ */
+export function convertObservedDensityTo20C(
+  dObsRelative: number,
+  temperatureC: number,
+): number {
+  let d = dObsRelative
+  for (let i = 0; i < 40; i += 1) {
+    const [a1, a2, b1, b2] = anpTabelaICoeffs(d)
+    const deltaT = temperatureC - 20
+    const corr =
+      -ANP_TABELA_I_SCALE * 1e-6 * (a1 + a2 * d) * deltaT -
+      ANP_TABELA_I_SCALE * 1e-6 * (b1 + b2 * d) * deltaT * deltaT
+    const d20 = dObsRelative + corr
+    if (Math.abs(d20 - d) < 1e-12) {
+      return Number(d20.toFixed(4))
+    }
+    d = d20
+  }
+  return Number(d.toFixed(4))
+}
+
+/** @deprecated Mantido para compatibilidade; use convertObservedDensityTo20C (Tabela I). */
 export const GASOLINE_DENSITY_POLY = {
   c1: 0.000857,
   c2: -0.00000088,
 } as const
 
-/**
- * Coeficiente de expansão térmica do óleo diesel (Tabela I / ASTM) na densidade relativa:
- * d20 = dObs + 0,00072·(T−20)
- */
+/** @deprecated Mantido para compatibilidade; use convertObservedDensityTo20C (Tabela I). */
 export const DIESEL_DENSITY_ALPHA = 0.00072
 
-/** Coeficiente absoluto γ (kg/m³/°C) na fórmula linear D20 = Dt + γ × (t − 20). Gasolina/diesel têm modelos próprios. */
+/**
+ * γ de referência (kg/m³/°C) para rótulos/UI e para o etanol (correção linear).
+ * Gasolina e diesel usam a Tabela I ANP (não este γ linear).
+ */
 export const FUEL_DENSITY_GAMMA_KG_M3: Record<FuelProductKey, number | null> = {
   'gasolina-comum': 0.857,
   'gasolina-aditivada': 0.857,
@@ -183,14 +246,15 @@ function interpolateEthanolAlcohol(d20KgM3: number): { massPercent: number; volu
 
 /**
  * Converte etanol hidratado (T lida + ρ lida) para parâmetros a 20 °C.
- * ρ20 = ρlida + 0,86·(T−20); teor via tabela alcoométrica; FCV = ρlida/ρ20.
+ * ρ20 = ρlida + 0,86·(T−20) (correção linear usual de EHC / NBR 5992);
+ * teor via tabela alcoométrica; FCV = ρlida/ρ20.
  */
 export function convertHydratedEthanol(
   temperatureC: number,
   rhoObservedKgM3: number,
 ): EthanolConversionResult {
   const rho20KgM3 = Number(
-    (rhoObservedKgM3 + ETHANOL_DENSITY_GAMMA_KG_M3 * (temperatureC - 20)).toFixed(2),
+    (rhoObservedKgM3 + ETHANOL_DENSITY_GAMMA_KG_M3 * (temperatureC - 20)).toFixed(1),
   )
   const alcohol = interpolateEthanolAlcohol(rho20KgM3)
   const fcv =
@@ -465,26 +529,19 @@ function assayTemperatureRange(productKey: FuelProductKey) {
 }
 
 /**
- * Converte densidade observada da gasolina para 20 °C (Tabela I / densidade relativa).
- * Retorna d20 em g/cm³ com 4 casas; equivalente em kg/m³ com 1 casa.
+ * Converte densidade observada da gasolina para 20 °C (Tabela I ANP 894).
+ * Retorna d20 em g/cm³ com 4 casas.
  */
 export function calculateGasolineDensity20C(dObsRelative: number, temperatureC: number): number {
-  const deltaT = temperatureC - 20
-  const d20 =
-    dObsRelative +
-    GASOLINE_DENSITY_POLY.c1 * deltaT +
-    GASOLINE_DENSITY_POLY.c2 * deltaT * deltaT
-  return Number(d20.toFixed(4))
+  return convertObservedDensityTo20C(dObsRelative, temperatureC)
 }
 
 /**
- * Converte densidade observada do óleo diesel para 20 °C (expansão térmica / Tabela I).
+ * Converte densidade observada do óleo diesel para 20 °C (Tabela I ANP 894).
  * Retorna d20 em g/cm³ com 4 casas.
  */
 export function calculateDieselDensity20C(dObsRelative: number, temperatureC: number): number {
-  const deltaT = temperatureC - 20
-  const d20 = dObsRelative + DIESEL_DENSITY_ALPHA * deltaT
-  return Number(d20.toFixed(4))
+  return convertObservedDensityTo20C(dObsRelative, temperatureC)
 }
 
 function validateAssayInputs(
@@ -509,10 +566,8 @@ function validateAssayInputs(
 
 /**
  * Converte densidade observada para 20 °C.
- * Gasolina: polinômio da Tabela I.
- * Diesel: expansão térmica α = 0,00072.
- * Etanol: γ = 0,86 + tabela alcoométrica (°INPM / % v/v / FCV).
- * Demais: D20 = Dt + γ × (t − 20).
+ * Gasolina e diesel: Tabela I (Res. ANP nº 894/2022), densímetro de vidro.
+ * Etanol: γ = 0,86 kg/m³/°C + tabela alcoométrica (°INPM / % v/v / FCV).
  *
  * Temperatura/Dt fora da faixa do ensaio → sempre Inapto (nunca Apto).
  * Gasolina: teor manual 31–33%. Etanol: teor °INPM calculado da densidade.
@@ -539,25 +594,18 @@ export function correctDensityTo20C(
   let formulaLabel: string
   let alcoholFormatted: string | null = null
 
-  if (isGasoline) {
+  if (isGasoline || isDiesel) {
     const dObsRelative = dtKgM3 / 1000
-    const d20Relative = calculateGasolineDensity20C(dObsRelative, temperatureC)
+    const d20Relative = convertObservedDensityTo20C(dObsRelative, temperatureC)
     rounded = Number((d20Relative * 1000).toFixed(1))
     d20Formatted = rounded.toFixed(1)
-    const deltaLabel = `(${temperatureC.toFixed(1)} − 20)`
-    formulaLabel = `D20 = ${dObsRelative.toFixed(4)} + 0,000857 × ${deltaLabel} − 0,00000088 × ${deltaLabel}²`
-  } else if (isDiesel) {
-    const dObsRelative = dtKgM3 / 1000
-    const d20Relative = calculateDieselDensity20C(dObsRelative, temperatureC)
-    rounded = Number((d20Relative * 1000).toFixed(1))
-    d20Formatted = rounded.toFixed(1)
-    formulaLabel = `D20 = ${dObsRelative.toFixed(4)} + 0,00072 × (${temperatureC.toFixed(1)} − 20)`
+    formulaLabel = `Tabela I ANP 894: Dt ${dObsRelative.toFixed(3)} @ ${temperatureC.toFixed(1)} °C → D20 ${d20Relative.toFixed(4)}`
   } else if (isEthanol) {
     const ethanol = convertHydratedEthanol(temperatureC, dtKgM3)
     rounded = ethanol.rho20KgM3
-    d20Formatted = ethanol.rho20KgM3.toFixed(2)
+    d20Formatted = ethanol.rho20KgM3.toFixed(1)
     alcoholFormatted = ethanol.massPercent.toFixed(2)
-    formulaLabel = `D20 = ${dtKgM3.toFixed(2)} + 0,86 × (${temperatureC.toFixed(1)} − 20); ${ethanol.massPercent.toFixed(2)}% m/m; ${ethanol.volumePercent.toFixed(2)}% v/v; FCV ${ethanol.fcv.toFixed(4)}`
+    formulaLabel = `D20 = ${dtKgM3.toFixed(1)} + 0,86 × (${temperatureC.toFixed(1)} − 20); ${ethanol.massPercent.toFixed(2)}% m/m; ${ethanol.volumePercent.toFixed(2)}% v/v; FCV ${ethanol.fcv.toFixed(4)}`
   } else {
     const d20KgM3 = dtKgM3 + gamma * (temperatureC - 20)
     rounded = Number(d20KgM3.toFixed(1))
