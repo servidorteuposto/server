@@ -369,7 +369,11 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
                 aria-label="Voltar ao início"
                 title="Voltar ao início"
               >
-                <span className="app-topbar__wordmark">Teu Posto</span>
+                <img
+                  src="/imagens/logoteuposto2.png"
+                  alt="Teu Posto"
+                  className="app-topbar__logo"
+                />
               </button>
               <span className="app-topbar__spacer" aria-hidden="true" />
             </header>

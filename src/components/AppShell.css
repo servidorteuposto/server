@@ -548,9 +548,9 @@
     justify-content: center;
     justify-self: center;
     width: auto;
-    max-width: min(240px, 62vw);
+    max-width: min(260px, 68vw);
     margin: 0;
-    padding: 0;
+    padding: 0.1rem 0;
     border: none;
     background: transparent;
     cursor: pointer;
@@ -564,14 +564,13 @@
     border-radius: 8px;
   }
 
-  .app-topbar__wordmark {
-    font-family: 'Grand Hotel', cursive;
-    font-size: 2rem;
-    font-weight: 400;
-    letter-spacing: 0.01em;
-    line-height: 1;
-    color: var(--blue-dark, #0c3b7a);
-    white-space: nowrap;
+  .app-topbar__logo {
+    display: block;
+    width: auto;
+    height: 2.15rem;
+    max-width: min(220px, 58vw);
+    object-fit: contain;
+    object-position: center;
   }
 
   .app-topbar__spacer {

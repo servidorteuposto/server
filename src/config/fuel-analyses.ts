@@ -48,7 +48,7 @@ export const FUEL_ASPECTO_OPTIONS = [
 export type FuelAspectoOption = (typeof FUEL_ASPECTO_OPTIONS)[number]
 
 /** Opções de cor no ensaio do combustível (RAQ). */
-export const FUEL_COR_OPTIONS = ['Verde', 'Vermelho', 'Amarelo incolor'] as const
+export const FUEL_COR_OPTIONS = ['Verde', 'Vermelho', 'Amarelo', 'Incolor'] as const
 
 export type FuelCorOption = (typeof FUEL_COR_OPTIONS)[number]
 
