@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { sendResendEmail } from './resend.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -53,27 +54,15 @@ function formatDateKeyPtBr(dateKey: string) {
 }
 
 async function sendEmail(to: string, subject: string, html: string) {
-  const resendKey = Deno.env.get('RESEND_API_KEY')
-  const from = Deno.env.get('SECURITY_EMAIL_FROM') ?? 'avisos@teuposto.com.br'
-  if (!resendKey) {
-    console.warn('RESEND_API_KEY not configured, skipping email')
-    return false
-  }
-
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${resendKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ from, to, subject, html }),
+  return sendResendEmail({
+    to,
+    subject,
+    html,
+    from:
+      Deno.env.get('DRAINAGE_EMAIL_FROM') ??
+      Deno.env.get('SECURITY_EMAIL_FROM') ??
+      'Teu Posto Avisos <noreply@appteuposto.com.br>',
   })
-
-  if (!response.ok) {
-    console.error('Failed to send drainage email', await response.text())
-    return false
-  }
-  return true
 }
 
 async function sendWhatsApp(phone: string, message: string) {

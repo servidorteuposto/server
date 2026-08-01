@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { sendResendEmail, SUPPORT_EMAIL } from './resend.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -59,35 +60,6 @@ async function hashValue(value: string) {
 const APP_URL = Deno.env.get('APP_PUBLIC_URL') ?? 'https://www.appteuposto.com.br'
 const LOGO_URL = `${APP_URL}/imagens/logo_teuposto.png`
 
-async function sendResendEmail(to: string, subject: string, html: string) {
-  const resendKey = Deno.env.get('RESEND_API_KEY')
-  const from =
-    Deno.env.get('AUTH_EMAIL_FROM') ??
-    Deno.env.get('SECURITY_EMAIL_FROM') ??
-    'Teu Posto <noreply@appteuposto.com.br>'
-
-  if (!resendKey) {
-    console.warn('RESEND_API_KEY not configured, skipping email')
-    return false
-  }
-
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${resendKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ from, to, subject, html }),
-  })
-
-  if (!response.ok) {
-    console.error('Failed to send email', await response.text())
-    return false
-  }
-
-  return true
-}
-
 function escapeHtml(value: string) {
   return value
     .replaceAll('&', '&amp;')
@@ -133,7 +105,9 @@ function buildWelcomeEmailHtml(postoName: string) {
               </td></tr>
             </table>
             <p style="margin:0 0 24px;font-size:13px;line-height:1.55;color:#6b7280;">
-              Se precisar de ajuda, use o menu <strong>Suporte</strong> dentro do app.
+              Se precisar de ajuda, use o menu <strong>Suporte</strong> no app ou responda este e-mail /
+              escreva para
+              <a href="mailto:${SUPPORT_EMAIL}" style="color:#3d8fd4;text-decoration:none;">${SUPPORT_EMAIL}</a>.
             </p>
           </td>
         </tr>
@@ -153,11 +127,11 @@ function buildWelcomeEmailHtml(postoName: string) {
 }
 
 async function sendWelcomeEmail(email: string, postoName: string) {
-  return sendResendEmail(
-    email,
-    'Bem-vindo ao Teu Posto',
-    buildWelcomeEmailHtml(postoName),
-  )
+  return sendResendEmail({
+    to: email,
+    subject: 'Bem-vindo ao Teu Posto',
+    html: buildWelcomeEmailHtml(postoName),
+  })
 }
 
 async function processPendingAlerts(admin: ReturnType<typeof createClient>, supabaseUrl: string) {

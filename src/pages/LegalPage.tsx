@@ -78,6 +78,8 @@ export default function LegalPage({ docId }: LegalPageProps) {
           <p>
             Contato de privacidade:{' '}
             <a href={LEGAL_CONTROLLER.supportUrl}>abrir formulário de suporte</a>
+            {' · '}
+            <a href={`mailto:${LEGAL_CONTROLLER.supportEmail}`}>{LEGAL_CONTROLLER.supportEmail}</a>
           </p>
           <p>
             <a href="/">Voltar ao aplicativo</a>

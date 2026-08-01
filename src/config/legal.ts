@@ -24,6 +24,7 @@ export const LEGAL_CONTROLLER = {
   supportUrl: '/?suporte=1',
   supportLabel: 'formulário de suporte',
   supportPath: 'Suporte',
+  supportEmail: 'suporte@appteuposto.com.br',
   /** Preencha com a razão social e CNPJ oficiais do operador do serviço. */
   legalName: 'Operador do Teu Posto',
   jurisdiction: 'Brasil',
@@ -130,7 +131,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
       {
         title: '13. Contato',
         paragraphs: [
-          `Dúvidas sobre estes Termos: use o ${LEGAL_CONTROLLER.supportLabel} no aplicativo (menu ${LEGAL_CONTROLLER.supportPath} ou a opção “Fale com o suporte” na tela de login).`,
+          `Dúvidas sobre estes Termos: use o ${LEGAL_CONTROLLER.supportLabel} no aplicativo (menu ${LEGAL_CONTROLLER.supportPath} ou a opção “Fale com o suporte” na tela de login) ou escreva para ${LEGAL_CONTROLLER.supportEmail}.`,
         ],
       },
     ],
