@@ -1,13 +1,22 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import {
-  formatCardExpiry,
-  formatCardNumber,
-  generateMockPixPayload,
+  createBoletoPayment,
+  createCardCheckout,
+  createPixPayment,
+  getMpPaymentStatus,
+  getMpSubscriptionStatus,
+  type CardBillingChoice,
+} from '../lib/mercadopago'
+import {
   PaymentMethod,
   SUBSCRIPTION_PERIOD_LABEL,
   SUBSCRIPTION_PRICE_LABEL,
 } from '../lib/payment'
+
+export type PaymentFormOutcome =
+  | { kind: 'activated'; activation: 'instant' | 'pending' }
+  | { kind: 'redirect' }
 
 interface PaymentFormProps {
   postoName: string
@@ -15,8 +24,9 @@ interface PaymentFormProps {
   email: string
   loading?: boolean
   error?: string | null
-  onSubmit: (method: PaymentMethod) => void
-  onPixConfirmed: () => void
+  onBusy?: (busy: boolean) => void
+  onError?: (message: string | null) => void
+  onActivated: (activation: 'instant' | 'pending') => void
 }
 
 function CreditCardIcon() {
@@ -64,71 +74,134 @@ export default function PaymentForm({
   email,
   loading = false,
   error = null,
-  onSubmit,
-  onPixConfirmed,
+  onBusy,
+  onError,
+  onActivated,
 }: PaymentFormProps) {
-  const [method, setMethod] = useState<PaymentMethod>('card')
-  const [cardNumber, setCardNumber] = useState('')
-  const [cardName, setCardName] = useState(postoName)
-  const [cardExpiry, setCardExpiry] = useState('')
-  const [cardCvv, setCardCvv] = useState('')
-  const [holderName, setHolderName] = useState(postoName)
-  const [holderDocument, setHolderDocument] = useState(cnpj)
+  const [method, setMethod] = useState<PaymentMethod>('pix')
+  const [cardBilling, setCardBilling] = useState<CardBillingChoice>('once')
+  const [localBusy, setLocalBusy] = useState(false)
   const [pixCode, setPixCode] = useState('')
   const [pixQrDataUrl, setPixQrDataUrl] = useState<string | null>(null)
+  const [pixPaymentId, setPixPaymentId] = useState<string | null>(null)
   const [pixWaiting, setPixWaiting] = useState(false)
   const [pixCopied, setPixCopied] = useState(false)
+  const [boletoUrl, setBoletoUrl] = useState<string | null>(null)
+  const [boletoLine, setBoletoLine] = useState<string | null>(null)
+  const [boletoReady, setBoletoReady] = useState(false)
+  const pollRef = useRef<number | null>(null)
+
+  const busy = loading || localBusy
+
+  function setBusy(value: boolean) {
+    setLocalBusy(value)
+    onBusy?.(value)
+  }
+
+  function setErr(message: string | null) {
+    onError?.(message)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) window.clearInterval(pollRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     if (method !== 'pix') {
-      setPixWaiting(false)
+      if (pollRef.current) {
+        window.clearInterval(pollRef.current)
+        pollRef.current = null
+      }
       return
     }
 
     let cancelled = false
-    const payload = generateMockPixPayload(email, cnpj)
 
     async function setupPix() {
-      setPixCode(payload)
-      setPixWaiting(true)
-      setPixCopied(false)
+      setBusy(true)
+      setErr(null)
+      setPixWaiting(false)
+      setPixCode('')
+      setPixQrDataUrl(null)
+      setPixPaymentId(null)
 
       try {
-        const qr = await QRCode.toDataURL(payload, {
-          width: 200,
-          margin: 1,
-          color: { dark: '#0c3b7a', light: '#ffffff' },
-        })
+        const result = await createPixPayment({ cnpj, email, nome: postoName })
+        if (cancelled) return
 
-        if (!cancelled) {
-          setPixQrDataUrl(qr)
+        const code = result.qr_code ?? ''
+        setPixPaymentId(result.payment_id ?? null)
+        setPixCode(code)
+        setPixWaiting(true)
+
+        if (result.qr_code_base64) {
+          setPixQrDataUrl(`data:image/png;base64,${result.qr_code_base64}`)
+        } else if (code) {
+          const qr = await QRCode.toDataURL(code, {
+            width: 200,
+            margin: 1,
+            color: { dark: '#0c3b7a', light: '#ffffff' },
+          })
+          if (!cancelled) setPixQrDataUrl(qr)
         }
-      } catch {
-        if (!cancelled) {
-          setPixQrDataUrl(null)
+
+        if (result.payment_id) {
+          pollRef.current = window.setInterval(() => {
+            void checkPixStatus(result.payment_id!)
+          }, 4000)
         }
+      } catch (err) {
+        if (!cancelled) {
+          setErr(err instanceof Error ? err.message : 'Falha ao gerar PIX.')
+        }
+      } finally {
+        if (!cancelled) setBusy(false)
       }
     }
 
-    setupPix()
-
-    // Simula confirmação automática via webhook após pagamento PIX
-    const confirmTimer = window.setTimeout(() => {
-      if (!cancelled) {
-        setPixWaiting(false)
-        onPixConfirmed()
-      }
-    }, 4000)
+    void setupPix()
 
     return () => {
       cancelled = true
-      window.clearTimeout(confirmTimer)
+      if (pollRef.current) {
+        window.clearInterval(pollRef.current)
+        pollRef.current = null
+      }
     }
-  }, [method, email, cnpj, onPixConfirmed])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [method, cnpj, email, postoName])
+
+  async function checkPixStatus(paymentId: string) {
+    try {
+      const status = await getMpPaymentStatus({ cnpj, email, payment_id: paymentId })
+      if (status.approved) {
+        if (pollRef.current) {
+          window.clearInterval(pollRef.current)
+          pollRef.current = null
+        }
+        setPixWaiting(false)
+        // Confirma ativação no banco (webhook pode já ter rodado)
+        const sub = await getMpSubscriptionStatus({ cnpj, email })
+        if (sub.activated) {
+          onActivated('instant')
+        } else {
+          // Aguarda webhook processar
+          window.setTimeout(async () => {
+            const again = await getMpSubscriptionStatus({ cnpj, email })
+            if (again.activated) onActivated('instant')
+            else setErr('Pagamento recebido. Se o acesso não liberar em instantes, atualize a página.')
+          }, 2500)
+        }
+      }
+    } catch {
+      // silencioso no polling
+    }
+  }
 
   async function handleCopyPixCode() {
     if (!pixCode) return
-
     try {
       await navigator.clipboard.writeText(pixCode)
       setPixCopied(true)
@@ -138,15 +211,44 @@ export default function PaymentForm({
     }
   }
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    if (method !== 'pix') {
-      onSubmit(method)
+    setErr(null)
+    setBusy(true)
+
+    try {
+      if (method === 'boleto') {
+        const result = await createBoletoPayment({ cnpj, email, nome: postoName })
+        setBoletoUrl(result.ticket_url ?? null)
+        setBoletoLine(result.digitable_line ?? result.barcode ?? null)
+        setBoletoReady(true)
+        onActivated('pending')
+        return
+      }
+
+      if (method === 'card') {
+        const result = await createCardCheckout({
+          cnpj,
+          email,
+          nome: postoName,
+          billing: cardBilling,
+        })
+        window.location.assign(result.init_point!)
+        return
+      }
+
+      if (method === 'pix' && pixPaymentId) {
+        await checkPixStatus(pixPaymentId)
+      }
+    } catch (err) {
+      setErr(err instanceof Error ? err.message : 'Não foi possível processar o pagamento.')
+    } finally {
+      setBusy(false)
     }
   }
 
   return (
-    <form className="login-form payment-form" onSubmit={handleSubmit}>
+    <form className="login-form payment-form" onSubmit={(e) => void handleSubmit(e)}>
       {error && (
         <div className="login-form__error" role="alert">
           {error}
@@ -171,7 +273,12 @@ export default function PaymentForm({
               role="radio"
               aria-checked={method === id}
               className={`payment-method ${method === id ? 'payment-method--active' : ''}`}
-              onClick={() => setMethod(id)}
+              onClick={() => {
+                setMethod(id)
+                setBoletoReady(false)
+                setErr(null)
+              }}
+              disabled={busy}
             >
               <Icon />
               <span>{label}</span>
@@ -183,126 +290,81 @@ export default function PaymentForm({
       {method === 'card' && (
         <>
           <p className="payment-form__info payment-form__info--instant">
-            Ativação instantânea após a confirmação do pagamento.
+            Você será redirecionado ao Mercado Pago para pagar com segurança.
           </p>
-
-          <div className="form-field">
-            <label htmlFor="card-number">Número do cartão</label>
-            <input
-              id="card-number"
-              type="text"
-              className="form-field__input"
-              placeholder="0000 0000 0000 0000"
-              value={cardNumber}
-              onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-              required
-              inputMode="numeric"
-              autoComplete="cc-number"
-            />
+          <div className="payment-methods" role="radiogroup" aria-label="Tipo de cobrança no cartão">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={cardBilling === 'once'}
+              className={`payment-method ${cardBilling === 'once' ? 'payment-method--active' : ''}`}
+              onClick={() => setCardBilling('once')}
+              disabled={busy}
+            >
+              <span>Único</span>
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={cardBilling === 'recurring'}
+              className={`payment-method ${cardBilling === 'recurring' ? 'payment-method--active' : ''}`}
+              onClick={() => setCardBilling('recurring')}
+              disabled={busy}
+            >
+              <span>Recorrente</span>
+            </button>
           </div>
-
-          <div className="form-field">
-            <label htmlFor="card-name">Nome no cartão</label>
-            <input
-              id="card-name"
-              type="text"
-              className="form-field__input"
-              placeholder="Como impresso no cartão"
-              value={cardName}
-              onChange={(e) => setCardName(e.target.value)}
-              required
-              autoComplete="cc-name"
-            />
-          </div>
-
-          <div className="payment-form__row">
-            <div className="form-field">
-              <label htmlFor="card-expiry">Validade</label>
-              <input
-                id="card-expiry"
-                type="text"
-                className="form-field__input"
-                placeholder="MM/AA"
-                value={cardExpiry}
-                onChange={(e) => setCardExpiry(formatCardExpiry(e.target.value))}
-                required
-                inputMode="numeric"
-                autoComplete="cc-exp"
-              />
-            </div>
-            <div className="form-field">
-              <label htmlFor="card-cvv">CVV</label>
-              <input
-                id="card-cvv"
-                type="text"
-                className="form-field__input"
-                placeholder="000"
-                value={cardCvv}
-                onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                required
-                inputMode="numeric"
-                autoComplete="cc-csc"
-              />
-            </div>
-          </div>
+          <p className="payment-form__info">
+            {cardBilling === 'recurring'
+              ? 'Cobrança automática a cada 30 dias. Você também receberá lembretes no app.'
+              : 'Pagamento único de 30 dias. Renove manualmente ao vencer.'}
+          </p>
         </>
       )}
 
-      {method === 'boleto' && (
-        <>
+      {method === 'boleto' && !boletoReady && (
+        <p className="payment-form__info">
+          O acesso é liberado quando o boleto for compensado (geralmente no próximo dia útil).
+        </p>
+      )}
+
+      {method === 'boleto' && boletoReady && (
+        <div className="pix-payment">
           <p className="payment-form__info">
-            O boleto será enviado para seu e-mail. A ativação ocorre no próximo dia útil após a
-            confirmação do pagamento.
+            Boleto gerado. Após a compensação, sua conta será ativada automaticamente.
           </p>
-
-          <div className="form-field">
-            <label htmlFor="boleto-name">Razão social / Nome</label>
-            <input
-              id="boleto-name"
-              type="text"
-              className="form-field__input"
-              value={holderName}
-              onChange={(e) => setHolderName(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="form-field">
-            <label htmlFor="boleto-document">CNPJ / CPF</label>
-            <input
-              id="boleto-document"
-              type="text"
-              className="form-field__input"
-              value={holderDocument}
-              onChange={(e) => setHolderDocument(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="form-field">
-            <label htmlFor="boleto-email">E-mail para envio do boleto</label>
-            <input
-              id="boleto-email"
-              type="email"
-              className="form-field__input form-field__input--readonly"
-              value={email}
-              readOnly
-            />
-          </div>
-        </>
+          {boletoLine && (
+            <div className="pix-payment__copy">
+              <input
+                type="text"
+                className="form-field__input pix-payment__code"
+                value={boletoLine}
+                readOnly
+                aria-label="Linha digitável do boleto"
+              />
+            </div>
+          )}
+          {boletoUrl && (
+            <a className="btn btn--secondary" href={boletoUrl} target="_blank" rel="noreferrer">
+              Abrir boleto
+            </a>
+          )}
+        </div>
       )}
 
       {method === 'pix' && (
         <div className="pix-payment">
           <p className="payment-form__info payment-form__info--instant">
-            Escaneie o QR Code ou copie o código abaixo. A ativação é instantânea após o pagamento.
+            Escaneie o QR Code ou copie o código. O acesso libera automaticamente após o pagamento.
           </p>
 
           <div className="pix-payment__qr-wrap">
             {pixQrDataUrl ? (
               <img src={pixQrDataUrl} alt="QR Code PIX" className="pix-payment__qr" />
             ) : (
-              <div className="pix-payment__qr-loading">Gerando QR Code...</div>
+              <div className="pix-payment__qr-loading">
+                {busy ? 'Gerando QR Code...' : 'Não foi possível gerar o QR Code.'}
+              </div>
             )}
           </div>
 
@@ -310,18 +372,20 @@ export default function PaymentForm({
             Valor: <strong>{SUBSCRIPTION_PRICE_LABEL}</strong>
           </div>
 
-          <div className="pix-payment__copy">
-            <input
-              type="text"
-              className="form-field__input pix-payment__code"
-              value={pixCode}
-              readOnly
-              aria-label="Código PIX copia e cola"
-            />
-            <button type="button" className="btn btn--secondary" onClick={handleCopyPixCode}>
-              {pixCopied ? 'Copiado!' : 'Copiar'}
-            </button>
-          </div>
+          {pixCode && (
+            <div className="pix-payment__copy">
+              <input
+                type="text"
+                className="form-field__input pix-payment__code"
+                value={pixCode}
+                readOnly
+                aria-label="Código PIX copia e cola"
+              />
+              <button type="button" className="btn btn--secondary" onClick={() => void handleCopyPixCode()}>
+                {pixCopied ? 'Copiado!' : 'Copiar'}
+              </button>
+            </div>
+          )}
 
           {pixWaiting && (
             <p className="pix-payment__status" role="status">
@@ -329,16 +393,29 @@ export default function PaymentForm({
               Aguardando confirmação do pagamento...
             </p>
           )}
+
+          {pixPaymentId && (
+            <button
+              type="button"
+              className="btn btn--secondary"
+              disabled={busy}
+              onClick={() => void checkPixStatus(pixPaymentId)}
+            >
+              Já paguei — verificar
+            </button>
+          )}
         </div>
       )}
 
-      {method !== 'pix' && (
-        <button type="submit" className="btn btn--primary" disabled={loading}>
-          {loading
+      {method !== 'pix' && !boletoReady && (
+        <button type="submit" className="btn btn--primary" disabled={busy}>
+          {busy
             ? 'Processando...'
             : method === 'boleto'
               ? 'Gerar boleto'
-              : `Pagar ${SUBSCRIPTION_PRICE_LABEL}`}
+              : cardBilling === 'recurring'
+                ? `Assinar ${SUBSCRIPTION_PRICE_LABEL}/mês`
+                : `Pagar ${SUBSCRIPTION_PRICE_LABEL}`}
         </button>
       )}
     </form>

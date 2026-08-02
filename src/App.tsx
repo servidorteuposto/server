@@ -26,7 +26,16 @@ function getLegalDocIdFromPath(): LegalDocId | null {
 function App() {
   const publicSlug = getPublicSlugFromPath()
   const legalDocId = getLegalDocIdFromPath()
-  const { user, loading, isReadOnly, isAdmin } = useAuth()
+  const {
+    user,
+    loading,
+    isReadOnly,
+    isAdmin,
+    subscriptionStatus,
+    subscriptionEndsAt,
+    billingMode,
+    daysLeft,
+  } = useAuth()
 
   if (legalDocId) {
     return (
@@ -57,7 +66,15 @@ function App() {
   if (user) {
     return (
       <>
-        <AppShell user={user} isReadOnly={isReadOnly} isAdmin={isAdmin} />
+        <AppShell
+          user={user}
+          isReadOnly={isReadOnly}
+          isAdmin={isAdmin}
+          subscriptionStatus={subscriptionStatus}
+          subscriptionEndsAt={subscriptionEndsAt}
+          billingMode={billingMode}
+          daysLeft={daysLeft}
+        />
         <CookieConsent />
       </>
     )

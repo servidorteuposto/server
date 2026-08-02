@@ -24,6 +24,26 @@
   text-align: center;
 }
 
+.renewal-banner {
+  flex-shrink: 0;
+  padding: 0.75rem 1rem;
+  font-size: clamp(0.82rem, 2.4vw, 0.9rem);
+  line-height: 1.45;
+  text-align: center;
+}
+
+.renewal-banner--warn {
+  background: #fffbeb;
+  border-bottom: 1px solid #fde68a;
+  color: #92400e;
+}
+
+.renewal-banner--urgent {
+  background: #fef2f2;
+  border-bottom: 1px solid #fecaca;
+  color: #991b1b;
+}
+
 .impersonate-banner {
   flex-shrink: 0;
   display: flex;

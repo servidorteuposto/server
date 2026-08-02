@@ -24,6 +24,8 @@ import SupportPage from '../pages/SupportPage'
 import WorkSafetyPage from '../pages/WorkSafetyPage'
 import { endImpersonateMode, getImpersonateLabel, isImpersonating } from '../lib/supabase'
 import { supabase } from '../lib/supabase'
+import { getRenewalNoticeKind } from '../lib/payment'
+import type { SubscriptionStatus } from '../lib/subscription'
 import './AppShell.css'
 
 const DRAWER_MQ = '(max-width: 960px)'
@@ -32,6 +34,10 @@ type AppShellProps = {
   user: User
   isReadOnly: boolean
   isAdmin: boolean
+  subscriptionStatus: SubscriptionStatus | null
+  subscriptionEndsAt: string | null
+  billingMode: 'one_time' | 'recurring' | null
+  daysLeft: number | null
 }
 
 type HomePostoInfo = {
@@ -82,7 +88,14 @@ function HomePostoFooter({ info }: { info: HomePostoInfo }) {
   )
 }
 
-export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
+export default function AppShell({
+  isReadOnly,
+  isAdmin,
+  subscriptionStatus,
+  subscriptionEndsAt,
+  billingMode,
+  daysLeft,
+}: AppShellProps) {
   const isDrawerLayout = useDrawerLayout()
   /** null = ainda não escolheu módulo após o login */
   const [activeMenuId, setActiveMenuId] = useState<MenuId | null>(null)
@@ -97,6 +110,14 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
     photoUrl: null,
   })
 
+  const renewalNotice = isAdmin
+    ? null
+    : getRenewalNoticeKind({
+        status: subscriptionStatus,
+        endsAt: subscriptionEndsAt,
+        daysLeft,
+      })
+  const isRecurring = billingMode === 'recurring'
   const mainMenuItems = getMainMenuItems(isAdmin)
   const activeModule = activeMenuId ? getMenuItem(activeMenuId) : null
 
@@ -283,7 +304,22 @@ export default function AppShell({ isReadOnly, isAdmin }: AppShellProps) {
       {isReadOnly && (
         <div className="readonly-banner" role="status">
           Sua assinatura venceu. O sistema está em modo visualização — você pode consultar os dados,
-          mas não preencher ou alterar nada até renovar a assinatura.
+          mas não preencher ou alterar nada até renovar a assinatura. Saia e entre novamente na tela
+          de pagamento para renovar.
+        </div>
+      )}
+      {!isReadOnly && renewalNotice === 'day_before' && (
+        <div className="renewal-banner renewal-banner--warn" role="status">
+          {isRecurring
+            ? 'Sua assinatura vence amanhã. A renovação automática do cartão deve ocorrer em breve — confira se o cartão está válido.'
+            : 'Sua assinatura vence amanhã. Renove o plano para não perder o acesso completo.'}
+        </div>
+      )}
+      {!isReadOnly && renewalNotice === 'due_day' && (
+        <div className="renewal-banner renewal-banner--urgent" role="status">
+          {isRecurring
+            ? 'Hoje é o dia da renovação automática. Se a cobrança falhar, atualize o cartão no Mercado Pago ou fale com o suporte.'
+            : 'Hoje sua assinatura completa 30 dias. Renove o pagamento o quanto antes para manter o acesso.'}
         </div>
       )}
 

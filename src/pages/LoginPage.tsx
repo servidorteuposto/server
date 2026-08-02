@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState, type ReactNode } from 'react'
+import { FormEvent, useEffect, useState, type ReactNode } from 'react'
 import PaymentForm from '../components/PaymentForm'
 import { ADMIN_CNPJ_DIGITS, requestPasswordResetByIdentifier } from '../lib/auth'
 import {
@@ -10,8 +10,7 @@ import {
   looksLikeEmail,
 } from '../lib/cnpj'
 import { buildLegalPath } from '../config/legal'
-import type { PaymentActivation, PaymentMethod } from '../lib/payment'
-import { getPaymentActivation } from '../lib/payment'
+import type { PaymentActivation } from '../lib/payment'
 import { isValidPassword, PASSWORD_RULE_MESSAGE } from '../lib/password'
 import {
   clearPreRegistration,
@@ -19,11 +18,11 @@ import {
   savePreRegistration,
 } from '../lib/pre-register'
 import {
-  activateSubscription,
   getAccountAccessByIdentifier,
   getRegistrationConflictMessage,
   type AccountAccess,
 } from '../lib/subscription'
+import { getMpSubscriptionStatus } from '../lib/mercadopago'
 import { getRememberedIdentifier, setRememberedIdentifier } from '../lib/session'
 import { secureLogin, secureRegister } from '../lib/secure-auth'
 import SupportContactForm from '../components/SupportContactForm'
@@ -308,11 +307,6 @@ export default function LoginPage() {
     setPreRegisterHint(true)
   }
 
-  function completePayment() {
-    clearPreRegistration(cnpj)
-    setPaymentSuccess(true)
-  }
-
   useEffect(() => {
     if (view === 'payment' && isValidCnpjLength(cnpj)) {
       savePreRegistration(cnpj, { postoName, email, phone: '', reachedPayment: true })
@@ -463,33 +457,75 @@ export default function LoginPage() {
     switchView('payment')
   }
 
-  async function finalizePayment(method: PaymentMethod) {
+  async function handlePaymentActivated(activation: PaymentActivation) {
+    clearPreRegistration(cnpj)
+    setPaymentSuccess(true)
+    setPaymentActivation(activation)
+    setPaymentError(null)
+  }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const payment = params.get('payment')
+    if (!payment) return
+
+    const returnedCnpj = params.get('cnpj')
+    if (returnedCnpj) setCnpj(formatCnpj(returnedCnpj))
+
+    const pre = returnedCnpj ? getPreRegistration(returnedCnpj) : null
+    if (pre?.email) setEmail(pre.email)
+    if (pre?.postoName) setPostoName(pre.postoName)
+
+    switchView('payment')
     setPaymentLoading(true)
     setPaymentError(null)
 
-    try {
-      // Integração com Stripe será implementada em seguida
-      await new Promise((resolve) => setTimeout(resolve, 1200))
-      await activateSubscription(cnpj)
-      completePayment()
-      setPaymentActivation(getPaymentActivation(method))
-    } catch {
-      setPaymentError('Não foi possível confirmar o pagamento. Tente novamente.')
-    } finally {
-      setPaymentLoading(false)
-    }
-  }
+    const emailForCheck = pre?.email || email
+    const cnpjForCheck = returnedCnpj || cnpj
 
-  const handlePixConfirmed = useCallback(async () => {
-    try {
-      await activateSubscription(cnpj)
-      clearPreRegistration(cnpj)
-      setPaymentSuccess(true)
-      setPaymentActivation('instant')
-    } catch {
-      setPaymentError('Não foi possível confirmar o pagamento PIX. Tente novamente.')
-    }
-  }, [cnpj])
+    void (async () => {
+      try {
+        if (payment === 'failure') {
+          setPaymentError('Pagamento não concluído. Tente novamente.')
+          return
+        }
+
+        // Aguarda webhook processar
+        for (let i = 0; i < 8; i++) {
+          const status = await getMpSubscriptionStatus({
+            cnpj: cnpjForCheck,
+            email: emailForCheck,
+          })
+          if (status.activated) {
+            handlePaymentActivated('instant')
+            return
+          }
+          await new Promise((r) => setTimeout(r, 1500))
+        }
+
+        if (payment === 'pending') {
+          setPaymentSuccess(true)
+          setPaymentActivation('pending')
+        } else {
+          setPaymentError(
+            'Ainda não confirmamos o pagamento. Se já pagou, aguarde alguns minutos e faça login.',
+          )
+        }
+      } catch {
+        setPaymentError('Não foi possível confirmar o retorno do pagamento.')
+      } finally {
+        setPaymentLoading(false)
+        params.delete('payment')
+        params.delete('cnpj')
+        params.delete('recurring')
+        const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`
+        window.history.replaceState({}, '', next)
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // removed mock finalizePayment / handlePixConfirmed
 
   return (
     <div className={`login-page${view !== 'login' ? ' login-page--focused' : ''}`}>
@@ -706,8 +742,9 @@ export default function LoginPage() {
                     email={email}
                     loading={paymentLoading}
                     error={paymentError}
-                    onSubmit={finalizePayment}
-                    onPixConfirmed={handlePixConfirmed}
+                    onBusy={setPaymentLoading}
+                    onError={setPaymentError}
+                    onActivated={handlePaymentActivated}
                   />
                 )}
               </>

@@ -10,6 +10,9 @@ export function useAuth() {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null)
+  const [subscriptionEndsAt, setSubscriptionEndsAt] = useState<string | null>(null)
+  const [billingMode, setBillingMode] = useState<'one_time' | 'recurring' | null>(null)
+  const [daysLeft, setDaysLeft] = useState<number | null>(null)
   const [isReadOnly, setIsReadOnly] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
 
@@ -17,6 +20,9 @@ export function useAuth() {
     if (isAdminUser(currentUser)) {
       setIsAdmin(true)
       setSubscriptionStatus('active')
+      setSubscriptionEndsAt(null)
+      setBillingMode(null)
+      setDaysLeft(null)
       setIsReadOnly(false)
       return
     }
@@ -31,18 +37,32 @@ export function useAuth() {
           setSession(null)
           setUser(null)
           setSubscriptionStatus(null)
+          setSubscriptionEndsAt(null)
+          setBillingMode(null)
+          setDaysLeft(null)
           setIsReadOnly(false)
           return
         }
 
         setSubscriptionStatus(subscription.subscription_status)
+        setSubscriptionEndsAt(subscription.subscription_ends_at ?? null)
+        setBillingMode(subscription.billing_mode ?? null)
+        setDaysLeft(
+          typeof subscription.days_left === 'number' ? subscription.days_left : null,
+        )
         setIsReadOnly(isImpersonating() ? false : Boolean(subscription.is_read_only))
       } else {
         setSubscriptionStatus(null)
+        setSubscriptionEndsAt(null)
+        setBillingMode(null)
+        setDaysLeft(null)
         setIsReadOnly(false)
       }
     } catch {
       setSubscriptionStatus(null)
+      setSubscriptionEndsAt(null)
+      setBillingMode(null)
+      setDaysLeft(null)
       setIsReadOnly(false)
     }
   }
@@ -60,6 +80,9 @@ export function useAuth() {
         setSession(null)
         setUser(null)
         setSubscriptionStatus(null)
+        setSubscriptionEndsAt(null)
+        setBillingMode(null)
+        setDaysLeft(null)
         setIsReadOnly(false)
         setIsAdmin(false)
         setLoading(false)
@@ -103,6 +126,9 @@ export function useAuth() {
         await loadSubscription(nextSession.user)
       } else {
         setSubscriptionStatus(null)
+        setSubscriptionEndsAt(null)
+        setBillingMode(null)
+        setDaysLeft(null)
         setIsReadOnly(false)
         setIsAdmin(false)
       }
@@ -114,5 +140,16 @@ export function useAuth() {
     }
   }, [])
 
-  return { user, session, loading, subscriptionStatus, isReadOnly, isAdmin, refreshSubscription: loadSubscription }
+  return {
+    user,
+    session,
+    loading,
+    subscriptionStatus,
+    subscriptionEndsAt,
+    billingMode,
+    daysLeft,
+    isReadOnly,
+    isAdmin,
+    refreshSubscription: loadSubscription,
+  }
 }

@@ -1,4 +1,3 @@
-import { secureActivatePayment } from './secure-auth'
 import { supabase } from './supabase'
 
 export type SubscriptionStatus = 'pending_payment' | 'active' | 'expired'
@@ -22,6 +21,8 @@ export interface MySubscription {
   found: boolean
   subscription_status?: SubscriptionStatus
   subscription_ends_at?: string | null
+  billing_mode?: 'one_time' | 'recurring' | null
+  days_left?: number | null
   is_read_only?: boolean
 }
 
@@ -60,8 +61,10 @@ export async function checkRegistrationAvailability(
   return (data ?? { available: true, field: null }) as RegistrationAvailability
 }
 
-export async function activateSubscription(cnpj: string) {
-  await secureActivatePayment(cnpj)
+export async function activateSubscription(_cnpj: string) {
+  throw new Error(
+    'A ativação da assinatura agora ocorre automaticamente após confirmação do Mercado Pago.',
+  )
 }
 
 export async function getMySubscription(): Promise<MySubscription> {
