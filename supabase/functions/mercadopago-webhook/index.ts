@@ -32,7 +32,12 @@ function parsePostoId(externalReference: unknown): string | null {
 
 function mapMethod(payment: Record<string, unknown>): string {
   const meta = (payment.metadata ?? {}) as Record<string, unknown>
-  if (meta.method === 'pix' || meta.method === 'boleto' || meta.method === 'card_once' || meta.method === 'card_recurring') {
+  if (
+    meta.method === 'pix' ||
+    meta.method === 'boleto' ||
+    meta.method === 'card_once' ||
+    meta.method === 'card_recurring'
+  ) {
     return String(meta.method)
   }
   const paymentType = String(payment.payment_type_id ?? '')
@@ -47,8 +52,7 @@ async function verifyWebhookSecret(req: Request) {
   const expected = Deno.env.get('MP_WEBHOOK_SECRET')
   if (!expected) return true
   const provided =
-    req.headers.get('x-webhook-secret') ??
-    new URL(req.url).searchParams.get('secret')
+    req.headers.get('x-webhook-secret') ?? new URL(req.url).searchParams.get('secret')
   return provided === expected
 }
 
@@ -61,8 +65,7 @@ async function processApprovedPayment(
   const metaPostoId = String(
     (payment.metadata as Record<string, unknown> | undefined)?.posto_id ?? '',
   ).trim()
-  let resolvedPostoId =
-    parsePostoId(payment.external_reference) ?? (metaPostoId || null)
+  let resolvedPostoId = parsePostoId(payment.external_reference) ?? (metaPostoId || null)
 
   if (!resolvedPostoId) {
     const { data: existing } = await admin
@@ -164,7 +167,6 @@ async function processPreapproval(
     { onConflict: 'mp_payment_id' },
   )
 
-  // authorized / paused with prior charge — activate on authorized
   if (data.status === 'authorized') {
     const { data: result, error } = await admin.rpc('activate_or_extend_subscription', {
       p_posto_id: postoId,
@@ -182,9 +184,45 @@ async function processPreapproval(
   return { ok: true, activated: false, status: data.status }
 }
 
+async function processMerchantOrder(
+  admin: ReturnType<typeof createClient>,
+  accessToken: string,
+  orderId: string,
+) {
+  const response = await fetch(`https://api.mercadopago.com/merchant_orders/${orderId}`, {
+    headers: mpHeaders(accessToken),
+  })
+  const order = await response.json()
+  if (!response.ok) {
+    console.error('Failed to fetch merchant order', order)
+    return { ok: false, message: 'merchant_order_fetch_failed' }
+  }
+
+  const payments = Array.isArray(order.payments) ? order.payments : []
+  const approved = payments.find((p: { status?: string }) => p.status === 'approved')
+  const target = approved ?? payments[0]
+  if (!target?.id) {
+    return { ok: true, ignored: true, reason: 'no_payments_in_order' }
+  }
+
+  const payRes = await fetch(`https://api.mercadopago.com/v1/payments/${target.id}`, {
+    headers: mpHeaders(accessToken),
+  })
+  const payment = await payRes.json()
+  if (!payRes.ok) {
+    return { ok: false, message: 'payment_fetch_failed' }
+  }
+  return processApprovedPayment(admin, payment)
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+
+  // MP faz GET de validação em alguns fluxos
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    return jsonResponse({ ok: true })
   }
 
   try {
@@ -205,20 +243,66 @@ Deno.serve(async (req) => {
     })
 
     const url = new URL(req.url)
-    let topic = url.searchParams.get('topic') ?? url.searchParams.get('type') ?? ''
-    let resourceId = url.searchParams.get('id') ?? url.searchParams.get('data.id') ?? ''
+    let topic =
+      url.searchParams.get('topic') ??
+      url.searchParams.get('type') ??
+      url.searchParams.get('topic') ??
+      ''
+    let resourceId =
+      url.searchParams.get('id') ??
+      url.searchParams.get('data.id') ??
+      url.searchParams.get('data_id') ??
+      ''
 
     if (req.method === 'POST') {
-      const body = await req.json().catch(() => ({}))
+      const body = await req.json().catch(() => ({} as Record<string, unknown>))
       topic = String(body?.type ?? body?.topic ?? topic ?? '')
-      resourceId = String(body?.data?.id ?? body?.id ?? resourceId ?? '')
+      const data = body?.data as { id?: string | number } | undefined
+      resourceId = String(data?.id ?? body?.id ?? resourceId ?? '')
       if (!topic && body?.action) topic = String(body.action)
     }
 
     topic = topic.toLowerCase()
 
     if (!resourceId) {
+      // Responde 200 para o MP não retentar em ping vazio
       return jsonResponse({ ok: true, ignored: true, reason: 'missing_id' })
+    }
+
+    if (topic.includes('merchant_order') || topic === 'topic_merchant_order_wh') {
+      const result = await processMerchantOrder(admin, accessToken, resourceId)
+      return jsonResponse(result)
+    }
+
+    if (
+      topic.includes('authorized_payment') ||
+      topic === 'subscription_authorized_payment'
+    ) {
+      // Cobrança recorrente: authorized_payments aponta para invoice; buscar payment vinculado
+      const invRes = await fetch(
+        `https://api.mercadopago.com/authorized_payments/${resourceId}`,
+        { headers: mpHeaders(accessToken) },
+      )
+      const invoice = await invRes.json()
+      if (invRes.ok && invoice?.payment?.id) {
+        const payRes = await fetch(
+          `https://api.mercadopago.com/v1/payments/${invoice.payment.id}`,
+          { headers: mpHeaders(accessToken) },
+        )
+        const payment = await payRes.json()
+        if (payRes.ok) {
+          return jsonResponse(await processApprovedPayment(admin, payment))
+        }
+      }
+      // fallback: tratar id como payment
+      const payRes = await fetch(`https://api.mercadopago.com/v1/payments/${resourceId}`, {
+        headers: mpHeaders(accessToken),
+      })
+      const payment = await payRes.json()
+      if (payRes.ok) {
+        return jsonResponse(await processApprovedPayment(admin, payment))
+      }
+      return jsonResponse({ ok: true, ignored: true, reason: 'authorized_payment_unresolved' })
     }
 
     if (topic.includes('payment') || topic === 'payment') {
@@ -230,8 +314,7 @@ Deno.serve(async (req) => {
         console.error('Failed to fetch payment', payment)
         return jsonResponse({ ok: false, message: 'payment_fetch_failed' }, 400)
       }
-      const result = await processApprovedPayment(admin, payment)
-      return jsonResponse(result)
+      return jsonResponse(await processApprovedPayment(admin, payment))
     }
 
     if (
@@ -239,8 +322,7 @@ Deno.serve(async (req) => {
       topic.includes('preapproval') ||
       topic === 'subscription_preapproval'
     ) {
-      const result = await processPreapproval(admin, accessToken, resourceId)
-      return jsonResponse(result)
+      return jsonResponse(await processPreapproval(admin, accessToken, resourceId))
     }
 
     return jsonResponse({ ok: true, ignored: true, topic })

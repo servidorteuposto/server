@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
     }
 
     const externalReference = `posto:${posto.id}`
-    const notificationUrl = `${supabaseUrl}/functions/v1/mercadopago-webhook`
+    const notificationUrl = `${supabaseUrl}/functions/v1/mercadopago-webhook?source_news=webhooks`
 
     if (action === 'create_pix' || action === 'create_boleto') {
       const method = action === 'create_pix' ? 'pix' : 'boleto'

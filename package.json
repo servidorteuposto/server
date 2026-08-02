@@ -15,7 +15,8 @@
     "supabase:deploy-admin-ops": "npx supabase functions deploy admin-ops --project-ref jilzklxnejztpphbryti --use-api",
     "supabase:deploy-mp-checkout": "npx supabase functions deploy mercadopago-checkout --project-ref jilzklxnejztpphbryti --no-verify-jwt --use-api",
     "supabase:deploy-mp-webhook": "npx supabase functions deploy mercadopago-webhook --project-ref jilzklxnejztpphbryti --no-verify-jwt --use-api",
-    "supabase:deploy-functions": "npm run supabase:deploy-auth && npm run supabase:deploy-alerts && npm run supabase:deploy-drainage-reminders && npm run supabase:deploy-admin-ops && npm run supabase:deploy-mp-checkout && npm run supabase:deploy-mp-webhook"
+    "supabase:deploy-mp-billing": "npx supabase functions deploy mercadopago-billing --project-ref jilzklxnejztpphbryti --use-api",
+    "supabase:deploy-functions": "npm run supabase:deploy-auth && npm run supabase:deploy-alerts && npm run supabase:deploy-drainage-reminders && npm run supabase:deploy-admin-ops && npm run supabase:deploy-mp-checkout && npm run supabase:deploy-mp-webhook && npm run supabase:deploy-mp-billing"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",

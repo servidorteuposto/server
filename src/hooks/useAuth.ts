@@ -13,8 +13,24 @@ export function useAuth() {
   const [subscriptionEndsAt, setSubscriptionEndsAt] = useState<string | null>(null)
   const [billingMode, setBillingMode] = useState<'one_time' | 'recurring' | null>(null)
   const [daysLeft, setDaysLeft] = useState<number | null>(null)
+  const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false)
+  const [canCancelRecurring, setCanCancelRecurring] = useState(false)
+  const [canRequestRefund, setCanRequestRefund] = useState(false)
+  const [refundRequestedAt, setRefundRequestedAt] = useState<string | null>(null)
   const [isReadOnly, setIsReadOnly] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+
+  function clearSubscriptionState() {
+    setSubscriptionStatus(null)
+    setSubscriptionEndsAt(null)
+    setBillingMode(null)
+    setDaysLeft(null)
+    setCancelAtPeriodEnd(false)
+    setCanCancelRecurring(false)
+    setCanRequestRefund(false)
+    setRefundRequestedAt(null)
+    setIsReadOnly(false)
+  }
 
   async function loadSubscription(currentUser: User | null) {
     if (isAdminUser(currentUser)) {
@@ -23,6 +39,10 @@ export function useAuth() {
       setSubscriptionEndsAt(null)
       setBillingMode(null)
       setDaysLeft(null)
+      setCancelAtPeriodEnd(false)
+      setCanCancelRecurring(false)
+      setCanRequestRefund(false)
+      setRefundRequestedAt(null)
       setIsReadOnly(false)
       return
     }
@@ -36,11 +56,7 @@ export function useAuth() {
           await supabase.auth.signOut()
           setSession(null)
           setUser(null)
-          setSubscriptionStatus(null)
-          setSubscriptionEndsAt(null)
-          setBillingMode(null)
-          setDaysLeft(null)
-          setIsReadOnly(false)
+          clearSubscriptionState()
           return
         }
 
@@ -50,20 +66,16 @@ export function useAuth() {
         setDaysLeft(
           typeof subscription.days_left === 'number' ? subscription.days_left : null,
         )
+        setCancelAtPeriodEnd(Boolean(subscription.cancel_at_period_end))
+        setCanCancelRecurring(Boolean(subscription.can_cancel_recurring))
+        setCanRequestRefund(Boolean(subscription.can_request_refund))
+        setRefundRequestedAt(subscription.refund_requested_at ?? null)
         setIsReadOnly(isImpersonating() ? false : Boolean(subscription.is_read_only))
       } else {
-        setSubscriptionStatus(null)
-        setSubscriptionEndsAt(null)
-        setBillingMode(null)
-        setDaysLeft(null)
-        setIsReadOnly(false)
+        clearSubscriptionState()
       }
     } catch {
-      setSubscriptionStatus(null)
-      setSubscriptionEndsAt(null)
-      setBillingMode(null)
-      setDaysLeft(null)
-      setIsReadOnly(false)
+      clearSubscriptionState()
     }
   }
 
@@ -79,11 +91,7 @@ export function useAuth() {
         await supabase.auth.signOut()
         setSession(null)
         setUser(null)
-        setSubscriptionStatus(null)
-        setSubscriptionEndsAt(null)
-        setBillingMode(null)
-        setDaysLeft(null)
-        setIsReadOnly(false)
+        clearSubscriptionState()
         setIsAdmin(false)
         setLoading(false)
         return
@@ -125,11 +133,7 @@ export function useAuth() {
         stopTabSession = startTabSession()
         await loadSubscription(nextSession.user)
       } else {
-        setSubscriptionStatus(null)
-        setSubscriptionEndsAt(null)
-        setBillingMode(null)
-        setDaysLeft(null)
-        setIsReadOnly(false)
+        clearSubscriptionState()
         setIsAdmin(false)
       }
     })
@@ -148,6 +152,10 @@ export function useAuth() {
     subscriptionEndsAt,
     billingMode,
     daysLeft,
+    cancelAtPeriodEnd,
+    canCancelRecurring,
+    canRequestRefund,
+    refundRequestedAt,
     isReadOnly,
     isAdmin,
     refreshSubscription: loadSubscription,

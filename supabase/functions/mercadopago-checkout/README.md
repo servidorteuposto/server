@@ -2,21 +2,28 @@
 
 Assinatura **R$ 99,00 / 30 dias** via Mercado Pago.
 
-## Webhook (cole no painel do MP)
+## Webhook — por que é a URL do Supabase?
+
+Neste projeto o backend de pagamento roda em **Edge Functions do Supabase**, não em rotas do Vercel/Next.
+Por isso a URL correta é:
 
 ```
 https://jilzklxnejztpphbryti.supabase.co/functions/v1/mercadopago-webhook
 ```
 
-Eventos recomendados: **Payments** e **Subscriptions / Preapproval**.
+(Em outros apps, como um Next.js com `/api/mercadopago/webhook`, a URL seria do domínio do site. Aqui o domínio do app **não** processa o webhook.)
 
-Se configurar `MP_WEBHOOK_SECRET` nas secrets da function, use a URL com query:
+O checkout já envia `notification_url` em cada pagamento/preferência (tem prioridade sobre o painel).
+Ainda assim, configure no painel do MP (**Sua integração → Webhooks**):
+
+- URL de produção: a URL acima
+- Eventos: **Payments**, **Plans and Subscriptions** (preapproval / authorized_payment), e se aparecer **Merchant Order**
+
+Opcional com secret:
 
 ```
-https://jilzklxnejztpphbryti.supabase.co/functions/v1/mercadopago-webhook?secret=SEU_SECRETO
+https://jilzklxnejztpphbryti.supabase.co/functions/v1/mercadopago-webhook?secret=SEU_SECRETO&source_news=webhooks
 ```
-
-(ou envie o mesmo valor no header `x-webhook-secret`)
 
 ## Secrets (Supabase → Edge Functions → Secrets)
 
@@ -30,22 +37,24 @@ https://jilzklxnejztpphbryti.supabase.co/functions/v1/mercadopago-webhook?secret
 
 | Método | Liberação |
 | --- | --- |
-| PIX | Automática quando o pagamento é `approved` (webhook) |
-| Boleto | Quando compensado (`approved`, em geral próximo dia útil) |
+| PIX | Automática quando o pagamento é `approved` |
+| Boleto | Quando compensado (`approved`) |
 | Cartão único | No `approved` do Checkout Pro |
 | Cartão recorrente | Na autorização do Preapproval e nas cobranças seguintes (+30 dias) |
 
-A ativação **não** é feita pelo front — só pelo webhook/`activate_or_extend_subscription`.
+## Cancelamento e reembolso
 
-## Deploy das functions
+Na tela **Configurações**:
+
+- **Cancelar plano** — só para cartão recorrente: cancela o preapproval no MP, mantém os dias já pagos.
+- **Solicitar reembolso** — até 7 dias após pagamento `approved`; abre chamado `[REEMBOLSO]` para a equipe e interrompe renovação.
+
+Função autenticada: `mercadopago-billing` (`cancel_plan` / `request_refund`).
+
+## Deploy
 
 ```bash
-npx supabase functions deploy mercadopago-checkout --project-ref jilzklxnejztpphbryti --no-verify-jwt --use-api
-npx supabase functions deploy mercadopago-webhook --project-ref jilzklxnejztpphbryti --no-verify-jwt --use-api
+npm run supabase:deploy-mp-checkout
+npm run supabase:deploy-mp-webhook
+npm run supabase:deploy-mp-billing
 ```
-
-## Avisos no app
-
-- **1 dia antes** do vencimento: banner amarelo
-- **No dia** do vencimento: banner vermelho
-- Assinatura **recorrente** também recebe os avisos (cobrança automática + lembrete)

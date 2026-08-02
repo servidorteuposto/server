@@ -14,8 +14,21 @@ import {
   updatePostoSettings,
   type PostoSettingsProfile,
 } from '../lib/posto-profile'
+import { cancelPlan, requestRefund } from '../lib/mercadopago'
+import { getMySubscription, type MySubscription } from '../lib/subscription'
 import '../pages/RegulatoryDocumentsPage.css'
 import './SettingsPage.css'
+
+function formatDatePtBr(value: string | null | undefined) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
 
 function formatPhone(value: string) {
   const digits = value.replace(/\D/g, '').slice(0, 11)
@@ -60,6 +73,11 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [removePhoto, setRemovePhoto] = useState(false)
+  const [subscription, setSubscription] = useState<MySubscription | null>(null)
+  const [billingBusy, setBillingBusy] = useState(false)
+  const [billingMessage, setBillingMessage] = useState<string | null>(null)
+  const [billingError, setBillingError] = useState<string | null>(null)
+  const [refundReason, setRefundReason] = useState('')
 
   const fillFromProfile = useCallback((data: PostoSettingsProfile) => {
     setProfile(data)
@@ -84,8 +102,12 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
     setLoading(true)
     setPageError(null)
     try {
-      const data = await getMyPostoSettings()
+      const [data, sub] = await Promise.all([
+        getMyPostoSettings(),
+        getMySubscription().catch(() => null),
+      ])
       fillFromProfile(data)
+      setSubscription(sub)
 
       if (data.foto_storage_path) {
         try {
@@ -103,6 +125,53 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
       setLoading(false)
     }
   }, [fillFromProfile])
+
+  async function handleCancelPlan() {
+    if (
+      !window.confirm(
+        'Cancelar a renovação automática? Você mantém o acesso até o fim do período já pago.',
+      )
+    ) {
+      return
+    }
+    setBillingBusy(true)
+    setBillingError(null)
+    setBillingMessage(null)
+    try {
+      const result = await cancelPlan()
+      setBillingMessage(result.message ?? 'Renovação cancelada.')
+      const sub = await getMySubscription()
+      setSubscription(sub)
+    } catch (error) {
+      setBillingError(error instanceof Error ? error.message : 'Falha ao cancelar o plano.')
+    } finally {
+      setBillingBusy(false)
+    }
+  }
+
+  async function handleRequestRefund() {
+    if (
+      !window.confirm(
+        'Solicitar reembolso? O pedido será analisado pela equipe. A renovação automática será interrompida.',
+      )
+    ) {
+      return
+    }
+    setBillingBusy(true)
+    setBillingError(null)
+    setBillingMessage(null)
+    try {
+      const result = await requestRefund(refundReason)
+      setBillingMessage(result.message ?? 'Pedido de reembolso enviado.')
+      setRefundReason('')
+      const sub = await getMySubscription()
+      setSubscription(sub)
+    } catch (error) {
+      setBillingError(error instanceof Error ? error.message : 'Falha ao solicitar reembolso.')
+    } finally {
+      setBillingBusy(false)
+    }
+  }
 
   useEffect(() => {
     loadPage()
@@ -289,6 +358,102 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
       </header>
 
       {pageError && <p className="reg-doc-form__error reg-docs-page__banner">{pageError}</p>}
+
+      {subscription?.found && (
+        <section className="settings-card settings-billing">
+          <div className="settings-section">
+            <h2>Assinatura</h2>
+            <p className="settings-section__hint">
+              Plano de R$ 99 / 30 dias. Cancelar interrompe cobranças futuras; reembolso só nos 7
+              dias após o pagamento (CDC).
+            </p>
+            <dl className="settings-billing__meta">
+              <div>
+                <dt>Status</dt>
+                <dd>
+                  {subscription.subscription_status === 'active'
+                    ? subscription.cancel_at_period_end
+                      ? 'Ativo (sem renovação)'
+                      : 'Ativo'
+                    : subscription.subscription_status === 'expired'
+                      ? 'Expirado'
+                      : (subscription.subscription_status ?? '—')}
+                </dd>
+              </div>
+              <div>
+                <dt>Válido até</dt>
+                <dd>{formatDatePtBr(subscription.subscription_ends_at)}</dd>
+              </div>
+              <div>
+                <dt>Cobrança</dt>
+                <dd>
+                  {subscription.billing_mode === 'recurring'
+                    ? 'Cartão recorrente'
+                    : subscription.billing_mode === 'one_time'
+                      ? 'Pagamento único'
+                      : '—'}
+                </dd>
+              </div>
+            </dl>
+
+            {billingMessage && <p className="settings-success">{billingMessage}</p>}
+            {billingError && <p className="reg-doc-form__error">{billingError}</p>}
+            {subscription.refund_requested_at && (
+              <p className="settings-hint">
+                Reembolso solicitado em {formatDatePtBr(subscription.refund_requested_at)}. Acompanhe
+                pelo suporte se necessário.
+              </p>
+            )}
+
+            {!isReadOnly && (
+              <div className="settings-billing__actions">
+                {subscription.can_cancel_recurring && (
+                  <button
+                    type="button"
+                    className="settings-billing__btn settings-billing__btn--secondary"
+                    disabled={billingBusy}
+                    onClick={handleCancelPlan}
+                  >
+                    Cancelar plano
+                  </button>
+                )}
+                {subscription.can_request_refund && (
+                  <div className="settings-billing__refund">
+                    <label className="reg-doc-form__field">
+                      <span>Motivo do reembolso (opcional)</span>
+                      <textarea
+                        value={refundReason}
+                        onChange={(event) => setRefundReason(event.target.value.slice(0, 500))}
+                        disabled={billingBusy}
+                        rows={3}
+                        placeholder="Descreva brevemente o motivo..."
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="settings-billing__btn settings-billing__btn--danger"
+                      disabled={billingBusy}
+                      onClick={handleRequestRefund}
+                    >
+                      Solicitar reembolso
+                    </button>
+                  </div>
+                )}
+                {!subscription.can_cancel_recurring &&
+                  !subscription.can_request_refund &&
+                  !subscription.refund_requested_at &&
+                  subscription.subscription_status === 'active' && (
+                    <p className="settings-hint">
+                      {subscription.cancel_at_period_end
+                        ? 'Renovação já cancelada. O acesso segue até a data acima.'
+                        : 'Não há cobrança automática para cancelar, e o prazo de 7 dias para reembolso não está disponível.'}
+                    </p>
+                  )}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       <form className="settings-card" onSubmit={handleSubmit}>
         <section className="settings-section">

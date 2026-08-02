@@ -156,3 +156,41 @@ export async function getMpSubscriptionStatus(input: {
   }
   return payload
 }
+
+export type BillingActionResult = {
+  ok: boolean
+  message?: string
+  already_cancelled?: boolean
+  already_requested?: boolean
+  ticket_id?: string
+  subscription_ends_at?: string | null
+  cancel_at_period_end?: boolean
+  refund_requested_at?: string | null
+}
+
+async function invokeBilling<T>(body: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke('mercadopago-billing', { body })
+  const payload = await parsePayload<T>(data as T | null, error)
+  return { payload, invokeFailed: !payload && Boolean(error) }
+}
+
+export async function cancelPlan(): Promise<BillingActionResult> {
+  const { payload, invokeFailed } = await invokeBilling<BillingActionResult>({
+    action: 'cancel_plan',
+  })
+  if (invokeFailed || !payload?.ok) {
+    throw new Error(payload?.message || 'Não foi possível cancelar o plano.')
+  }
+  return payload
+}
+
+export async function requestRefund(reason?: string): Promise<BillingActionResult> {
+  const { payload, invokeFailed } = await invokeBilling<BillingActionResult>({
+    action: 'request_refund',
+    reason: reason?.trim() || undefined,
+  })
+  if (invokeFailed || !payload?.ok) {
+    throw new Error(payload?.message || 'Não foi possível solicitar o reembolso.')
+  }
+  return payload
+}

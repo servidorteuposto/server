@@ -24,6 +24,12 @@ export interface MySubscription {
   billing_mode?: 'one_time' | 'recurring' | null
   days_left?: number | null
   is_read_only?: boolean
+  cancel_at_period_end?: boolean
+  subscription_cancelled_at?: string | null
+  refund_requested_at?: string | null
+  can_cancel_recurring?: boolean
+  can_request_refund?: boolean
+  last_approved_payment_at?: string | null
 }
 
 const FIELD_LABELS: Record<string, string> = {
