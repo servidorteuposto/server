@@ -29,9 +29,19 @@ https://jilzklxnejztpphbryti.supabase.co/functions/v1/mercadopago-webhook?secret
 
 | Secret | Descrição |
 | --- | --- |
-| `MP_ACCESS_TOKEN` | Access Token do Mercado Pago (teste ou produção) |
-| `MP_WEBHOOK_SECRET` | Opcional — segredo compartilhado do webhook |
+| `MP_ACCESS_TOKEN` | Access Token do Mercado Pago (produção). **Nunca** no front. |
+| `MP_WEBHOOK_SECRET` | Secret Signature da tela Webhooks do MP (valida `x-signature` HMAC). Opcional mas recomendado. |
 | `APP_PUBLIC_URL` | Opcional — padrão `https://www.appteuposto.com.br` |
+
+## Proteções
+
+- Preço fixo no servidor (R$ 99); cliente não define valor.
+- Liberação só com status `approved` consultado na API do MP (não confia no body do webhook).
+- Ativação rejeitada se o valor for diferente de R$ 99.
+- Checkout exige e-mail igual ao cadastro do CNPJ + limite de tentativas por janela.
+- Cancelar/reembolso exigem login do titular (`mercadopago-billing` com JWT).
+- Access Token só em secrets de Edge Function.
+
 
 ## Fluxo
 

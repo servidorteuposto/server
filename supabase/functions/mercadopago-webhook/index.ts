@@ -6,6 +6,8 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type, x-signature, x-request-id',
 }
 
+const EXPECTED_PRICE = 99
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -22,6 +24,19 @@ function mpHeaders(accessToken: string) {
     Authorization: `Bearer ${accessToken}`,
     'Content-Type': 'application/json',
   }
+}
+
+function isValidSubscriptionAmount(payment: Record<string, unknown>) {
+  const amount = Number(payment.transaction_amount)
+  if (!Number.isFinite(amount)) return false
+  return Math.abs(amount - EXPECTED_PRICE) < 0.02
+}
+
+function isValidPreapprovalAmount(data: Record<string, unknown>) {
+  const recurring = data.auto_recurring as { transaction_amount?: number } | undefined
+  const amount = Number(recurring?.transaction_amount ?? data.transaction_amount)
+  if (!Number.isFinite(amount)) return false
+  return Math.abs(amount - EXPECTED_PRICE) < 0.02
 }
 
 function parsePostoId(externalReference: unknown): string | null {
@@ -48,12 +63,75 @@ function mapMethod(payment: Record<string, unknown>): string {
   return 'card_once'
 }
 
-async function verifyWebhookSecret(req: Request) {
-  const expected = Deno.env.get('MP_WEBHOOK_SECRET')
-  if (!expected) return true
-  const provided =
+function timingSafeEqualHex(a: string, b: string) {
+  if (a.length !== b.length) return false
+  let mismatch = 0
+  for (let i = 0; i < a.length; i += 1) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  }
+  return mismatch === 0
+}
+
+async function hmacSha256Hex(secret: string, message: string) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message))
+  return Array.from(new Uint8Array(signature))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+/**
+ * Valida x-signature do Mercado Pago (secret da tela Webhooks).
+ * Se o secret não estiver configurado, segue (ainda reconsultamos a API do MP).
+ * Se o header x-signature vier, exige validação quando o secret existe.
+ */
+async function verifyMercadoPagoSignature(req: Request, dataId: string) {
+  const secret = Deno.env.get('MP_WEBHOOK_SECRET')
+  const legacyQuery =
     req.headers.get('x-webhook-secret') ?? new URL(req.url).searchParams.get('secret')
-  return provided === expected
+
+  // Compat: secret simples na query (legado)
+  if (secret && legacyQuery) {
+    return legacyQuery === secret
+  }
+
+  const xSignature = req.headers.get('x-signature')
+  if (!secret) {
+    // Sem secret: aceita, pois o status real sempre vem da API do MP com Access Token.
+    return true
+  }
+
+  if (!xSignature) {
+    // notification_url às vezes chega sem x-signature; API fetch ainda protege.
+    return true
+  }
+
+  const parts = Object.fromEntries(
+    xSignature.split(',').map((part) => {
+      const [k, ...rest] = part.trim().split('=')
+      return [k, rest.join('=')]
+    }),
+  )
+  const ts = parts.ts
+  const v1 = parts.v1
+  if (!ts || !v1) return false
+
+  const requestId = req.headers.get('x-request-id') ?? ''
+  const id = String(dataId ?? '').toLowerCase()
+  const manifestParts: string[] = []
+  if (id) manifestParts.push(`id:${id}`)
+  if (requestId) manifestParts.push(`request-id:${requestId}`)
+  manifestParts.push(`ts:${ts}`)
+  const manifest = `${manifestParts.join(';')};`
+
+  const expected = await hmacSha256Hex(secret, manifest)
+  return timingSafeEqualHex(expected, v1)
 }
 
 async function processApprovedPayment(
@@ -107,6 +185,11 @@ async function processApprovedPayment(
 
   if (status !== 'approved') {
     return { ok: true, activated: false, status }
+  }
+
+  if (!isValidSubscriptionAmount(payment)) {
+    console.error('Rejected webhook activation: unexpected amount', paymentId, payment.transaction_amount)
+    return { ok: false, message: 'invalid_amount', activated: false }
   }
 
   const { data, error } = await admin.rpc('activate_or_extend_subscription', {
@@ -168,6 +251,10 @@ async function processPreapproval(
   )
 
   if (data.status === 'authorized') {
+    if (!isValidPreapprovalAmount(data)) {
+      console.error('Rejected preapproval activation: unexpected amount', data.id)
+      return { ok: false, message: 'invalid_amount', activated: false }
+    }
     const { data: result, error } = await admin.rpc('activate_or_extend_subscription', {
       p_posto_id: postoId,
       p_billing_mode: 'recurring',
@@ -226,10 +313,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    if (!(await verifyWebhookSecret(req))) {
-      return jsonResponse({ ok: false, message: 'Unauthorized' }, 401)
-    }
-
     const accessToken = Deno.env.get('MP_ACCESS_TOKEN')
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -246,7 +329,6 @@ Deno.serve(async (req) => {
     let topic =
       url.searchParams.get('topic') ??
       url.searchParams.get('type') ??
-      url.searchParams.get('topic') ??
       ''
     let resourceId =
       url.searchParams.get('id') ??
@@ -260,6 +342,10 @@ Deno.serve(async (req) => {
       const data = body?.data as { id?: string | number } | undefined
       resourceId = String(data?.id ?? body?.id ?? resourceId ?? '')
       if (!topic && body?.action) topic = String(body.action)
+    }
+
+    if (!(await verifyMercadoPagoSignature(req, resourceId))) {
+      return jsonResponse({ ok: false, message: 'Unauthorized' }, 401)
     }
 
     topic = topic.toLowerCase()

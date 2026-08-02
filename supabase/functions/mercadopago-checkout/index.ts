@@ -9,6 +9,8 @@ const APP_URL = Deno.env.get('APP_PUBLIC_URL') ?? 'https://www.appteuposto.com.b
 const PRICE = 99
 const PRICE_CENTS = 9900
 const TITLE = 'Assinatura Teu Posto — 30 dias'
+const MAX_CHECKOUTS_PER_WINDOW = 8
+const CHECKOUT_WINDOW_MS = 30 * 60 * 1000
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -19,6 +21,18 @@ function jsonResponse(body: unknown, status = 200) {
 
 function onlyDigits(value: string) {
   return value.replace(/\D/g, '')
+}
+
+function emailsMatch(a: string, b: string) {
+  return a.trim().toLowerCase() === b.trim().toLowerCase()
+}
+
+/** Só libera assinatura com valor esperado (defesa contra payload adulterado). */
+function isValidSubscriptionAmount(payment: Record<string, unknown>) {
+  const amount = Number(payment.transaction_amount)
+  if (!Number.isFinite(amount)) return false
+  // tolerância de 0,01 por arredondamento
+  return Math.abs(amount - PRICE) < 0.02
 }
 
 function mpHeaders(accessToken: string, idempotencyKey?: string) {
@@ -133,6 +147,10 @@ async function processPaymentActivation(
   payment: Record<string, unknown>,
 ) {
   if (String(payment.status) !== 'approved') return
+  if (!isValidSubscriptionAmount(payment)) {
+    console.error('Rejected activation: unexpected amount', payment.id, payment.transaction_amount)
+    return
+  }
 
   const postoId =
     String((payment.metadata as Record<string, unknown> | undefined)?.posto_id ?? '') ||
@@ -216,6 +234,45 @@ Deno.serve(async (req) => {
     const posto = await findPosto(admin, cnpj)
     if (!posto) {
       return jsonResponse({ ok: false, message: 'Conta não encontrada. Conclua o cadastro primeiro.' }, 404)
+    }
+
+    const postoEmail = String(posto.email ?? '').trim().toLowerCase()
+    if (!postoEmail || !emailsMatch(postoEmail, email)) {
+      return jsonResponse(
+        {
+          ok: false,
+          message: 'E-mail não confere com o cadastro deste CNPJ.',
+        },
+        403,
+      )
+    }
+
+    // Limita spam de cobranças (PIX/boleto/cartão) por posto
+    if (
+      action === 'create_pix' ||
+      action === 'create_boleto' ||
+      action === 'create_card_once' ||
+      action === 'create_card_recurring'
+    ) {
+      const windowStart = new Date(Date.now() - CHECKOUT_WINDOW_MS).toISOString()
+      const { count, error: countError } = await admin
+        .from('mp_payments')
+        .select('id', { count: 'exact', head: true })
+        .eq('posto_id', posto.id)
+        .gte('created_at', windowStart)
+
+      if (countError) {
+        console.error('checkout rate count failed', countError)
+      } else if ((count ?? 0) >= MAX_CHECKOUTS_PER_WINDOW) {
+        return jsonResponse(
+          {
+            ok: false,
+            message:
+              'Muitas tentativas de pagamento em pouco tempo. Aguarde alguns minutos e tente novamente.',
+          },
+          429,
+        )
+      }
     }
 
     const externalReference = `posto:${posto.id}`

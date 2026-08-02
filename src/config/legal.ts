@@ -36,7 +36,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
     id: 'termos-de-uso',
     title: 'Termos de Uso',
     shortTitle: 'Termos de Uso',
-    updatedAt: '27/07/2026',
+    updatedAt: '02/08/2026',
     intro:
       'Estes Termos de Uso regulam o acesso e a utilização do Teu Posto, plataforma de gestão regulatória e operacional para postos de combustíveis. Ao criar conta, acessar ou usar o serviço, você declara ter lido e aceitado estes Termos e a Política de Privacidade.',
     sections: [
@@ -63,18 +63,39 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
         ],
       },
       {
-        title: '4. Uso permitido e proibições',
+        title: '4. Planos, preços e pagamento',
+        paragraphs: [
+          'O plano padrão do Teu Posto é a assinatura mensal no valor de R$ 99,00 (noventa e nove reais) por período de 30 dias corridos, salvo condição comercial diversa comunicada por escrito.',
+          'O pagamento é processado pelo Mercado Pago (Mercado Livre S.A. ou empresas do mesmo grupo), plataforma de pagamentos de terceiros. Ao pagar, você também se sujeita às regras e políticas do Mercado Pago.',
+          'Métodos disponíveis podem incluir PIX, boleto bancário e cartão de crédito (pagamento único ou recorrente), conforme habilitação na conta do Mercado Pago e na interface do Teu Posto.',
+          'A liberação do acesso ocorre somente após confirmação de pagamento aprovado pelo Mercado Pago. No PIX e no cartão, a liberação tende a ser imediata após a aprovação. No boleto, a liberação ocorre quando o título for compensado (em regra, no próximo dia útil após o pagamento).',
+          'Se você renovar antes do vencimento com a assinatura ainda ativa, o novo período de 30 dias será acumulado a partir da data de vencimento vigente (saldo de dias).',
+          'Preços e formas de pagamento podem ser atualizados; alterações valem para ciclos futuros e serão refletidas no site/app.',
+        ],
+      },
+      {
+        title: '5. Cancelamento, reembolso e arrependimento',
+        paragraphs: [
+          'Cancelamento da renovação automática (cartão recorrente): você pode solicitar o cancelamento da cobrança automática nas Configurações do sistema. O cancelamento interrompe novas cobranças; o acesso permanece até o fim do período já pago. Após o vencimento, a conta pode ficar em modo somente leitura até nova assinatura.',
+          'Direito de arrependimento (CDC): quando aplicável a consumidor, nos termos do art. 49 do Código de Defesa do Consumidor, você pode solicitar reembolso em até 7 (sete) dias corridos contados da confirmação do pagamento aprovado, pelo botão “Solicitar reembolso” nas Configurações ou pelo suporte.',
+          'O pedido de reembolso gera chamado para análise da equipe e, se houver plano recorrente, interrompe a renovação automática. A efetivação do estorno ocorre conforme prazos e regras do Mercado Pago e da instituição financeira.',
+          'Fora do prazo de 7 dias, não há reembolso automático do período já iniciado, salvo disposição legal diversa ou cortesia comercial. Pagamentos pendentes (PIX/boleto não pagos) não geram direito a serviço.',
+        ],
+      },
+      {
+        title: '6. Uso permitido e proibições',
         paragraphs: ['É permitido usar o Teu Posto apenas para fins legítimos relacionados à operação do posto. É proibido:'],
         bullets: [
           'Compartilhar credenciais ou permitir acesso não autorizado',
           'Inserir dados falsos, ilícitos ou de terceiros sem base legal',
           'Tentar invadir, sobrecarregar, engenheirar reversamente ou explorar falhas do sistema',
+          'Manipular, simular ou burlar o fluxo de pagamento/assinatura',
           'Usar o serviço para spam, fraude ou qualquer atividade ilegal',
           'Violar direitos de propriedade intelectual ou a LGPD',
         ],
       },
       {
-        title: '5. Conteúdo e dados do usuário',
+        title: '7. Conteúdo e dados do usuário',
         paragraphs: [
           'Documentos, fotos, assinaturas, dados cadastrais e demais conteúdos enviados pelo posto permanecem sob sua responsabilidade quanto à licitude, qualidade e atualização.',
           'Você concede ao Teu Posto licença limitada para armazenar, processar e exibir esse conteúdo exclusivamente para prestar o serviço (incluindo backups, segurança e suporte).',
@@ -82,54 +103,56 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
         ],
       },
       {
-        title: '6. Disponibilidade e limitações',
+        title: '8. Disponibilidade e limitações',
         paragraphs: [
           'Envidamos esforços razoáveis para manter o serviço disponível e seguro, mas não garantimos operação ininterrupta ou isenta de erros. Manutenções programadas ou emergenciais podem ocorrer.',
           'O Teu Posto é ferramenta de apoio à conformidade; não substitui assessoria jurídica, contábil ou a responsabilidade do posto perante órgãos reguladores (ANP, INMETRO, órgãos ambientais, bombeiros etc.).',
+          'Indisponibilidades do Mercado Pago, bancos ou meios de pagamento estão fora do controle direto do Teu Posto; nestes casos, o acesso será liberado assim que a confirmação oficial do pagamento for recebida.',
         ],
       },
       {
-        title: '7. Propriedade intelectual',
+        title: '9. Propriedade intelectual',
         paragraphs: [
           'Marca, layout, código, textos e demais elementos do Teu Posto são protegidos. É vedada a reprodução não autorizada.',
           'Conteúdo inserido pelo usuário permanece de titularidade do usuário ou de quem lhe detém os direitos, observados os limites legais.',
         ],
       },
       {
-        title: '8. Privacidade, cookies e segurança',
+        title: '10. Privacidade, cookies e segurança',
         paragraphs: [
           'O tratamento de dados pessoais segue a Política de Privacidade, a Política de Cookies e a Política de Segurança, partes integrantes destes Termos.',
+          'Para cobranças, dados necessários ao pagamento (ex.: e-mail, CNPJ, dados do pagador e endereço para boleto) são enviados ao Mercado Pago na medida exigida para processar a transação.',
         ],
       },
       {
-        title: '9. Suspensão e encerramento',
+        title: '11. Suspensão e encerramento',
         paragraphs: [
           'Podemos suspender ou encerrar o acesso em caso de violação destes Termos, inadimplemento, risco à segurança ou determinação legal.',
           'Você pode solicitar o encerramento da conta pelo suporte. Após o encerramento, dados serão retidos ou eliminados conforme a Política de Privacidade e obrigações legais.',
         ],
       },
       {
-        title: '10. Limitação de responsabilidade',
+        title: '12. Limitação de responsabilidade',
         paragraphs: [
-          'Na máxima extensão permitida pela legislação brasileira, o Teu Posto não responde por lucros cessantes, danos indiretos ou prejuízos decorrentes de uso inadequado, indisponibilidade temporária, ou decisões tomadas com base em informações inseridas pelo usuário.',
-          'Nada nestes Termos exclui responsabilidade por dolo ou demais hipóteses inafastáveis por lei.',
+          'Na máxima extensão permitida pela legislação brasileira, o Teu Posto não responde por lucros cessantes, danos indiretos ou prejuízos decorrentes de uso inadequado, indisponibilidade temporária, falhas de terceiros (incluindo processadores de pagamento) ou decisões tomadas com base em informações inseridas pelo usuário.',
+          'Nada nestes Termos exclui responsabilidade por dolo ou demais hipóteses inafastáveis por lei, inclusive direitos do consumidor quando aplicáveis.',
         ],
       },
       {
-        title: '11. Alterações',
+        title: '13. Alterações',
         paragraphs: [
           'Podemos atualizar estes Termos. A versão vigente será publicada no site/app com a data de atualização. O uso continuado após a publicação pode constituir aceitação, quando aplicável. Em mudanças relevantes, poderemos solicitar novo aceite.',
         ],
       },
       {
-        title: '12. Foro e legislação',
+        title: '14. Foro e legislação',
         paragraphs: [
           `Estes Termos são regidos pelas leis da República Federativa do Brasil, em especial a ${LEGAL_CONTROLLER.law} e o Código de Defesa do Consumidor, quando aplicável.`,
           'Fica eleito o foro da comarca do domicílio do usuário consumidor, ou outro foro legalmente competente, para dirimir controvérsias.',
         ],
       },
       {
-        title: '13. Contato',
+        title: '15. Contato',
         paragraphs: [
           `Dúvidas sobre estes Termos: use o ${LEGAL_CONTROLLER.supportLabel} no aplicativo (menu ${LEGAL_CONTROLLER.supportPath} ou a opção “Fale com o suporte” na tela de login) ou escreva para ${LEGAL_CONTROLLER.supportEmail}.`,
         ],
@@ -140,7 +163,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
     id: 'privacidade',
     title: 'Política de Privacidade',
     shortTitle: 'Privacidade',
-    updatedAt: '27/07/2026',
+    updatedAt: '02/08/2026',
     intro:
       'Esta Política descreve como o Teu Posto trata dados pessoais em conformidade com a Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018) e demais normas aplicáveis.',
     sections: [
@@ -148,7 +171,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
         title: '1. Controlador e canal de atendimento',
         paragraphs: [
           `Controlador dos dados pessoais tratados para operação da plataforma (contas, autenticação, assinatura, suporte e melhoria do serviço): ${LEGAL_CONTROLLER.legalName}, marca ${LEGAL_CONTROLLER.brand}, serviço ${LEGAL_CONTROLLER.product}.`,
-          `Canal para exercício de direitos e dúvidas de privacidade: ${LEGAL_CONTROLLER.supportLabel} no aplicativo (menu ${LEGAL_CONTROLLER.supportPath} ou “Fale com o suporte” na tela de login).`,
+          `Canal para exercício de direitos e dúvidas de privacidade: ${LEGAL_CONTROLLER.supportLabel} no aplicativo (menu ${LEGAL_CONTROLLER.supportPath} ou “Fale com o suporte” na tela de login). Contato: ${LEGAL_CONTROLLER.supportEmail}.`,
           'Quando o posto cadastra ou anexa dados de colaboradores, motoristas, parceiros ou terceiros, o posto é, em regra, o controlador desses dados; o Teu Posto atua como operador, processando-os para viabilizar as funcionalidades contratadas.',
         ],
       },
@@ -158,8 +181,9 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
         bullets: [
           'Dados cadastrais: razão social, CNPJ, e-mail, telefone/WhatsApp, endereço, coordenadas e foto do posto',
           'Dados de acesso: credenciais (senha armazenada de forma criptografada/hash), logs de autenticação e segurança',
+          'Dados de cobrança: identificadores de pagamento, método (PIX, boleto, cartão), status, valores, referências externas e metadados necessários à assinatura; cartões são tokenizados/processados pelo Mercado Pago — o Teu Posto não armazena número completo do cartão nem CVV',
           'Dados operacionais: documentos, PDFs, fotos com data/hora/GPS, assinaturas, lançamentos de análises, metrologia, drenagens, equipamentos e segurança do trabalho',
-          'Dados de suporte: mensagens, anexos e metadados de tickets',
+          'Dados de suporte: mensagens, anexos e metadados de tickets (incluindo pedidos de reembolso)',
           'Dados técnicos: endereço IP, identificadores de dispositivo/navegador, cookies e registros de segurança (conforme Política de Cookies)',
         ],
       },
@@ -167,7 +191,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
         title: '3. Finalidades e bases legais (art. 7º e 11 da LGPD)',
         paragraphs: ['Tratamos dados pessoais para:'],
         bullets: [
-          'Execução de contrato / procedimentos preliminares: criar conta, autenticar, prestar o serviço e gerir assinatura (art. 7º, V)',
+          'Execução de contrato / procedimentos preliminares: criar conta, autenticar, prestar o serviço e gerir assinatura/pagamento (art. 7º, V)',
           'Cumprimento de obrigação legal ou regulatória, quando aplicável (art. 7º, II)',
           'Legítimo interesse: segurança da informação, prevenção a fraudes e melhoria do serviço, com equilíbrio aos direitos do titular (art. 7º, IX)',
           'Consentimento: quando exigido (ex.: cookies não essenciais), podendo ser revogado (art. 7º, I)',
@@ -177,8 +201,9 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
       {
         title: '4. Compartilhamento',
         paragraphs: [
-          'Podemos compartilhar dados com prestadores que nos auxiliam na operação (hospedagem, autenticação, e-mail transacional, infraestrutura), sempre sob contrato e medidas de segurança adequadas, na qualidade de operadores.',
-          'Exemplos típicos: provedores de nuvem/banco de dados, autenticação, envio de e-mails (ex.: Resend) e CDN/DNS (ex.: Cloudflare), conforme configuração vigente.',
+          'Podemos compartilhar dados com prestadores que nos auxiliam na operação (hospedagem, autenticação, e-mail transacional, infraestrutura e pagamentos), sempre sob contrato e medidas de segurança adequadas, na qualidade de operadores ou controladores independentes, conforme o caso.',
+          'Exemplos típicos: provedores de nuvem/banco de dados (ex.: Supabase), autenticação, envio de e-mails (ex.: Resend), CDN/DNS (ex.: Cloudflare) e processador de pagamentos Mercado Pago.',
+          'Ao Mercado Pago podem ser enviados dados necessários à cobrança (nome/razão social, e-mail, CNPJ, endereço para boleto e metadados da transação). O tratamento pelo Mercado Pago segue suas próprias políticas.',
           'Também poderemos divulgar dados se exigido por lei, ordem judicial ou autoridade competente.',
           'Não vendemos dados pessoais.',
         ],
@@ -192,7 +217,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
       {
         title: '6. Armazenamento e retenção',
         paragraphs: [
-          'Mantemos dados pelo tempo necessário às finalidades, à vigência da conta/assinatura e a obrigações legais ou de defesa de direitos.',
+          'Mantemos dados pelo tempo necessário às finalidades, à vigência da conta/assinatura e a obrigações legais ou de defesa de direitos (incluindo registros de pagamento e suporte).',
           'Após o encerramento, poderemos anonimizar ou eliminar dados, ressalvados prazos legais de guarda e backups de segurança por período limitado.',
         ],
       },
@@ -243,7 +268,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
     id: 'cookies',
     title: 'Política de Cookies',
     shortTitle: 'Cookies',
-    updatedAt: '27/07/2026',
+    updatedAt: '02/08/2026',
     intro:
       'Esta Política explica o que são cookies, quais utilizamos no Teu Posto e como você pode gerenciá-los, em conformidade com a LGPD e boas práticas de transparência.',
     sections: [
@@ -277,6 +302,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
         paragraphs: [
           'Na versão atual do Teu Posto, o uso predominante é de cookies/armazenamento essenciais e de preferências ligadas ao funcionamento do app (autenticação Supabase, sessão, preferências locais e registro do consentimento de cookies).',
           'Não utilizamos, neste momento, cookies de publicidade de terceiros para remarketing. Se isso mudar, atualizaremos esta Política e o banner de consentimento.',
+          'Páginas de pagamento do Mercado Pago (Checkout Pro / redirecionamento) podem utilizar cookies próprios do Mercado Pago, sujeitos às políticas daquele provedor.',
         ],
       },
       {
@@ -296,7 +322,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
       {
         title: '7. Contato',
         paragraphs: [
-          `Dúvidas: use o ${LEGAL_CONTROLLER.supportLabel} no aplicativo (menu ${LEGAL_CONTROLLER.supportPath} ou “Fale com o suporte” na tela de login).`,
+          `Dúvidas: use o ${LEGAL_CONTROLLER.supportLabel} no aplicativo (menu ${LEGAL_CONTROLLER.supportPath} ou “Fale com o suporte” na tela de login) ou ${LEGAL_CONTROLLER.supportEmail}.`,
         ],
       },
     ],
@@ -305,7 +331,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
     id: 'seguranca',
     title: 'Política de Segurança da Informação',
     shortTitle: 'Segurança',
-    updatedAt: '27/07/2026',
+    updatedAt: '02/08/2026',
     intro:
       'Esta Política descreve princípios e medidas de segurança adotados no Teu Posto para proteger dados pessoais e informações do posto, alinhados à LGPD (arts. 46 e seguintes) e a boas práticas de segurança da informação.',
     sections: [
@@ -326,6 +352,9 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
           'Envio de alertas de segurança por canais configurados (e-mail/WhatsApp), quando aplicável',
           'Uso de infraestrutura de nuvem com controles de rede, backups e monitoramento',
           'Proteções de borda (ex.: CDN/WAF/bot protection) quando configuradas no domínio',
+          'Credenciais do Mercado Pago (Access Token) armazenadas apenas em secrets de servidor, nunca no navegador',
+          'Ativação de assinatura apenas após confirmação oficial de pagamento aprovado junto à API do Mercado Pago, com validação de valor e vínculo ao posto',
+          'Cancelamento/reembolso autenticados na conta do titular; funções administrativas restritas',
         ],
       },
       {
@@ -343,6 +372,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
         title: '4. Desenvolvimento e fornecedores',
         paragraphs: [
           'Alterações no sistema devem preservar controles de segurança. Fornecedores com acesso a dados pessoais são selecionados e contratados com deveres de confidencialidade e segurança compatíveis com a LGPD.',
+          'O processamento de cartões e meios de pagamento é realizado pelo Mercado Pago; o Teu Posto não processa dados sensíveis de cartão em seus próprios servidores.',
         ],
       },
       {
@@ -367,7 +397,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
       {
         title: '8. Contato',
         paragraphs: [
-          `Para reportar vulnerabilidades ou incidentes: use o ${LEGAL_CONTROLLER.supportLabel} no aplicativo (menu ${LEGAL_CONTROLLER.supportPath} ou “Fale com o suporte” na tela de login).`,
+          `Para reportar vulnerabilidades ou incidentes: use o ${LEGAL_CONTROLLER.supportLabel} no aplicativo (menu ${LEGAL_CONTROLLER.supportPath} ou “Fale com o suporte” na tela de login) ou ${LEGAL_CONTROLLER.supportEmail}.`,
         ],
       },
     ],
