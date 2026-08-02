@@ -539,6 +539,18 @@
   gap: 0.75rem;
 }
 
+.payment-form__address {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.payment-form__hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
+
 .payment-form__info {
   font-size: 0.8rem;
   color: var(--gray-500);

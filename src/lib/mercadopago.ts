@@ -99,6 +99,14 @@ export async function createBoletoPayment(input: {
   cnpj: string
   email: string
   nome: string
+  address: {
+    zip_code: string
+    street_name: string
+    street_number: string
+    neighborhood: string
+    city: string
+    federal_unit: string
+  }
 }): Promise<BoletoCheckoutResult> {
   const { payload, invokeFailed } = await invokeCheckout<BoletoCheckoutResult>({
     action: 'create_boleto',

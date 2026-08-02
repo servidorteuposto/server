@@ -34,21 +34,70 @@ async function findPosto(
   cnpj: string,
 ) {
   const digits = onlyDigits(cnpj)
-  const { data: byExact } = await admin
-    .from('postos')
-    .select('id, nome, cnpj, email, telefone, subscription_status')
-    .eq('cnpj', cnpj)
-    .maybeSingle()
+  const select =
+    'id, nome, cnpj, email, telefone, subscription_status, cep, logradouro, numero, bairro, cidade, uf'
+  const { data: byExact } = await admin.from('postos').select(select).eq('cnpj', cnpj).maybeSingle()
   if (byExact) return byExact
 
   // CNPJ pode estar formatado no banco
   const { data: rows } = await admin
     .from('postos')
-    .select('id, nome, cnpj, email, telefone, subscription_status')
+    .select(select)
     .ilike('cnpj', `%${digits.slice(0, 8)}%`)
     .limit(20)
 
   return (rows ?? []).find((row) => onlyDigits(row.cnpj ?? '') === digits) ?? null
+}
+
+function resolvePayerAddress(body: Record<string, unknown>, posto: {
+  cep?: string | null
+  logradouro?: string | null
+  numero?: string | null
+  bairro?: string | null
+  cidade?: string | null
+  uf?: string | null
+}) {
+  const fromBody = (body?.address ?? {}) as Record<string, unknown>
+  const zip = onlyDigits(String(fromBody.zip_code ?? fromBody.cep ?? posto.cep ?? ''))
+  const street = String(fromBody.street_name ?? fromBody.logradouro ?? posto.logradouro ?? '').trim()
+  const number = String(fromBody.street_number ?? fromBody.numero ?? posto.numero ?? '').trim()
+  const neighborhood = String(fromBody.neighborhood ?? fromBody.bairro ?? posto.bairro ?? '').trim()
+  const city = String(fromBody.city ?? fromBody.cidade ?? posto.cidade ?? '').trim()
+  const federalUnit = String(fromBody.federal_unit ?? fromBody.uf ?? posto.uf ?? '')
+    .trim()
+    .toUpperCase()
+    .slice(0, 2)
+
+  if (
+    zip.length !== 8 ||
+    !street ||
+    !number ||
+    !neighborhood ||
+    !city ||
+    federalUnit.length !== 2
+  ) {
+    return null
+  }
+
+  return {
+    zip_code: zip,
+    street_name: street.slice(0, 256),
+    street_number: number.slice(0, 16),
+    neighborhood: neighborhood.slice(0, 256),
+    city: city.slice(0, 256),
+    federal_unit: federalUnit,
+  }
+}
+
+function mpErrorMessage(data: Record<string, unknown>, fallback: string) {
+  const causes = Array.isArray(data?.cause) ? data.cause : []
+  const fromCause = causes
+    .map((item) => String((item as { description?: string })?.description ?? '').trim())
+    .filter(Boolean)
+    .join(' ')
+  const message = String(data?.message ?? '').trim()
+  if (message && fromCause) return `${message}: ${fromCause}`
+  return message || fromCause || fallback
 }
 
 async function upsertPendingPayment(
@@ -177,18 +226,35 @@ Deno.serve(async (req) => {
       const paymentMethodId = method === 'pix' ? 'pix' : 'bolbradesco'
       const idempotencyKey = crypto.randomUUID()
 
+      const payer: Record<string, unknown> = {
+        email,
+        first_name: payerName.slice(0, 60),
+        identification: {
+          type: 'CNPJ',
+          number: onlyDigits(cnpj),
+        },
+      }
+
+      if (method === 'boleto') {
+        const address = resolvePayerAddress(body, posto)
+        if (!address) {
+          return jsonResponse(
+            {
+              ok: false,
+              message:
+                'Para gerar boleto, informe CEP, rua, número, bairro, cidade e UF do pagador.',
+            },
+            400,
+          )
+        }
+        payer.address = address
+      }
+
       const payload = {
         transaction_amount: PRICE,
         description: TITLE,
         payment_method_id: paymentMethodId,
-        payer: {
-          email,
-          first_name: payerName.slice(0, 60),
-          identification: {
-            type: 'CNPJ',
-            number: onlyDigits(cnpj),
-          },
-        },
+        payer,
         external_reference: externalReference,
         notification_url: notificationUrl,
         metadata: {
@@ -207,7 +273,13 @@ Deno.serve(async (req) => {
       if (!response.ok) {
         console.error('MP payment create failed', data)
         return jsonResponse(
-          { ok: false, message: data?.message ?? 'Não foi possível criar o pagamento.' },
+          {
+            ok: false,
+            message: mpErrorMessage(
+              data,
+              'Não foi possível criar o pagamento.',
+            ),
+          },
           400,
         )
       }

@@ -1,6 +1,11 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import {
+  fetchAddressByCep,
+  formatCep,
+  stripCep,
+} from '../config/posto-settings'
+import {
   createBoletoPayment,
   createCardCheckout,
   createPixPayment,
@@ -89,6 +94,13 @@ export default function PaymentForm({
   const [boletoUrl, setBoletoUrl] = useState<string | null>(null)
   const [boletoLine, setBoletoLine] = useState<string | null>(null)
   const [boletoReady, setBoletoReady] = useState(false)
+  const [boletoCep, setBoletoCep] = useState('')
+  const [boletoStreet, setBoletoStreet] = useState('')
+  const [boletoNumber, setBoletoNumber] = useState('')
+  const [boletoNeighborhood, setBoletoNeighborhood] = useState('')
+  const [boletoCity, setBoletoCity] = useState('')
+  const [boletoUf, setBoletoUf] = useState('')
+  const [cepLoading, setCepLoading] = useState(false)
   const pollRef = useRef<number | null>(null)
 
   const busy = loading || localBusy
@@ -211,6 +223,30 @@ export default function PaymentForm({
     }
   }
 
+  async function lookupBoletoCep(value: string) {
+    const digits = stripCep(value)
+    setBoletoCep(formatCep(digits))
+    if (digits.length !== 8) return
+
+    setCepLoading(true)
+    try {
+      const data = await fetchAddressByCep(digits)
+      if (!data) {
+        setErr('CEP não encontrado. Preencha o endereço manualmente.')
+        return
+      }
+      setErr(null)
+      setBoletoStreet(data.logradouro ?? '')
+      setBoletoNeighborhood(data.bairro ?? '')
+      setBoletoCity(data.localidade ?? '')
+      setBoletoUf((data.uf ?? '').toUpperCase())
+    } catch {
+      setErr('Não foi possível consultar o CEP. Preencha o endereço manualmente.')
+    } finally {
+      setCepLoading(false)
+    }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setErr(null)
@@ -218,7 +254,31 @@ export default function PaymentForm({
 
     try {
       if (method === 'boleto') {
-        const result = await createBoletoPayment({ cnpj, email, nome: postoName })
+        const zip = stripCep(boletoCep)
+        const street = boletoStreet.trim()
+        const number = boletoNumber.trim()
+        const neighborhood = boletoNeighborhood.trim()
+        const city = boletoCity.trim()
+        const uf = boletoUf.trim().toUpperCase()
+
+        if (zip.length !== 8 || !street || !number || !neighborhood || !city || uf.length !== 2) {
+          setErr('Preencha CEP, rua, número, bairro, cidade e UF para gerar o boleto.')
+          return
+        }
+
+        const result = await createBoletoPayment({
+          cnpj,
+          email,
+          nome: postoName,
+          address: {
+            zip_code: zip,
+            street_name: street,
+            street_number: number,
+            neighborhood,
+            city,
+            federal_unit: uf,
+          },
+        })
         setBoletoUrl(result.ticket_url ?? null)
         setBoletoLine(result.digitable_line ?? result.barcode ?? null)
         setBoletoReady(true)
@@ -323,9 +383,86 @@ export default function PaymentForm({
       )}
 
       {method === 'boleto' && !boletoReady && (
-        <p className="payment-form__info">
-          O acesso é liberado quando o boleto for compensado (geralmente no próximo dia útil).
-        </p>
+        <>
+          <p className="payment-form__info">
+            O acesso é liberado quando o boleto for compensado (geralmente no próximo dia útil).
+            Informe o endereço do posto para emitir o boleto registrado.
+          </p>
+          <div className="payment-form__address">
+            <label className="form-field">
+              <span className="form-field__label">CEP</span>
+              <input
+                type="text"
+                className="form-field__input"
+                inputMode="numeric"
+                value={boletoCep}
+                onChange={(event) => void lookupBoletoCep(event.target.value)}
+                disabled={busy || cepLoading}
+                placeholder="00000-000"
+                required
+              />
+              {cepLoading && <small className="payment-form__hint">Consultando CEP...</small>}
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Rua / logradouro</span>
+              <input
+                type="text"
+                className="form-field__input"
+                value={boletoStreet}
+                onChange={(event) => setBoletoStreet(event.target.value)}
+                disabled={busy}
+                required
+              />
+            </label>
+            <div className="payment-form__row">
+              <label className="form-field">
+                <span className="form-field__label">Número</span>
+                <input
+                  type="text"
+                  className="form-field__input"
+                  value={boletoNumber}
+                  onChange={(event) => setBoletoNumber(event.target.value)}
+                  disabled={busy}
+                  required
+                />
+              </label>
+              <label className="form-field">
+                <span className="form-field__label">UF</span>
+                <input
+                  type="text"
+                  className="form-field__input"
+                  value={boletoUf}
+                  onChange={(event) => setBoletoUf(event.target.value.toUpperCase().slice(0, 2))}
+                  disabled={busy}
+                  maxLength={2}
+                  required
+                />
+              </label>
+            </div>
+            <label className="form-field">
+              <span className="form-field__label">Bairro</span>
+              <input
+                type="text"
+                className="form-field__input"
+                value={boletoNeighborhood}
+                onChange={(event) => setBoletoNeighborhood(event.target.value)}
+                disabled={busy}
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Cidade</span>
+              <input
+                type="text"
+                className="form-field__input"
+                value={boletoCity}
+                onChange={(event) => setBoletoCity(event.target.value)}
+                disabled={busy}
+                required
+              />
+            </label>
+          </div>
+        </>
       )}
 
       {method === 'boleto' && boletoReady && (
