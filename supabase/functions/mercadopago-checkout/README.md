@@ -38,7 +38,7 @@ https://jilzklxnejztpphbryti.supabase.co/functions/v1/mercadopago-webhook?secret
 - Preço fixo no servidor (R$ 99); cliente não define valor.
 - Liberação só com status `approved` consultado na API do MP (não confia no body do webhook).
 - Ativação rejeitada se o valor for diferente de R$ 99.
-- Checkout exige e-mail igual ao cadastro do CNPJ + limite de tentativas por janela.
+- Checkout permite e-mail do pagador diferente do cadastro; limita tentativas por janela.
 - Cancelar/reembolso exigem login do titular (`mercadopago-billing` com JWT).
 - Access Token só em secrets de Edge Function.
 

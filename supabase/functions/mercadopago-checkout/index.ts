@@ -23,10 +23,6 @@ function onlyDigits(value: string) {
   return value.replace(/\D/g, '')
 }
 
-function emailsMatch(a: string, b: string) {
-  return a.trim().toLowerCase() === b.trim().toLowerCase()
-}
-
 /** Só libera assinatura com valor esperado (defesa contra payload adulterado). */
 function isValidSubscriptionAmount(payment: Record<string, unknown>) {
   const amount = Number(payment.transaction_amount)
@@ -234,17 +230,6 @@ Deno.serve(async (req) => {
     const posto = await findPosto(admin, cnpj)
     if (!posto) {
       return jsonResponse({ ok: false, message: 'Conta não encontrada. Conclua o cadastro primeiro.' }, 404)
-    }
-
-    const postoEmail = String(posto.email ?? '').trim().toLowerCase()
-    if (!postoEmail || !emailsMatch(postoEmail, email)) {
-      return jsonResponse(
-        {
-          ok: false,
-          message: 'E-mail não confere com o cadastro deste CNPJ.',
-        },
-        403,
-      )
     }
 
     // Limita spam de cobranças (PIX/boleto/cartão) por posto
