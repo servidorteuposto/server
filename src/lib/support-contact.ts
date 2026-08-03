@@ -7,6 +7,7 @@ export const SUPPORT_MAX_PHOTOS = 3
 
 export type SupportAudience = 'sem_cadastro' | 'com_cadastro'
 export type SupportCategory = 'duvida' | 'sugestao' | 'reclamacao'
+export type SupportTicketStatus = 'aberta' | 'em_andamento' | 'respondida'
 
 export const SUPPORT_CATEGORY_LABELS: Record<SupportCategory, string> = {
   duvida: 'Dúvida',
@@ -14,10 +15,17 @@ export const SUPPORT_CATEGORY_LABELS: Record<SupportCategory, string> = {
   reclamacao: 'Reclamação',
 }
 
+export const SUPPORT_STATUS_LABELS: Record<SupportTicketStatus, string> = {
+  aberta: 'Aberta',
+  em_andamento: 'Em andamento',
+  respondida: 'Respondida',
+}
+
 export type SupportTicket = {
   id: string
   audience: SupportAudience
   category: SupportCategory
+  status: SupportTicketStatus
   name: string
   email: string
   phone: string
@@ -25,6 +33,9 @@ export type SupportTicket = {
   user_id: string | null
   posto_id: string | null
   attachment_paths: string[]
+  admin_reply: string | null
+  replied_at: string | null
+  replied_by: string | null
   created_at: string
   updated_at: string
 }
@@ -178,7 +189,7 @@ export async function listSupportTickets(audience: SupportAudience): Promise<Sup
   const { data, error } = await supabase
     .from('support_tickets')
     .select(
-      'id, audience, category, name, email, phone, message, user_id, posto_id, attachment_paths, created_at, updated_at',
+      'id, audience, category, status, name, email, phone, message, user_id, posto_id, attachment_paths, admin_reply, replied_at, replied_by, created_at, updated_at',
     )
     .eq('audience', audience)
     .order('created_at', { ascending: false })
@@ -187,7 +198,13 @@ export async function listSupportTickets(audience: SupportAudience): Promise<Sup
     throw new Error(error.message || 'Não foi possível carregar os chamados.')
   }
 
-  return (data ?? []) as SupportTicket[]
+  return (data ?? []).map((row) => ({
+    ...(row as SupportTicket),
+    status: (row.status as SupportTicketStatus | null) ?? 'aberta',
+    admin_reply: (row.admin_reply as string | null) ?? null,
+    replied_at: (row.replied_at as string | null) ?? null,
+    replied_by: (row.replied_by as string | null) ?? null,
+  }))
 }
 
 export async function getSupportAttachmentUrl(path: string) {
@@ -200,4 +217,117 @@ export async function getSupportAttachmentUrl(path: string) {
   }
 
   return data.signedUrl
+}
+
+async function parsePayload<T>(data: T | null, error: unknown): Promise<T | null> {
+  if (data) return data
+  if (!error || typeof error !== 'object' || !('context' in error)) return null
+  const context = (error as { context?: unknown }).context
+  if (context instanceof Response) {
+    try {
+      return (await context.json()) as T
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+async function invokeSupportAdmin<T>(body: Record<string, unknown>) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  let accessToken = session?.access_token
+  if (!accessToken) {
+    const refreshed = await supabase.auth.refreshSession()
+    accessToken = refreshed.data.session?.access_token
+  }
+
+  if (!accessToken) {
+    return { payload: null as T | null, invokeFailed: true }
+  }
+
+  const { data, error } = await supabase.functions.invoke('support-admin', {
+    body,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+  const payload = await parsePayload<T>(data as T | null, error)
+  return { payload, invokeFailed: !payload && Boolean(error) }
+}
+
+export async function updateSupportTicketStatus(
+  ticketId: string,
+  status: SupportTicketStatus,
+): Promise<SupportTicket> {
+  const { data, error } = await supabase
+    .from('support_tickets')
+    .update({ status })
+    .eq('id', ticketId)
+    .select(
+      'id, audience, category, status, name, email, phone, message, user_id, posto_id, attachment_paths, admin_reply, replied_at, replied_by, created_at, updated_at',
+    )
+    .maybeSingle()
+
+  if (error || !data) {
+    throw new Error(error?.message || 'Não foi possível atualizar o status.')
+  }
+
+  return {
+    ...(data as SupportTicket),
+    status: (data.status as SupportTicketStatus | null) ?? 'aberta',
+    admin_reply: (data.admin_reply as string | null) ?? null,
+    replied_at: (data.replied_at as string | null) ?? null,
+    replied_by: (data.replied_by as string | null) ?? null,
+  }
+}
+
+export async function deleteSupportTicket(ticketId: string): Promise<void> {
+  const { data: existing, error: loadError } = await supabase
+    .from('support_tickets')
+    .select('id, attachment_paths')
+    .eq('id', ticketId)
+    .maybeSingle()
+
+  if (loadError || !existing) {
+    throw new Error(loadError?.message || 'Chamado não encontrado.')
+  }
+
+  const paths = Array.isArray(existing.attachment_paths)
+    ? (existing.attachment_paths as string[])
+    : []
+
+  if (paths.length > 0) {
+    await supabase.storage.from(SUPPORT_ATTACHMENTS_BUCKET).remove(paths)
+  }
+
+  const { error } = await supabase.from('support_tickets').delete().eq('id', ticketId)
+  if (error) {
+    throw new Error(error.message || 'Não foi possível excluir o chamado.')
+  }
+}
+
+export async function replySupportTicket(
+  ticketId: string,
+  reply: string,
+): Promise<SupportTicket> {
+  const { payload, invokeFailed } = await invokeSupportAdmin<{
+    ok: boolean
+    message?: string
+    ticket?: SupportTicket
+  }>({ action: 'reply_ticket', ticket_id: ticketId, reply })
+
+  if (invokeFailed || !payload?.ok || !payload.ticket) {
+    throw new Error(payload?.message || 'Não foi possível enviar a resposta.')
+  }
+
+  return {
+    ...payload.ticket,
+    status: payload.ticket.status ?? 'respondida',
+    admin_reply: payload.ticket.admin_reply ?? reply,
+    replied_at: payload.ticket.replied_at ?? null,
+    replied_by: payload.ticket.replied_by ?? null,
+  }
 }

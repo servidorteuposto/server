@@ -3,3 +3,6 @@ verify_jwt = false
 
 [functions.send-security-alert]
 verify_jwt = true
+
+[functions.support-admin]
+verify_jwt = false

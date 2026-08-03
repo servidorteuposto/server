@@ -1,11 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   SUPPORT_CATEGORY_LABELS,
+  SUPPORT_STATUS_LABELS,
+  deleteSupportTicket,
   getSupportAttachmentUrl,
   listSupportTickets,
+  replySupportTicket,
+  updateSupportTicketStatus,
   type SupportAudience,
   type SupportCategory,
   type SupportTicket,
+  type SupportTicketStatus,
 } from '../lib/support-contact'
 import '../pages/RegulatoryDocumentsPage.css'
 import './SettingsPage.css'
@@ -22,14 +27,35 @@ const CATEGORY_TABS: { id: SupportCategory; label: string }[] = [
   { id: 'sugestao', label: 'Sugestão' },
 ]
 
+const STATUS_FILTERS: { id: SupportTicketStatus | 'todas'; label: string }[] = [
+  { id: 'todas', label: 'Todas' },
+  { id: 'aberta', label: 'Abertas' },
+  { id: 'em_andamento', label: 'Em andamento' },
+  { id: 'respondida', label: 'Respondidas' },
+]
+
+const STATUS_ACTIONS: SupportTicketStatus[] = ['aberta', 'em_andamento', 'respondida']
+
 function formatDateTime(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString('pt-BR')
 }
 
-function TicketCard({ ticket }: { ticket: SupportTicket }) {
+function TicketCard({
+  ticket,
+  onUpdated,
+  onDeleted,
+}: {
+  ticket: SupportTicket
+  onUpdated: (ticket: SupportTicket) => void
+  onDeleted: (ticketId: string) => void
+}) {
   const [urls, setUrls] = useState<string[]>([])
+  const [reply, setReply] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionOk, setActionOk] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -54,38 +80,150 @@ function TicketCard({ ticket }: { ticket: SupportTicket }) {
     }
   }, [ticket.attachment_paths])
 
+  async function handleStatus(status: SupportTicketStatus) {
+    if (busy || ticket.status === status) return
+    setBusy(true)
+    setActionError(null)
+    setActionOk(null)
+    try {
+      const updated = await updateSupportTicketStatus(ticket.id, status)
+      onUpdated(updated)
+      setActionOk(`Status: ${SUPPORT_STATUS_LABELS[status]}`)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Falha ao atualizar status.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (busy) return
+    const confirmed = window.confirm(
+      `Excluir o chamado de ${ticket.name}? Essa ação não pode ser desfeita.`,
+    )
+    if (!confirmed) return
+
+    setBusy(true)
+    setActionError(null)
+    setActionOk(null)
+    try {
+      await deleteSupportTicket(ticket.id)
+      onDeleted(ticket.id)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Falha ao excluir.')
+      setBusy(false)
+    }
+  }
+
+  async function handleReply(event: FormEvent) {
+    event.preventDefault()
+    if (busy) return
+    setBusy(true)
+    setActionError(null)
+    setActionOk(null)
+    try {
+      const updated = await replySupportTicket(ticket.id, reply)
+      onUpdated(updated)
+      setReply('')
+      setActionOk('Resposta enviada por e-mail (suporte@appteuposto.com.br).')
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Falha ao enviar resposta.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
-    <article className="admin-support-card">
+    <article className="admin-support-card" data-status={ticket.status}>
       <header className="admin-support-card__header">
-        <div>
+        <div className="admin-support-card__title">
           <h3>{ticket.name}</h3>
-          <p>{formatDateTime(ticket.created_at)}</p>
+          <span className="admin-support-card__badge">{SUPPORT_CATEGORY_LABELS[ticket.category]}</span>
         </div>
-        <span className="admin-support-card__badge">{SUPPORT_CATEGORY_LABELS[ticket.category]}</span>
+        <div className="admin-support-card__meta-right">
+          <span className={`admin-support-card__status admin-support-card__status--${ticket.status}`}>
+            {SUPPORT_STATUS_LABELS[ticket.status]}
+          </span>
+          <time className="admin-support-card__time" dateTime={ticket.created_at}>
+            {formatDateTime(ticket.created_at)}
+          </time>
+        </div>
       </header>
 
-      <dl className="admin-support-card__meta">
-        <div>
-          <dt>E-mail</dt>
-          <dd>{ticket.email}</dd>
-        </div>
-        <div>
-          <dt>Telefone</dt>
-          <dd>{ticket.phone}</dd>
-        </div>
-      </dl>
+      <p className="admin-support-card__contact">
+        <span>{ticket.email}</span>
+        <span>{ticket.phone}</span>
+      </p>
 
       <p className="admin-support-card__message">{ticket.message}</p>
 
       {urls.length > 0 && (
         <div className="admin-support-card__photos">
           {urls.map((url, index) => (
-            <a key={`${ticket.id}-${index}`} href={url} target="_blank" rel="noreferrer">
+            <a key={`${ticket.id}-${index}`} href={url} target="_blank" rel="noreferrer" title="Abrir anexo">
               <img src={url} alt={`Print ${index + 1} de ${ticket.name}`} />
             </a>
           ))}
         </div>
       )}
+
+      {ticket.admin_reply && (
+        <div className="admin-support-card__reply-box">
+          <strong>Resposta enviada</strong>
+          {ticket.replied_at && (
+            <time dateTime={ticket.replied_at}>{formatDateTime(ticket.replied_at)}</time>
+          )}
+          <p>{ticket.admin_reply}</p>
+        </div>
+      )}
+
+      <div className="admin-support-card__actions" role="group" aria-label="Status do chamado">
+        {STATUS_ACTIONS.map((status) => (
+          <button
+            key={status}
+            type="button"
+            className="admin-support-card__action-btn"
+            data-active={ticket.status === status}
+            disabled={busy}
+            onClick={() => void handleStatus(status)}
+          >
+            {SUPPORT_STATUS_LABELS[status]}
+          </button>
+        ))}
+      </div>
+
+      <form className="admin-support-card__reply-form" onSubmit={(event) => void handleReply(event)}>
+        <label className="admin-support-card__reply-label" htmlFor={`reply-${ticket.id}`}>
+          Responder por e-mail
+        </label>
+        <textarea
+          id={`reply-${ticket.id}`}
+          value={reply}
+          onChange={(event) => setReply(event.target.value)}
+          placeholder="Digite a resposta que será enviada ao e-mail do usuário…"
+          rows={3}
+          disabled={busy}
+          required
+          minLength={5}
+          maxLength={5000}
+        />
+        <div className="admin-support-card__reply-footer">
+          <span className="admin-support-card__reply-hint">
+            Envio via Resend · respostas vão para suporte@appteuposto.com.br
+          </span>
+          <div className="admin-support-card__reply-buttons">
+            <button type="button" className="btn btn--danger" disabled={busy} onClick={() => void handleDelete()}>
+              Excluir
+            </button>
+            <button type="submit" className="btn btn--primary" disabled={busy || reply.trim().length < 5}>
+              {busy ? 'Enviando…' : 'Enviar resposta'}
+            </button>
+          </div>
+        </div>
+      </form>
+
+      {actionError && <p className="admin-support-card__feedback admin-support-card__feedback--error">{actionError}</p>}
+      {actionOk && <p className="admin-support-card__feedback admin-support-card__feedback--ok">{actionOk}</p>}
     </article>
   )
 }
@@ -93,6 +231,7 @@ function TicketCard({ ticket }: { ticket: SupportTicket }) {
 export default function AdminSupportPage() {
   const [audience, setAudience] = useState<SupportAudience>('sem_cadastro')
   const [category, setCategory] = useState<SupportCategory>('reclamacao')
+  const [statusFilter, setStatusFilter] = useState<SupportTicketStatus | 'todas'>('todas')
   const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -116,8 +255,13 @@ export default function AdminSupportPage() {
   }, [audience, loadTickets])
 
   const filtered = useMemo(
-    () => tickets.filter((ticket) => ticket.category === category),
-    [tickets, category],
+    () =>
+      tickets.filter((ticket) => {
+        if (ticket.category !== category) return false
+        if (statusFilter === 'todas') return true
+        return ticket.status === statusFilter
+      }),
+    [tickets, category, statusFilter],
   )
 
   const counts = useMemo(() => {
@@ -132,12 +276,20 @@ export default function AdminSupportPage() {
     return base
   }, [tickets])
 
+  function handleUpdated(updated: SupportTicket) {
+    setTickets((current) => current.map((ticket) => (ticket.id === updated.id ? updated : ticket)))
+  }
+
+  function handleDeleted(ticketId: string) {
+    setTickets((current) => current.filter((ticket) => ticket.id !== ticketId))
+  }
+
   return (
     <section className="settings-page admin-support-page">
       <header className="reg-docs-page__header settings-page__header">
         <div className="reg-docs-page__header-text">
           <h1>Painel de Suporte</h1>
-          <p>Chamados enviados pelo site, separados por cadastro e tipo de solicitação.</p>
+          <p>Chamados enviados pelo site — responda por e-mail, altere o status ou exclua.</p>
         </div>
         <button
           type="button"
@@ -182,6 +334,22 @@ export default function AdminSupportPage() {
         ))}
       </div>
 
+      <div className="admin-support-tabs admin-support-tabs--secondary" role="tablist" aria-label="Status">
+        {STATUS_FILTERS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            className="admin-support-tabs__btn"
+            aria-selected={statusFilter === tab.id}
+            data-active={statusFilter === tab.id}
+            onClick={() => setStatusFilter(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {error && <p className="reg-doc-form__error reg-docs-page__banner">{error}</p>}
 
       {loading ? (
@@ -191,7 +359,12 @@ export default function AdminSupportPage() {
       ) : (
         <div className="admin-support-list">
           {filtered.map((ticket) => (
-            <TicketCard key={ticket.id} ticket={ticket} />
+            <TicketCard
+              key={ticket.id}
+              ticket={ticket}
+              onUpdated={handleUpdated}
+              onDeleted={handleDeleted}
+            />
           ))}
         </div>
       )}
