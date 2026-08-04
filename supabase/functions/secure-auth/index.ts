@@ -58,7 +58,7 @@ async function hashValue(value: string) {
 }
 
 const APP_URL = Deno.env.get('APP_PUBLIC_URL') ?? 'https://www.appteuposto.com.br'
-const LOGO_URL = `${APP_URL}/imagens/logo_teuposto.png`
+const LOGO_URL = `${APP_URL}/imagens/logoteuposto2.png`
 
 function escapeHtml(value: string) {
   return value
@@ -81,8 +81,8 @@ function buildWelcomeEmailHtml(postoName: string) {
           <td style="padding:28px 32px 24px;background:linear-gradient(135deg,#0c3b7a 0%,#1a5fad 55%,#3d8fd4 100%);text-align:center;">
             <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 14px;">
               <tr><td style="padding:12px 22px;background-color:#ffffff;border-radius:14px;">
-                <img src="${LOGO_URL}" alt="Teu Posto" width="168" style="display:block;max-width:168px;width:100%;height:auto;border:0;" />
-              </td></tr>
+                    <img src="${LOGO_URL}" alt="Teu Posto" width="200" style="display:block;max-width:200px;width:100%;height:auto;border:0;background:#ffffff;" />
+                  </td></tr>
             </table>
             <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.88);">Gestão do seu posto</p>
           </td>
@@ -155,7 +155,7 @@ function buildRecoveryEmailHtml(actionLink: string, email: string) {
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 14px;">
                 <tr>
                   <td style="padding:12px 22px;background-color:#ffffff;border-radius:14px;">
-                    <img src="${LOGO_URL}" alt="Teu Posto" width="168" style="display:block;max-width:168px;width:100%;height:auto;border:0;" />
+                    <img src="${LOGO_URL}" alt="Teu Posto" width="200" style="display:block;max-width:200px;width:100%;height:auto;border:0;" />
                   </td>
                 </tr>
               </table>
@@ -250,10 +250,17 @@ async function handlePasswordRecovery(
     return { ok: false, message: 'Não foi possível gerar o link de recuperação.' }
   }
 
-  const actionLink = data?.properties?.action_link
+  const hashedToken = data?.properties?.hashed_token
+  // Link no nosso domínio (não supabase.co) — o app troca o token via verifyOtp
+  const actionLink = hashedToken
+    ? `${APP_URL}/?type=recovery&token_hash=${encodeURIComponent(hashedToken)}`
+    : data?.properties?.action_link
+
   if (!actionLink) {
     return { ok: false, message: 'Não foi possível gerar o link de recuperação.' }
   }
+
+  console.log('password_recovery_email_queued', { email, via: 'resend', host: APP_URL })
 
   const sent = await sendResendEmail({
     to: email,

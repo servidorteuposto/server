@@ -6,7 +6,7 @@ const corsHeaders = {
 }
 
 const APP_URL = Deno.env.get('APP_PUBLIC_URL') ?? 'https://www.appteuposto.com.br'
-const LOGO_URL = `${APP_URL}/imagens/logo_teuposto.png`
+const LOGO_URL = `${APP_URL}/imagens/logoteuposto2.png`
 const SUPPORT_EMAIL = 'suporte@appteuposto.com.br'
 
 function jsonResponse(body: unknown, status = 200) {

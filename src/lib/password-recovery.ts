@@ -35,12 +35,20 @@ export function urlIndicatesPasswordRecovery() {
   return searchParams.get('type') === 'recovery'
 }
 
+export function getRecoveryTokenHashFromUrl() {
+  if (typeof window === 'undefined') return null
+  const searchParams = new URLSearchParams(window.location.search)
+  if (searchParams.get('type') !== 'recovery') return null
+  return searchParams.get('token_hash')
+}
+
 export function cleanRecoveryParamsFromUrl() {
   if (typeof window === 'undefined') return
 
   const url = new URL(window.location.href)
   url.searchParams.delete('type')
   url.searchParams.delete('code')
+  url.searchParams.delete('token_hash')
   const nextHash = new URLSearchParams(url.hash.replace(/^#/, ''))
   nextHash.delete('type')
   nextHash.delete('access_token')

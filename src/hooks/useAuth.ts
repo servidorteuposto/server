@@ -4,6 +4,7 @@ import { isAdminUser } from '../lib/admin'
 import { getMySubscription, type SubscriptionStatus } from '../lib/subscription'
 import {
   clearPasswordRecoveryFlag,
+  getRecoveryTokenHashFromUrl,
   isPasswordRecoveryMarked,
   markPasswordRecovery,
   urlIndicatesPasswordRecovery,
@@ -92,6 +93,25 @@ export function useAuth() {
     let stopTabSession: (() => void) | null = null
 
     async function initAuth() {
+      // Link de recovery no nosso domínio: /?type=recovery&token_hash=...
+      const recoveryTokenHash = getRecoveryTokenHashFromUrl()
+      if (recoveryTokenHash) {
+        markPasswordRecovery()
+        setPasswordRecovery(true)
+        const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
+          type: 'recovery',
+          token_hash: recoveryTokenHash,
+        })
+
+        if (!otpError && otpData.session) {
+          setSession(otpData.session)
+          setUser(otpData.session.user)
+          stopTabSession = startTabSession()
+          setLoading(false)
+          return
+        }
+      }
+
       const {
         data: { session: currentSession },
       } = await supabase.auth.getSession()
