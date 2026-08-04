@@ -2,7 +2,11 @@
   position: relative;
   height: 100vh;
   height: 100dvh;
+  height: -webkit-fill-available;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
   overflow: hidden;
+  background: #041428;
 }
 
 .login-page__bg {

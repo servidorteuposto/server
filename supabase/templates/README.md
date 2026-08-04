@@ -12,15 +12,21 @@ O cadastro já cria a conta **confirmada** (`email_confirm: true`). Para o Supab
 
 1. **Authentication → Email Templates → Reset password**
 2. **Subject:** `Recuperação de senha — Teu Posto`
-3. Cole o conteúdo de `recovery.html`
+3. Cole o conteúdo de `recovery.html` (corpo HTML completo)
 4. Salve
 
 Variáveis: `{{ .ConfirmationURL }}`, `{{ .Email }}`
 
+> O template já está no repositório. Se o e-mail chegar sem a marca (logo/azul), o painel do Supabase ainda está com o template antigo — cole de novo o `recovery.html`.
+
+## Alerta de bloqueio (Resend)
+
+Enviado por `send-security-alert`. Referência visual: `security-alert.html` (mesmo layout da recuperação).
+
 ## Boas-vindas e avisos (Resend)
 
 Enviados pelas Edge Functions (`secure-auth`, `send-security-alert`, `diesel-drainage-reminders`).
-Referência visual: `welcome.html`.
+Referência visual: `welcome.html` / `security-alert.html`.
 
 Secrets / env das functions:
 

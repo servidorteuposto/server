@@ -5,6 +5,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const APP_URL = Deno.env.get('APP_PUBLIC_URL') ?? 'https://www.appteuposto.com.br'
+const LOGO_URL = `${APP_URL}/imagens/logo_teuposto.png`
+const SUPPORT_EMAIL = 'suporte@appteuposto.com.br'
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -39,6 +43,92 @@ function collectPhones(phone: unknown, payload: Record<string, unknown> | null |
   }
 
   return [...unique]
+}
+
+function buildSecurityAlertEmailHtml() {
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Acesso bloqueado — Teu Posto</title>
+</head>
+<body style="margin:0;padding:0;background-color:#eef2f7;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#eef2f7;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background-color:#ffffff;border-radius:18px;overflow:hidden;border:1px solid rgba(61,143,212,0.18);box-shadow:0 18px 40px rgba(12,59,122,0.10);">
+          <tr>
+            <td style="padding:28px 32px 24px;background:linear-gradient(135deg,#0c3b7a 0%,#1a5fad 55%,#3d8fd4 100%);text-align:center;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 14px;">
+                <tr>
+                  <td style="padding:12px 22px;background-color:#ffffff;border-radius:14px;">
+                    <img src="${LOGO_URL}" alt="Teu Posto" width="168" style="display:block;max-width:168px;width:100%;height:auto;border:0;" />
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.88);">
+                Gestão do seu posto
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 32px 8px;">
+              <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;font-weight:700;color:#0c3b7a;">
+                🔒 Acesso bloqueado
+              </h1>
+              <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#4b5563;">
+                Olá!
+              </p>
+              <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#4b5563;">
+                Seu acesso ao aplicativo <strong style="color:#0c3b7a;">Teu Posto</strong> foi temporariamente bloqueado
+                devido a várias tentativas de login com senha incorreta.
+              </p>
+              <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#4b5563;">
+                Para recuperar o acesso, acesse o site do Teu Posto e utilize a opção
+                <em>“Esqueci minha senha”</em> para redefinir sua senha.
+              </p>
+              <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#4b5563;">
+                Após a redefinição, você poderá acessar o aplicativo normalmente.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 24px;">
+                <tr>
+                  <td align="center" style="border-radius:10px;background-color:#0c3b7a;">
+                    <a href="${APP_URL}" target="_blank" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">
+                      Ir para o Teu Posto
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom:24px;">
+                <tr>
+                  <td style="padding:14px 16px;border-radius:12px;background-color:#fff7ed;border:1px solid #fed7aa;">
+                    <p style="margin:0;font-size:13px;line-height:1.55;color:#9a3412;">
+                      <strong style="color:#9a3412;">⚠️ Não reconhece essas tentativas?</strong><br />
+                      Recomendamos alterar sua senha por segurança. Se precisar de ajuda, fale com o suporte pelo app
+                      ou pelo e-mail
+                      <a href="mailto:${SUPPORT_EMAIL}" style="color:#0c3b7a;text-decoration:none;">${SUPPORT_EMAIL}</a>.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px 28px;">
+              <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 18px;" />
+              <p style="margin:0;font-size:12px;line-height:1.5;color:#9ca3af;text-align:center;">
+                © Teu Posto · <a href="${APP_URL}" style="color:#3d8fd4;text-decoration:none;">appteuposto.com.br</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
 }
 
 async function sendEmail(to: string, subject: string, html: string) {
@@ -99,21 +189,23 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, message: 'Tipo de alerta inválido.' }, 400)
     }
 
-    const nome = payload?.nome ?? 'usuário'
     const phones = collectPhones(phone, payload)
-    const message =
-      `Olá, ${nome}! Detectamos 5 tentativas incorretas de login na sua conta do teu posto. ` +
-      `Por segurança, o acesso foi bloqueado. Para liberar, recupere sua senha em "Esqueci minha senha".`
+    const message = [
+      '🔒 *Acesso bloqueado — Teu Posto*',
+      '',
+      'Olá! Seu acesso ao aplicativo *Teu Posto* foi temporariamente bloqueado devido a várias tentativas de login com senha incorreta.',
+      '',
+      'Para recuperar o acesso, acesse o site do Teu Posto e utilize a opção _“Esqueci minha senha”_ para redefinir sua senha.',
+      '',
+      'Após a redefinição, você poderá acessar o aplicativo normalmente.',
+      '',
+      '⚠️ Se você não reconhece essas tentativas de acesso, recomendamos alterar sua senha por segurança.',
+    ].join('\n')
 
-    const emailHtml = `
-      <p>Olá, <strong>${nome}</strong>,</p>
-      <p>Detectamos <strong>5 tentativas incorretas de login</strong> na sua conta do teu posto.</p>
-      <p>Por segurança, o acesso foi bloqueado. Para liberar, utilize a opção <strong>Esqueci minha senha</strong> no site.</p>
-      <p>Se não foi você, entre em contato com o suporte imediatamente.</p>
-    `
+    const emailHtml = buildSecurityAlertEmailHtml()
 
     const [emailSent, ...whatsappResults] = await Promise.all([
-      email ? sendEmail(email, 'Alerta de segurança — teu posto', emailHtml) : Promise.resolve(false),
+      email ? sendEmail(email, 'Acesso bloqueado — Teu Posto', emailHtml) : Promise.resolve(false),
       ...phones.map((p) => sendWhatsApp(p, message)),
     ])
 

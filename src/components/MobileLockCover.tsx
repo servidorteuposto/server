@@ -50,10 +50,14 @@ export default function MobileLockCover() {
 
   useEffect(() => {
     if (!active) return
-    const prev = document.body.style.overflow
+    const prevOverflow = document.body.style.overflow
+    document.documentElement.classList.add('teuposto-lock-active')
+    document.body.classList.add('teuposto-lock-active')
     document.body.style.overflow = 'hidden'
     return () => {
-      document.body.style.overflow = prev
+      document.documentElement.classList.remove('teuposto-lock-active')
+      document.body.classList.remove('teuposto-lock-active')
+      document.body.style.overflow = prevOverflow
     }
   }, [active])
 

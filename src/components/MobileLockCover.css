@@ -1,6 +1,17 @@
 .mobile-lock {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  height: 100svh;
+  height: 100lvh;
+  min-height: 100%;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
   z-index: 10000;
   display: none;
   flex-direction: column;
@@ -11,6 +22,7 @@
     1.5rem
     calc(env(safe-area-inset-bottom, 0px) + 2.5rem);
   color: #fff;
+  background: #041428;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -32,7 +44,13 @@
 
 .mobile-lock__bg {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
   background: #041428;
   z-index: 0;
 }
@@ -146,4 +164,18 @@
   .mobile-lock {
     display: none !important;
   }
+}
+
+/* Evita faixa branca do body/html no iOS/PWA sob a capa */
+html.teuposto-lock-active,
+body.teuposto-lock-active,
+html.teuposto-lock-active #root {
+  background: #041428 !important;
+  min-height: 100%;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+}
+
+html.teuposto-lock-active .cookie-consent {
+  display: none !important;
 }

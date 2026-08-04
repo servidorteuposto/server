@@ -8,6 +8,28 @@ type Props = {
   onCompleted: () => void
 }
 
+function translatePasswordUpdateError(message: string | undefined) {
+  const normalized = (message ?? '').toLowerCase()
+
+  if (normalized.includes('different from the old password')) {
+    return 'A nova senha deve ser diferente da senha atual.'
+  }
+  if (normalized.includes('same as the old password') || normalized.includes('same password')) {
+    return 'A nova senha deve ser diferente da senha atual.'
+  }
+  if (normalized.includes('password should be at least')) {
+    return 'A senha deve ter no mínimo 6 caracteres.'
+  }
+  if (normalized.includes('weak') || normalized.includes('not strong enough')) {
+    return PASSWORD_RULE_MESSAGE
+  }
+  if (normalized.includes('session') || normalized.includes('expired') || normalized.includes('jwt')) {
+    return 'Link de recuperação expirado ou inválido. Solicite um novo e-mail.'
+  }
+
+  return message?.trim() || 'Não foi possível atualizar a senha.'
+}
+
 export default function ResetPasswordPage({ onCompleted }: Props) {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -34,7 +56,7 @@ export default function ResetPasswordPage({ onCompleted }: Props) {
     try {
       const { error: updateError } = await supabase.auth.updateUser({ password })
       if (updateError) {
-        setError(updateError.message || 'Não foi possível atualizar a senha.')
+        setError(translatePasswordUpdateError(updateError.message))
         return
       }
 
