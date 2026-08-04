@@ -20,6 +20,12 @@ function onlyDigits(value: string) {
   return value.replace(/\D/g, '')
 }
 
+function formatCnpj(value: string | null | undefined) {
+  const digits = onlyDigits(value ?? '')
+  if (digits.length !== 14) return (value ?? '').trim() || 'não informado'
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`
+}
+
 /** Z-API espera DDI+DDD+número (ex.: 5511999999999). */
 function toZApiPhone(phone: string) {
   let digits = onlyDigits(phone)
@@ -45,7 +51,147 @@ function collectPhones(phone: unknown, payload: Record<string, unknown> | null |
   return [...unique]
 }
 
-function buildSecurityAlertEmailHtml() {
+function pickVariantIndex(seed: string, count = 10) {
+  let hash = 2166136261
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return Math.abs(hash) % count
+}
+
+function accountLockedWhatsAppMessage(
+  postoNome: string,
+  cnpj: string,
+  seed: string,
+) {
+  const cnpjFmt = formatCnpj(cnpj)
+  const header = [`🏪 *Posto:* ${postoNome}`, `🧾 *CNPJ:* ${cnpjFmt}`].join('\n')
+  const variants = [
+    [
+      '🔒 *Acesso bloqueado — Teu Posto*',
+      '',
+      header,
+      '',
+      'Seu acesso ao *Teu Posto* foi temporariamente bloqueado por várias tentativas de login com senha incorreta.',
+      '',
+      'Para recuperar: acesse o site e use _“Esqueci minha senha”_.',
+      '',
+      '⚠️ Se não reconhece essas tentativas, altere a senha por segurança.',
+    ].join('\n'),
+    [
+      '🛑 *Conta temporariamente bloqueada*',
+      '',
+      header,
+      '',
+      'Detectamos muitas tentativas de senha incorreta no *Teu Posto*.',
+      '',
+      'Redefina a senha pelo site (_Esqueci minha senha_) para liberar o acesso.',
+      '',
+      'Se não foi você, troque a senha imediatamente.',
+    ].join('\n'),
+    [
+      '🔐 *Segurança Teu Posto*',
+      '',
+      header,
+      '',
+      'O acesso desta conta foi bloqueado por segurança (falhas de login).',
+      '',
+      'Recupere entrando no site e escolhendo _“Esqueci minha senha”_.',
+      '',
+      'Não reconhece? Proteja a conta alterando a senha.',
+    ].join('\n'),
+    [
+      '❗ *Login bloqueado*',
+      '',
+      header,
+      '',
+      'Várias senhas incorretas levaram ao bloqueio temporário no *Teu Posto*.',
+      '',
+      'Desbloqueie redefinindo a senha no site do Teu Posto.',
+      '',
+      '⚠️ Em caso de dúvida, fale com o suporte.',
+    ].join('\n'),
+    [
+      '🚨 *Alerta de segurança*',
+      '',
+      header,
+      '',
+      'Sua conta no *Teu Posto* está bloqueada temporariamente.',
+      '',
+      'Use _“Esqueci minha senha”_ no site para redefinir e voltar a acessar.',
+      '',
+      'Se não foi você, altere a senha assim que possível.',
+    ].join('\n'),
+    [
+      '🔒 *Acesso suspenso temporariamente*',
+      '',
+      header,
+      '',
+      'Por segurança, o login foi bloqueado após tentativas inválidas.',
+      '',
+      'Acesse o site do Teu Posto → _Esqueci minha senha_ → redefina.',
+      '',
+      'Depois disso, o acesso volta ao normal.',
+    ].join('\n'),
+    [
+      '📢 *Aviso importante — Teu Posto*',
+      '',
+      header,
+      '',
+      'Conta bloqueada por tentativas de login com senha errada.',
+      '',
+      'Para liberar: redefina a senha no site (_Esqueci minha senha_).',
+      '',
+      'Não reconhece a atividade? Troque a senha e avise o suporte.',
+    ].join('\n'),
+    [
+      '🛡️ *Proteção de conta*',
+      '',
+      header,
+      '',
+      'O *Teu Posto* bloqueou temporariamente o acesso desta conta.',
+      '',
+      'Recupere com a opção _“Esqueci minha senha”_ no site.',
+      '',
+      'Após redefinir, você entra normalmente no app.',
+    ].join('\n'),
+    [
+      '⚠️ *Bloqueio por tentativas de senha*',
+      '',
+      header,
+      '',
+      'Identificamos várias falhas de login e bloqueamos o acesso.',
+      '',
+      'Redefina a senha no site do Teu Posto para desbloquear.',
+      '',
+      'Se não foi você, priorize a troca de senha.',
+    ].join('\n'),
+    [
+      '🔑 *Recupere seu acesso — Teu Posto*',
+      '',
+      header,
+      '',
+      'Sua conta foi bloqueada temporariamente por segurança.',
+      '',
+      'No site, use _“Esqueci minha senha”_, defina uma nova senha e acesse o app.',
+      '',
+      'Dúvidas? Fale com o suporte pelo e-mail suporte@appteuposto.com.br.',
+    ].join('\n'),
+  ]
+  return variants[pickVariantIndex(seed, variants.length)]
+}
+
+function buildSecurityAlertEmailHtml(postoNome: string, cnpj: string) {
+  const cnpjFmt = formatCnpj(cnpj)
+  const postoLine =
+    postoNome || cnpj
+      ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#4b5563;">
+          Conta: <strong style="color:#0c3b7a;">${postoNome || 'Posto'}</strong>
+          ${cnpj ? ` · CNPJ <strong style="color:#0c3b7a;">${cnpjFmt}</strong>` : ''}
+        </p>`
+      : ''
+
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -78,6 +224,7 @@ function buildSecurityAlertEmailHtml() {
               <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;font-weight:700;color:#0c3b7a;">
                 🔒 Acesso bloqueado
               </h1>
+              ${postoLine}
               <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#4b5563;">
                 Olá!
               </p>
@@ -189,20 +336,19 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, message: 'Tipo de alerta inválido.' }, 400)
     }
 
-    const phones = collectPhones(phone, payload)
-    const message = [
-      '🔒 *Acesso bloqueado — Teu Posto*',
-      '',
-      'Olá! Seu acesso ao aplicativo *Teu Posto* foi temporariamente bloqueado devido a várias tentativas de login com senha incorreta.',
-      '',
-      'Para recuperar o acesso, acesse o site do Teu Posto e utilize a opção _“Esqueci minha senha”_ para redefinir sua senha.',
-      '',
-      'Após a redefinição, você poderá acessar o aplicativo normalmente.',
-      '',
-      '⚠️ Se você não reconhece essas tentativas de acesso, recomendamos alterar sua senha por segurança.',
-    ].join('\n')
+    const payloadObj =
+      payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {}
+    const postoNome =
+      typeof payloadObj.nome === 'string' && payloadObj.nome.trim()
+        ? payloadObj.nome.trim()
+        : 'Seu posto'
+    const cnpj = typeof payloadObj.cnpj === 'string' ? payloadObj.cnpj : ''
 
-    const emailHtml = buildSecurityAlertEmailHtml()
+    const phones = collectPhones(phone, payloadObj)
+    const seed = `${alertId ?? ''}:${postoNome}:${cnpj}:${phones.join(',')}`
+    // Conta bloqueada: envio imediato (sem delay entre mensagens)
+    const message = accountLockedWhatsAppMessage(postoNome, cnpj, seed)
+    const emailHtml = buildSecurityAlertEmailHtml(postoNome, cnpj)
 
     const [emailSent, ...whatsappResults] = await Promise.all([
       email ? sendEmail(email, 'Acesso bloqueado — Teu Posto', emailHtml) : Promise.resolve(false),
@@ -218,6 +364,8 @@ Deno.serve(async (req) => {
       whatsapp_sent: whatsappSent,
       whatsapp_targets: phones.length,
       whatsapp_delivered: whatsappResults.filter(Boolean).length,
+      posto: postoNome,
+      cnpj: formatCnpj(cnpj),
     })
   } catch (error) {
     console.error('send-security-alert error', error)
