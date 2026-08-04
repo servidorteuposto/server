@@ -21,37 +21,47 @@ export async function resolveEmailFromIdentifier(identifier: string): Promise<st
   return data
 }
 
-export async function requestPasswordResetByIdentifier(identifier: string) {
-  const trimmed = identifier.trim()
-  let email: string | null = null
+type PasswordResetPayload = {
+  ok?: boolean
+  sent?: boolean
+  message?: string
+}
 
-  if (looksLikeEmail(trimmed)) {
-    email = trimmed.toLowerCase()
-  } else {
-    const { data, error: lookupError } = await supabase.rpc('get_email_by_cnpj', {
-      p_cnpj: trimmed,
-    })
-
-    if (lookupError) {
-      throw lookupError
+async function parseFunctionPayload<T>(data: T | null, error: unknown): Promise<T | null> {
+  if (data) return data
+  if (!error || typeof error !== 'object' || !('context' in error)) return null
+  const context = (error as { context?: unknown }).context
+  if (context instanceof Response) {
+    try {
+      return (await context.json()) as T
+    } catch {
+      return null
     }
-
-    email = data
   }
+  return null
+}
 
-  if (!email) {
-    return { sent: false as const }
-  }
-
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/?type=recovery`,
+/** Envia recuperação pelo Resend (template Teu Posto), não pelo mailer padrão do Supabase. */
+export async function requestPasswordResetByIdentifier(identifier: string) {
+  const { data, error } = await supabase.functions.invoke('secure-auth', {
+    body: {
+      action: 'request_password_reset',
+      identifier: identifier.trim(),
+      redirectTo: `${window.location.origin}/?type=recovery`,
+    },
   })
 
-  if (error) {
-    throw error
+  const payload = await parseFunctionPayload<PasswordResetPayload>(data as PasswordResetPayload | null, error)
+
+  if (!payload) {
+    throw new Error('password_reset_unavailable')
   }
 
-  return { sent: true as const }
+  if (!payload.ok) {
+    throw new Error(payload.message || 'password_reset_failed')
+  }
+
+  return { sent: Boolean(payload.sent) as boolean }
 }
 
 /** @deprecated Prefer requestPasswordResetByIdentifier */

@@ -8,16 +8,16 @@ O cadastro já cria a conta **confirmada** (`email_confirm: true`). Para o Supab
 2. Desative **Confirm email**
 3. Salve
 
-## Recuperação de senha (Supabase Auth)
+## Recuperação de senha (Resend via secure-auth)
 
-1. **Authentication → Email Templates → Reset password**
-2. **Subject:** `Recuperação de senha — Teu Posto`
-3. Cole o conteúdo de `recovery.html` (corpo HTML completo)
-4. Salve
+O app **não** usa mais o mailer padrão do Supabase Auth para recovery.
 
-Variáveis: `{{ .ConfirmationURL }}`, `{{ .Email }}`
+Fluxo atual:
+1. Front chama `secure-auth` com `action: request_password_reset`
+2. A function gera o link (`admin.generateLink`) e envia pelo **Resend**
+3. Layout: mesmo visual de `recovery.html`
 
-> O template já está no repositório. Se o e-mail chegar sem a marca (logo/azul), o painel do Supabase ainda está com o template antigo — cole de novo o `recovery.html`.
+O arquivo `recovery.html` fica só como referência visual.
 
 ## Alerta de bloqueio (Resend)
 

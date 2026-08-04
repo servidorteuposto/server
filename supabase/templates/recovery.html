@@ -7,11 +7,15 @@
   <title>Recuperação de senha — Teu Posto</title>
 </head>
 <body style="margin:0;padding:0;background-color:#eef2f7;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+  <!--
+    Este arquivo é a referência visual.
+    O envio real é feito pela Edge Function secure-auth (Resend),
+    não pelo mailer padrão do Supabase Auth.
+  -->
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#eef2f7;padding:32px 16px;">
     <tr>
       <td align="center">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background-color:#ffffff;border-radius:18px;overflow:hidden;border:1px solid rgba(61,143,212,0.18);box-shadow:0 18px 40px rgba(12,59,122,0.10);">
-          <!-- Header -->
           <tr>
             <td style="padding:28px 32px 24px;background:linear-gradient(135deg,#0c3b7a 0%,#1a5fad 55%,#3d8fd4 100%);text-align:center;">
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 14px;">
@@ -31,8 +35,6 @@
               </p>
             </td>
           </tr>
-
-          <!-- Body -->
           <tr>
             <td style="padding:32px 32px 8px;">
               <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;font-weight:700;color:#0c3b7a;">
@@ -45,7 +47,6 @@
                 Recebemos um pedido para redefinir a senha da sua conta no <strong style="color:#0c3b7a;">Teu Posto</strong>.
                 Clique no botão abaixo para criar uma nova senha. O link é válido por tempo limitado.
               </p>
-
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 24px;">
                 <tr>
                   <td align="center" style="border-radius:10px;background-color:#0c3b7a;">
@@ -59,29 +60,14 @@
                   </td>
                 </tr>
               </table>
-
               <p style="margin:0 0 10px;font-size:13px;line-height:1.55;color:#6b7280;">
                 Se o botão não funcionar, copie e cole este endereço no navegador:
               </p>
               <p style="margin:0 0 24px;word-break:break-all;font-size:12px;line-height:1.5;color:#2b8fd9;">
                 <a href="{{ .ConfirmationURL }}" style="color:#2b8fd9;text-decoration:underline;">{{ .ConfirmationURL }}</a>
               </p>
-
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom:24px;">
-                <tr>
-                  <td style="padding:14px 16px;border-radius:12px;background-color:#fffbeb;border:1px solid #fde68a;">
-                    <p style="margin:0;font-size:13px;line-height:1.55;color:#92400e;">
-                      <strong style="color:#78350f;">Não solicitou esta alteração?</strong><br />
-                      Ignore este e-mail. Sua senha permanece a mesma. Se suspeitar de acesso indevido,
-                      entre em contato com o suporte pelo app.
-                    </p>
-                  </td>
-                </tr>
-              </table>
             </td>
           </tr>
-
-          <!-- Footer -->
           <tr>
             <td style="padding:0 32px 28px;">
               <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 18px;" />

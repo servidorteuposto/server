@@ -134,6 +134,141 @@ async function sendWelcomeEmail(email: string, postoName: string) {
   })
 }
 
+function buildRecoveryEmailHtml(actionLink: string, email: string) {
+  const safeLink = escapeHtml(actionLink)
+  const safeEmail = escapeHtml(email)
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Recuperação de senha — Teu Posto</title>
+</head>
+<body style="margin:0;padding:0;background-color:#eef2f7;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#eef2f7;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background-color:#ffffff;border-radius:18px;overflow:hidden;border:1px solid rgba(61,143,212,0.18);box-shadow:0 18px 40px rgba(12,59,122,0.10);">
+          <tr>
+            <td style="padding:28px 32px 24px;background:linear-gradient(135deg,#0c3b7a 0%,#1a5fad 55%,#3d8fd4 100%);text-align:center;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 14px;">
+                <tr>
+                  <td style="padding:12px 22px;background-color:#ffffff;border-radius:14px;">
+                    <img src="${LOGO_URL}" alt="Teu Posto" width="168" style="display:block;max-width:168px;width:100%;height:auto;border:0;" />
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.88);">
+                Gestão do seu posto
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 32px 8px;">
+              <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;font-weight:700;color:#0c3b7a;">
+                Recuperação de senha
+              </h1>
+              <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#4b5563;">
+                Olá,
+              </p>
+              <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#4b5563;">
+                Recebemos um pedido para redefinir a senha da sua conta no <strong style="color:#0c3b7a;">Teu Posto</strong>.
+                Clique no botão abaixo para criar uma nova senha. O link é válido por tempo limitado.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 24px;">
+                <tr>
+                  <td align="center" style="border-radius:10px;background-color:#0c3b7a;">
+                    <a href="${safeLink}" target="_blank" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">
+                      Redefinir minha senha
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 10px;font-size:13px;line-height:1.55;color:#6b7280;">
+                Se o botão não funcionar, copie e cole este endereço no navegador:
+              </p>
+              <p style="margin:0 0 24px;word-break:break-all;font-size:12px;line-height:1.5;">
+                <a href="${safeLink}" style="color:#2b8fd9;text-decoration:underline;">${safeLink}</a>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px 28px;">
+              <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 18px;" />
+              <p style="margin:0 0 6px;font-size:12px;line-height:1.5;color:#9ca3af;text-align:center;">
+                Este e-mail foi enviado para <strong style="color:#6b7280;">${safeEmail}</strong>
+              </p>
+              <p style="margin:0;font-size:12px;line-height:1.5;color:#9ca3af;text-align:center;">
+                © Teu Posto · <a href="${APP_URL}" style="color:#3d8fd4;text-decoration:none;">appteuposto.com.br</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+}
+
+async function handlePasswordRecovery(
+  admin: ReturnType<typeof createClient>,
+  identifier: string,
+  redirectTo?: string,
+) {
+  const trimmed = identifier.trim()
+  if (!trimmed) {
+    return { ok: true, sent: false as const }
+  }
+
+  let email: string | null = null
+  if (trimmed.includes('@')) {
+    email = trimmed.toLowerCase()
+  } else {
+    const { data, error } = await admin.rpc('get_email_by_cnpj', { p_cnpj: trimmed })
+    if (error) {
+      console.error('get_email_by_cnpj failed', error)
+      return { ok: false, message: 'Não foi possível processar a recuperação.' }
+    }
+    email = typeof data === 'string' ? data : null
+  }
+
+  if (!email) {
+    return { ok: true, sent: false as const }
+  }
+
+  const redirect = redirectTo?.trim() || `${APP_URL}/?type=recovery`
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: 'recovery',
+    email,
+    options: { redirectTo: redirect },
+  })
+
+  if (error) {
+    console.error('generateLink recovery failed', error)
+    return { ok: false, message: 'Não foi possível gerar o link de recuperação.' }
+  }
+
+  const actionLink = data?.properties?.action_link
+  if (!actionLink) {
+    return { ok: false, message: 'Não foi possível gerar o link de recuperação.' }
+  }
+
+  const sent = await sendResendEmail({
+    to: email,
+    subject: 'Recuperação de senha — Teu Posto',
+    html: buildRecoveryEmailHtml(actionLink, email),
+    from: Deno.env.get('AUTH_EMAIL_FROM') ?? `Teu Posto <noreply@appteuposto.com.br>`,
+  })
+
+  if (!sent) {
+    return { ok: false, message: 'Não foi possível enviar o e-mail de recuperação.' }
+  }
+
+  return { ok: true, sent: true as const }
+}
+
 async function processPendingAlerts(admin: ReturnType<typeof createClient>, supabaseUrl: string) {
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   const { data: alerts } = await admin.rpc('security_get_pending_alerts', { p_limit: 5 })
@@ -472,6 +607,11 @@ Deno.serve(async (req) => {
         p_identifier: body.identifier,
       })
       return jsonResponse({ ok: !error }, error ? 400 : 200)
+    }
+
+    if (action === 'request_password_reset') {
+      const result = await handlePasswordRecovery(admin, body.identifier ?? '', body.redirectTo)
+      return jsonResponse(result, result.ok ? 200 : 400)
     }
 
     return jsonResponse({ ok: false, message: 'Ação inválida.' }, 400)
