@@ -243,12 +243,11 @@ Deno.serve(async (req) => {
         <p>A drenagem de tanques de óleo diesel deve ser registrada semanalmente.</p>
       `
 
-      const phones = collectAvisoPhones(posto)
-      const [emailSent, ...whatsappResults] = await Promise.all([
+      const [emailSent] = await Promise.all([
         posto.email ? sendEmail(posto.email, subject, emailHtml) : Promise.resolve(false),
-        ...phones.map((p) => sendWhatsApp(p, bodyText)),
       ])
-      const whatsappSent = whatsappResults.some(Boolean)
+      // WhatsApp de drenagem é enviado por operational-reminders (1x no dia do vencimento).
+      const whatsappSent = false
 
       const { error: insertError } = await supabase.from('diesel_drainage_reminders').insert({
         posto_id: tank.posto_id,

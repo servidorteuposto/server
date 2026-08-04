@@ -482,8 +482,9 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
         <section className="settings-section">
           <h2>Contato de Avisos</h2>
           <p className="settings-section__hint">
-            Cadastre até 4 números de WhatsApp para receber avisos de documentos perto de vencer e
-            outros alertas do sistema.
+            Cadastre até 4 números de WhatsApp para receber avisos automáticos: documentos e laudos
+            (30/15/7/1 dia e no vencimento), metrologia (a cada 15 dias), drenagem (semanal) e RAQ
+            (a cada 2 dias). A instância Z-API precisa estar conectada.
           </p>
           <div className="settings-grid settings-grid--whatsapp">
             <label className="reg-doc-form__field">
