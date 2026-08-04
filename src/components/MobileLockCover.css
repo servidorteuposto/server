@@ -1,0 +1,149 @@
+.mobile-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding:
+    0
+    1.5rem
+    calc(env(safe-area-inset-bottom, 0px) + 2.5rem);
+  color: #fff;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+  will-change: transform, opacity;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.35s ease;
+}
+
+.mobile-lock--dragging {
+  transition: none;
+  cursor: grabbing;
+}
+
+.mobile-lock--exit {
+  transform: translate3d(0, -110%, 0) !important;
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+.mobile-lock__bg {
+  position: absolute;
+  inset: 0;
+  background: #041428;
+  z-index: 0;
+}
+
+.mobile-lock__brand {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.mobile-lock__art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 42%;
+}
+
+.mobile-lock__fade {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    transparent 58%,
+    rgba(4, 20, 40, 0.75) 72%,
+    #041428 86%,
+    #041428 100%
+  );
+}
+
+.mobile-lock__hint {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 1rem 1.5rem 0.5rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-lock__hint-en {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #5ec8ff;
+  text-shadow: 0 0 18px rgba(80, 200, 255, 0.55);
+}
+
+.mobile-lock__hint-pt {
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.mobile-lock__chevrons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  animation: mobile-lock-bounce 1.6s ease-in-out infinite;
+}
+
+.mobile-lock__chevron {
+  width: 18px;
+  height: 18px;
+  border-left: 3px solid #5ec8ff;
+  border-top: 3px solid #5ec8ff;
+  transform: rotate(45deg);
+  opacity: 0.95;
+  filter: drop-shadow(0 0 8px rgba(80, 200, 255, 0.7));
+}
+
+.mobile-lock__chevron + .mobile-lock__chevron {
+  margin-top: -0.55rem;
+  opacity: 0.55;
+}
+
+@keyframes mobile-lock-bounce {
+  0%,
+  100% {
+    transform: translateY(6px);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 960px) {
+  .mobile-lock {
+    display: flex;
+  }
+}
+
+@media (min-width: 961px) {
+  .mobile-lock {
+    display: none !important;
+  }
+}

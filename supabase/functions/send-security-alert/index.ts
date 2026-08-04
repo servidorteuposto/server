@@ -40,7 +40,13 @@ async function sendWhatsApp(phone: string, message: string) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      // Z-API usa Client-Token; Bearer fica como fallback para outros provedores
+      ...(apiKey
+        ? {
+            'Client-Token': apiKey,
+            Authorization: `Bearer ${apiKey}`,
+          }
+        : {}),
     },
     body: JSON.stringify({
       phone: onlyDigits(phone),
