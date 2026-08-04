@@ -21,6 +21,37 @@ function onlyDigits(value: string) {
   return value.replace(/\D/g, '')
 }
 
+function toZApiPhone(phone: string) {
+  let digits = onlyDigits(phone)
+  if (!digits) return ''
+  if (digits.startsWith('55') && digits.length >= 12) return digits
+  if (digits.length === 10 || digits.length === 11) return `55${digits}`
+  return digits
+}
+
+function collectAvisoPhones(posto: {
+  aviso_whatsapp_1?: string | null
+  aviso_whatsapp_2?: string | null
+  aviso_whatsapp_3?: string | null
+  aviso_whatsapp_4?: string | null
+  telefone?: string | null
+}) {
+  const avisos = [
+    posto.aviso_whatsapp_1,
+    posto.aviso_whatsapp_2,
+    posto.aviso_whatsapp_3,
+    posto.aviso_whatsapp_4,
+  ]
+  const candidates = avisos.some(Boolean) ? avisos : [posto.telefone]
+  const unique = new Set<string>()
+  for (const candidate of candidates) {
+    if (!candidate) continue
+    const normalized = toZApiPhone(candidate)
+    if (normalized.length >= 12 && normalized.length <= 15) unique.add(normalized)
+  }
+  return [...unique]
+}
+
 function pad2(value: number) {
   return String(value).padStart(2, '0')
 }
@@ -77,7 +108,6 @@ async function sendWhatsApp(phone: string, message: string) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      // Z-API usa Client-Token; Bearer fica como fallback para outros provedores
       ...(apiKey
         ? {
             'Client-Token': apiKey,
@@ -86,7 +116,7 @@ async function sendWhatsApp(phone: string, message: string) {
         : {}),
     },
     body: JSON.stringify({
-      phone: onlyDigits(phone),
+      phone: toZApiPhone(phone),
       message,
     }),
   })
@@ -139,7 +169,12 @@ Deno.serve(async (req) => {
 
     const [{ data: postos, error: postosError }, { data: reports, error: reportsError }] =
       await Promise.all([
-        supabase.from('postos').select('id, nome, email, telefone').in('id', postoIds),
+        supabase
+          .from('postos')
+          .select(
+            'id, nome, email, telefone, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4',
+          )
+          .in('id', postoIds),
         supabase
           .from('diesel_drainage_reports')
           .select('tank_id, drained_at')
@@ -208,10 +243,12 @@ Deno.serve(async (req) => {
         <p>A drenagem de tanques de óleo diesel deve ser registrada semanalmente.</p>
       `
 
-      const [emailSent, whatsappSent] = await Promise.all([
+      const phones = collectAvisoPhones(posto)
+      const [emailSent, ...whatsappResults] = await Promise.all([
         posto.email ? sendEmail(posto.email, subject, emailHtml) : Promise.resolve(false),
-        posto.telefone ? sendWhatsApp(posto.telefone, bodyText) : Promise.resolve(false),
+        ...phones.map((p) => sendWhatsApp(p, bodyText)),
       ])
+      const whatsappSent = whatsappResults.some(Boolean)
 
       const { error: insertError } = await supabase.from('diesel_drainage_reminders').insert({
         posto_id: tank.posto_id,

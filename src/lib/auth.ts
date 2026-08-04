@@ -44,7 +44,7 @@ export async function requestPasswordResetByIdentifier(identifier: string) {
   }
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin,
+    redirectTo: `${window.location.origin}/?type=recovery`,
   })
 
   if (error) {

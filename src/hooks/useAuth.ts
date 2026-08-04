@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { isAdminUser } from '../lib/admin'
 import { getMySubscription, type SubscriptionStatus } from '../lib/subscription'
+import {
+  clearPasswordRecoveryFlag,
+  isPasswordRecoveryMarked,
+  markPasswordRecovery,
+  urlIndicatesPasswordRecovery,
+} from '../lib/password-recovery'
 import { isImpersonating, supabase } from '../lib/supabase'
 import { shouldExpireSessionAfterAbsence, startTabSession } from '../lib/session'
 
@@ -9,6 +15,9 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [passwordRecovery, setPasswordRecovery] = useState(
+    () => isPasswordRecoveryMarked() || urlIndicatesPasswordRecovery(),
+  )
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null)
   const [subscriptionEndsAt, setSubscriptionEndsAt] = useState<string | null>(null)
   const [billingMode, setBillingMode] = useState<'one_time' | 'recurring' | null>(null)
@@ -97,12 +106,22 @@ export function useAuth() {
         return
       }
 
+      const recovering =
+        isPasswordRecoveryMarked() || urlIndicatesPasswordRecovery()
+
+      if (recovering && currentSession) {
+        markPasswordRecovery()
+        setPasswordRecovery(true)
+      }
+
       setSession(currentSession)
       setUser(currentSession?.user ?? null)
 
       if (currentSession) {
         stopTabSession = startTabSession()
-        await loadSubscription(currentSession.user)
+        if (!recovering) {
+          await loadSubscription(currentSession.user)
+        }
       }
 
       setLoading(false)
@@ -118,12 +137,14 @@ export function useAuth() {
         stopTabSession = null
       }
 
-      if (event === 'USER_UPDATED' || event === 'PASSWORD_RECOVERY') {
-        try {
-          await supabase.rpc('security_clear_my_login_lockout')
-        } catch {
-          // ignora falha de desbloqueio
-        }
+      if (event === 'PASSWORD_RECOVERY' || urlIndicatesPasswordRecovery()) {
+        markPasswordRecovery()
+        setPasswordRecovery(true)
+      }
+
+      if (event === 'SIGNED_OUT') {
+        clearPasswordRecoveryFlag()
+        setPasswordRecovery(false)
       }
 
       setSession(nextSession)
@@ -131,7 +152,10 @@ export function useAuth() {
 
       if (nextSession) {
         stopTabSession = startTabSession()
-        await loadSubscription(nextSession.user)
+        // Em recovery, não carrega o painel até a senha ser trocada.
+        if (!(event === 'PASSWORD_RECOVERY' || isPasswordRecoveryMarked())) {
+          await loadSubscription(nextSession.user)
+        }
       } else {
         clearSubscriptionState()
         setIsAdmin(false)
@@ -144,10 +168,20 @@ export function useAuth() {
     }
   }, [])
 
+  function completePasswordRecovery() {
+    clearPasswordRecoveryFlag()
+    setPasswordRecovery(false)
+    if (user) {
+      void loadSubscription(user)
+    }
+  }
+
   return {
     user,
     session,
     loading,
+    passwordRecovery,
+    completePasswordRecovery,
     subscriptionStatus,
     subscriptionEndsAt,
     billingMode,

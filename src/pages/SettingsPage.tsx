@@ -70,6 +70,7 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
   const [avisoWhatsapp1, setAvisoWhatsapp1] = useState('')
   const [avisoWhatsapp2, setAvisoWhatsapp2] = useState('')
   const [avisoWhatsapp3, setAvisoWhatsapp3] = useState('')
+  const [avisoWhatsapp4, setAvisoWhatsapp4] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [removePhoto, setRemovePhoto] = useState(false)
@@ -94,6 +95,7 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
     setAvisoWhatsapp1(data.aviso_whatsapp_1 ? formatPhone(data.aviso_whatsapp_1) : '')
     setAvisoWhatsapp2(data.aviso_whatsapp_2 ? formatPhone(data.aviso_whatsapp_2) : '')
     setAvisoWhatsapp3(data.aviso_whatsapp_3 ? formatPhone(data.aviso_whatsapp_3) : '')
+    setAvisoWhatsapp4(data.aviso_whatsapp_4 ? formatPhone(data.aviso_whatsapp_4) : '')
     setPhotoFile(null)
     setRemovePhoto(false)
   }, [])
@@ -268,7 +270,8 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
     if (
       !isValidWhatsappPhone(avisoWhatsapp1) ||
       !isValidWhatsappPhone(avisoWhatsapp2) ||
-      !isValidWhatsappPhone(avisoWhatsapp3)
+      !isValidWhatsappPhone(avisoWhatsapp3) ||
+      !isValidWhatsappPhone(avisoWhatsapp4)
     ) {
       setFormError('Informe telefones de WhatsApp válidos com DDD (10 ou 11 dígitos).')
       return
@@ -318,6 +321,7 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
         avisoWhatsapp1,
         avisoWhatsapp2,
         avisoWhatsapp3,
+        avisoWhatsapp4,
         photoFile,
         existingPhotoPath: profile.foto_storage_path,
         removePhoto,
@@ -478,8 +482,8 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
         <section className="settings-section">
           <h2>Contato de Avisos</h2>
           <p className="settings-section__hint">
-            Cadastre até 3 números de WhatsApp para receber avisos de documentos perto de vencer e
-            outros alertas do sistema. A integração com a API será conectada em breve.
+            Cadastre até 4 números de WhatsApp para receber avisos de documentos perto de vencer e
+            outros alertas do sistema.
           </p>
           <div className="settings-grid settings-grid--whatsapp">
             <label className="reg-doc-form__field">
@@ -514,6 +518,18 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
                 autoComplete="tel"
                 value={avisoWhatsapp3}
                 onChange={(event) => setAvisoWhatsapp3(formatPhone(event.target.value))}
+                disabled={isReadOnly || busy}
+                placeholder="(00) 00000-0000"
+              />
+            </label>
+            <label className="reg-doc-form__field">
+              <span>WhatsApp 4</span>
+              <input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={avisoWhatsapp4}
+                onChange={(event) => setAvisoWhatsapp4(formatPhone(event.target.value))}
                 disabled={isReadOnly || busy}
                 placeholder="(00) 00000-0000"
               />

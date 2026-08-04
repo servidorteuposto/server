@@ -2,6 +2,7 @@ import { useAuth } from './hooks/useAuth'
 import AppShell from './components/AppShell'
 import CookieConsent from './components/CookieConsent'
 import LoginPage from './pages/LoginPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import PublicPostoPage from './pages/PublicPostoPage'
 import ImpersonatePage from './pages/ImpersonatePage'
 import LegalPage from './pages/LegalPage'
@@ -29,6 +30,8 @@ function App() {
   const {
     user,
     loading,
+    passwordRecovery,
+    completePasswordRecovery,
     isReadOnly,
     isAdmin,
     subscriptionStatus,
@@ -61,6 +64,15 @@ function App() {
 
   if (loading) {
     return null
+  }
+
+  if (user && passwordRecovery) {
+    return (
+      <>
+        <ResetPasswordPage onCompleted={completePasswordRecovery} />
+        <CookieConsent />
+      </>
+    )
   }
 
   if (user) {

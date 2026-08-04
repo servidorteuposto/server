@@ -16,6 +16,31 @@ function onlyDigits(value: string) {
   return value.replace(/\D/g, '')
 }
 
+/** Z-API espera DDI+DDD+número (ex.: 5511999999999). */
+function toZApiPhone(phone: string) {
+  let digits = onlyDigits(phone)
+  if (!digits) return ''
+  if (digits.startsWith('55') && digits.length >= 12) return digits
+  if (digits.length === 10 || digits.length === 11) return `55${digits}`
+  return digits
+}
+
+function collectPhones(phone: unknown, payload: Record<string, unknown> | null | undefined) {
+  const fromPayload = Array.isArray(payload?.phones) ? payload.phones : []
+  const candidates = [...fromPayload, phone]
+  const unique = new Set<string>()
+
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string' && typeof candidate !== 'number') continue
+    const normalized = toZApiPhone(String(candidate))
+    if (normalized.length >= 12 && normalized.length <= 15) {
+      unique.add(normalized)
+    }
+  }
+
+  return [...unique]
+}
+
 async function sendEmail(to: string, subject: string, html: string) {
   return sendResendEmail({
     to,
@@ -40,7 +65,6 @@ async function sendWhatsApp(phone: string, message: string) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      // Z-API usa Client-Token; Bearer fica como fallback para outros provedores
       ...(apiKey
         ? {
             'Client-Token': apiKey,
@@ -49,13 +73,13 @@ async function sendWhatsApp(phone: string, message: string) {
         : {}),
     },
     body: JSON.stringify({
-      phone: onlyDigits(phone),
+      phone,
       message,
     }),
   })
 
   if (!response.ok) {
-    console.error('Failed to send WhatsApp alert', await response.text())
+    console.error('Failed to send WhatsApp alert', phone, await response.text())
     return false
   }
 
@@ -76,6 +100,7 @@ Deno.serve(async (req) => {
     }
 
     const nome = payload?.nome ?? 'usuário'
+    const phones = collectPhones(phone, payload)
     const message =
       `Olá, ${nome}! Detectamos 5 tentativas incorretas de login na sua conta do teu posto. ` +
       `Por segurança, o acesso foi bloqueado. Para liberar, recupere sua senha em "Esqueci minha senha".`
@@ -87,16 +112,20 @@ Deno.serve(async (req) => {
       <p>Se não foi você, entre em contato com o suporte imediatamente.</p>
     `
 
-    const results = await Promise.all([
+    const [emailSent, ...whatsappResults] = await Promise.all([
       email ? sendEmail(email, 'Alerta de segurança — teu posto', emailHtml) : Promise.resolve(false),
-      phone ? sendWhatsApp(phone, message) : Promise.resolve(false),
+      ...phones.map((p) => sendWhatsApp(p, message)),
     ])
+
+    const whatsappSent = whatsappResults.some(Boolean)
 
     return jsonResponse({
       ok: true,
       alert_id: alertId,
-      email_sent: results[0],
-      whatsapp_sent: results[1],
+      email_sent: emailSent,
+      whatsapp_sent: whatsappSent,
+      whatsapp_targets: phones.length,
+      whatsapp_delivered: whatsappResults.filter(Boolean).length,
     })
   } catch (error) {
     console.error('send-security-alert error', error)
