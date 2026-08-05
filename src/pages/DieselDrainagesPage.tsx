@@ -14,15 +14,23 @@ import {
   formatDateTimePtBr,
 } from '../config/fuel-analyses'
 import {
+  buildDrainagePdfFileName,
+  buildDrainageSpreadsheetFileName,
+  downloadBlob,
+  generateDrainagePrintPdf,
+  generateDrainageSpreadsheetCsv,
+  type DrainageExportPosto,
+} from '../lib/diesel-drainage-export'
+import {
   ensureStandardDieselTanks,
   getDrainagePhotoUrl,
   getDrainageSignatureUrl,
-  getMyPostoId,
   listDieselDrainageReports,
   saveDieselDrainageReport,
   type DieselDrainageReport,
   type DieselTank,
 } from '../lib/diesel-drainages'
+import { getMyPostoProfile } from '../lib/fuel-analyses'
 import '../pages/RegulatoryDocumentsPage.css'
 import '../pages/FuelAnalysesPage.css'
 import './DieselDrainagesPage.css'
@@ -47,10 +55,13 @@ function readGeolocation(): Promise<GeolocationPosition> {
 
 export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageProps) {
   const [postoId, setPostoId] = useState<string | null>(null)
+  const [postoInfo, setPostoInfo] = useState<DrainageExportPosto | null>(null)
   const [tanks, setTanks] = useState<DieselTank[]>([])
   const [reports, setReports] = useState<DieselDrainageReport[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [exporting, setExporting] = useState<'pdf' | 'sheet' | null>(null)
+  const [showExportMenu, setShowExportMenu] = useState(false)
   const [pageError, setPageError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -95,11 +106,16 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
     setLoading(true)
     setPageError(null)
     try {
-      const id = await getMyPostoId()
-      setPostoId(id)
+      const profile = await getMyPostoProfile()
+      setPostoId(profile.id)
+      setPostoInfo({
+        nome: profile.nome,
+        cnpj: profile.cnpj,
+        endereco: profile.endereco,
+      })
       const [tankRows, reportRows] = await Promise.all([
-        ensureStandardDieselTanks(id),
-        listDieselDrainageReports(id),
+        ensureStandardDieselTanks(profile.id),
+        listDieselDrainageReports(profile.id),
       ])
       setTanks(tankRows)
       setReports(reportRows)
@@ -148,6 +164,32 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
     clearLivePhoto()
     setFormError(null)
     setDrainedAtPreview(new Date().toISOString())
+  }
+
+  async function handleExport(kind: 'pdf' | 'sheet') {
+    if (!postoInfo || !reports.length || exporting) return
+
+    setExporting(kind)
+    setPageError(null)
+    setShowExportMenu(false)
+
+    try {
+      if (kind === 'sheet') {
+        const csv = generateDrainageSpreadsheetCsv(postoInfo, reports)
+        downloadBlob(csv, buildDrainageSpreadsheetFileName(postoInfo), 'text/csv;charset=utf-8')
+      } else {
+        const bytes = await generateDrainagePrintPdf(postoInfo, reports)
+        downloadBlob(bytes, buildDrainagePdfFileName(postoInfo), 'application/pdf')
+      }
+    } catch {
+      setPageError(
+        kind === 'sheet'
+          ? 'Não foi possível gerar a planilha. Tente novamente.'
+          : 'Não foi possível gerar o PDF. Tente novamente.',
+      )
+    } finally {
+      setExporting(null)
+    }
   }
 
   async function handleLivePhotoCapture(file: File) {
@@ -268,6 +310,44 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
             antes e no dia do vencimento.
           </p>
         </div>
+        {reports.length > 0 && (
+          <div className="fuel-header-actions diesel-export">
+            <button
+              type="button"
+              className={`reg-docs-page__add-btn fuel-header-actions__btn fuel-header-actions__btn--ghost${showExportMenu ? ' is-active' : ''}`}
+              onClick={() => setShowExportMenu((open) => !open)}
+              disabled={!!exporting}
+              aria-expanded={showExportMenu}
+              aria-haspopup="menu"
+            >
+              {exporting === 'pdf'
+                ? 'Gerando PDF...'
+                : exporting === 'sheet'
+                  ? 'Gerando planilha...'
+                  : 'Imprimir'}
+            </button>
+            {showExportMenu && (
+              <div className="diesel-export__menu" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => void handleExport('sheet')}
+                  disabled={!!exporting}
+                >
+                  Planilha (Excel)
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => void handleExport('pdf')}
+                  disabled={!!exporting}
+                >
+                  PDF A4 completo
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </header>
 
       {pageError && <p className="reg-doc-form__error reg-docs-page__banner">{pageError}</p>}

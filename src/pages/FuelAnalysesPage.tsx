@@ -45,6 +45,12 @@ import {
 import { listPartners, type PostoPartner } from '../lib/partners'
 import { buildPublicPostoUrl } from '../config/public-posto'
 import { formatDatePtBr } from '../config/regulatory-documents'
+import { fetchPublicPostoBoard } from '../lib/public-posto'
+import {
+  buildRaqPdfFileName,
+  downloadRaqPdf,
+  generateRaqPrintPdf,
+} from '../lib/raq-print-report'
 import QRCode from 'qrcode'
 import '../pages/RegulatoryDocumentsPage.css'
 import './FuelAnalysesPage.css'
@@ -223,6 +229,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [publicUrl, setPublicUrl] = useState<string | null>(null)
   const [showQrPanel, setShowQrPanel] = useState(false)
+  const [printing, setPrinting] = useState(false)
   /** Combustíveis que chegaram neste recebimento (um, vários ou todos). */
   const [launchProductKeys, setLaunchProductKeys] = useState<FuelProductKey[]>([])
   const [transporters, setTransporters] = useState<PostoPartner[]>([])
@@ -295,6 +302,28 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
     }, 1000)
     return () => window.clearInterval(timer)
   }, [formOpen])
+
+  async function handlePrintRaq() {
+    if (!posto?.public_slug || reports.length === 0 || printing) return
+
+    setPrinting(true)
+    setPageError(null)
+
+    try {
+      const board = await fetchPublicPostoBoard(posto.public_slug)
+      if (!board || (!board.raq_items.length && !board.analysis_items.length)) {
+        setPageError('Não há RAQ publicado para imprimir.')
+        return
+      }
+
+      const bytes = await generateRaqPrintPdf(board)
+      downloadRaqPdf(bytes, buildRaqPdfFileName(board))
+    } catch {
+      setPageError('Não foi possível gerar o PDF do RAQ. Tente novamente.')
+    } finally {
+      setPrinting(false)
+    }
+  }
 
   function openForm() {
     setLaunchProductKeys([])
@@ -496,6 +525,10 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
       return
     }
 
+    window.alert(
+      'Atenção: não esqueça de verificar o adesivo com a distribuidora correspondente.',
+    )
+
     setBusy(true)
     setFormError(null)
     const submittedAt = new Date().toISOString()
@@ -588,6 +621,17 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
             >
               QR Code
             </button>
+            {reports.length > 0 && (
+              <button
+                type="button"
+                className="reg-docs-page__add-btn fuel-header-actions__btn fuel-header-actions__btn--ghost"
+                onClick={() => void handlePrintRaq()}
+                disabled={printing || !posto.public_slug}
+                title="Imprimir PDF completo do RAQ (mesmo da página pública)"
+              >
+                {printing ? 'Gerando...' : 'Imprimir'}
+              </button>
+            )}
             {!isReadOnly && (
               <button type="button" className="reg-docs-page__add-btn" onClick={openForm}>
                 Incluir RAQ

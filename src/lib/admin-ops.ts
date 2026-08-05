@@ -100,6 +100,20 @@ export async function startAdminImpersonation(postoId: string) {
   }
 }
 
+export async function deleteAdminAccount(postoId: string) {
+  const { payload, invokeFailed } = await invokeAdminOps<{
+    ok: boolean
+    message?: string
+    posto_id?: string
+  }>({ action: 'delete_account', posto_id: postoId })
+
+  if (invokeFailed || !payload?.ok) {
+    throw new Error(payload?.message || 'Não foi possível excluir a conta.')
+  }
+
+  return payload
+}
+
 export function subscriptionStatusLabel(status: AdminAccount['subscription_status']) {
   if (status === 'active') return 'Ativo'
   if (status === 'expired') return 'Expirado'

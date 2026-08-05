@@ -200,6 +200,62 @@ Deno.serve(async (req) => {
       })
     }
 
+    if (action === 'delete_account') {
+      const postoId = body?.posto_id
+      if (!postoId || typeof postoId !== 'string') {
+        return jsonResponse({ ok: false, message: 'Informe o posto.' }, 400)
+      }
+
+      const { data: posto, error: postoError } = await admin
+        .from('postos')
+        .select('id, nome, cnpj, email, user_id')
+        .eq('id', postoId)
+        .maybeSingle()
+
+      if (postoError || !posto) {
+        return jsonResponse({ ok: false, message: 'Posto não encontrado.' }, 404)
+      }
+
+      if (
+        onlyDigits(posto.cnpj ?? '') === ADMIN_CNPJ_DIGITS ||
+        String(posto.email ?? '').trim().toLowerCase() === ADMIN_EMAIL
+      ) {
+        return jsonResponse({ ok: false, message: 'Conta administrativa não pode ser excluída.' }, 400)
+      }
+
+      const userId = typeof posto.user_id === 'string' ? posto.user_id : null
+
+      // Apaga o posto (cascade nos dados operacionais). Depois remove o login no Auth.
+      const { error: deletePostoError } = await admin.from('postos').delete().eq('id', postoId)
+      if (deletePostoError) {
+        return jsonResponse(
+          { ok: false, message: deletePostoError.message || 'Não foi possível excluir o posto.' },
+          500,
+        )
+      }
+
+      if (userId) {
+        const { error: deleteUserError } = await admin.auth.admin.deleteUser(userId)
+        if (deleteUserError) {
+          return jsonResponse(
+            {
+              ok: false,
+              message:
+                deleteUserError.message ||
+                'Posto removido, mas falhou ao excluir o login. Tente novamente.',
+            },
+            500,
+          )
+        }
+      }
+
+      return jsonResponse({
+        ok: true,
+        message: `Conta de ${posto.nome} excluída com sucesso.`,
+        posto_id: postoId,
+      })
+    }
+
     return jsonResponse({ ok: false, message: 'Ação inválida.' }, 400)
   } catch (error) {
     console.error('admin-ops error', error)

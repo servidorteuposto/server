@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  deleteAdminAccount,
   listAdminAccounts,
   startAdminImpersonation,
   subscriptionStatusLabel,
@@ -84,14 +85,39 @@ export default function AdminAccountsPage() {
     }
   }
 
+  async function handleDelete(account: AdminAccount) {
+    const confirmed = window.confirm(
+      `Excluir a conta de "${account.nome}"?\n\nIsso apaga o login e todos os dados do posto (RAQ, drenagens, documentos etc.). Esta ação não pode ser desfeita.`,
+    )
+    if (!confirmed) return
+
+    const confirmedAgain = window.confirm(
+      `Confirma a exclusão definitiva de "${account.nome}" (CNPJ ${formatCnpj(account.cnpj)})?`,
+    )
+    if (!confirmedAgain) return
+
+    setBusyId(account.id)
+    setError(null)
+    setSuccess(null)
+    try {
+      const result = await deleteAdminAccount(account.id)
+      setAccounts((current) => current.filter((row) => row.id !== account.id))
+      setSuccess(result.message || `Conta de ${account.nome} excluída.`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao excluir a conta.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   return (
     <section className="settings-page admin-accounts-page">
       <header className="reg-docs-page__header settings-page__header">
         <div className="reg-docs-page__header-text">
           <h1>Contas dos usuários</h1>
           <p>
-            Liberar acesso sem pagamento e entrar no sistema de qualquer posto para editar
-            informações.
+            Liberar acesso sem pagamento, entrar no sistema de qualquer posto e excluir contas
+            do sistema.
           </p>
         </div>
         <button type="button" className="btn btn--primary" onClick={() => void load()} disabled={loading}>
@@ -177,6 +203,14 @@ export default function AdminAccountsPage() {
                     onClick={() => void handleEnter(account)}
                   >
                     {busy ? 'Abrindo...' : 'Entrar no sistema'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--danger"
+                    disabled={busy}
+                    onClick={() => void handleDelete(account)}
+                  >
+                    {busy ? 'Excluindo...' : 'Excluir conta'}
                   </button>
                 </div>
               </article>

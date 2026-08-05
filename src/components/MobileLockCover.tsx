@@ -82,6 +82,9 @@ export default function MobileLockCover() {
     if (unlocked.current) return
     unlocked.current = true
     markUnlocked()
+    // Tira o azul do html/body já no swipe — senão vaza faixa embaixo do login
+    document.documentElement.classList.remove('teuposto-lock-active')
+    document.body.classList.remove('teuposto-lock-active')
     setExiting(true)
     setDragY(0)
     window.setTimeout(() => setActive(false), 420)
@@ -148,17 +151,15 @@ export default function MobileLockCover() {
       aria-modal="true"
       aria-label="Tela inicial Teu Posto. Arraste para cima para continuar."
     >
-      <div className="mobile-lock__bg" aria-hidden="true" />
-
-      <div className="mobile-lock__brand" aria-hidden="true">
-        <img
-          src="/imagens/capa_mobile.png"
-          alt=""
-          className="mobile-lock__art"
-          draggable={false}
-        />
-      </div>
-      <div className="mobile-lock__fade" aria-hidden="true" />
+      <img
+        src="/imagens/capa_mobile.png?v=6"
+        alt=""
+        aria-hidden="true"
+        className="mobile-lock__art"
+        draggable={false}
+        decoding="async"
+        fetchPriority="high"
+      />
 
       <button
         type="button"
