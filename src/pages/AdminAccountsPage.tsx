@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import ConfirmDialog from '../components/regulatory/ConfirmDialog'
 import {
   deleteAdminAccount,
   listAdminAccounts,
@@ -27,6 +28,8 @@ export default function AdminAccountsPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [savingPassword, setSavingPassword] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<AdminAccount | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -109,27 +112,34 @@ export default function AdminAccountsPage() {
     }
   }
 
-  async function handleDelete(account: AdminAccount) {
-    const confirmed = window.confirm(
-      `Excluir a conta de "${account.nome}"?\n\nIsso apaga o login e todos os dados do posto (RAQ, drenagens, documentos etc.). Esta ação não pode ser desfeita.`,
-    )
-    if (!confirmed) return
-
-    const confirmedAgain = window.confirm(
-      `Confirma a exclusão definitiva de "${account.nome}" (CNPJ ${formatCnpj(account.cnpj)})?`,
-    )
-    if (!confirmedAgain) return
-
-    setBusyId(account.id)
+  function openDeleteModal(account: AdminAccount) {
     setError(null)
     setSuccess(null)
+    setDeleteTarget(account)
+  }
+
+  function closeDeleteModal() {
+    if (deleting) return
+    setDeleteTarget(null)
+  }
+
+  async function confirmDeleteAccount() {
+    if (!deleteTarget || deleting) return
+
+    setDeleting(true)
+    setBusyId(deleteTarget.id)
+    setError(null)
+    setSuccess(null)
+
     try {
-      const result = await deleteAdminAccount(account.id)
-      setAccounts((current) => current.filter((row) => row.id !== account.id))
-      setSuccess(result.message || `Conta de ${account.nome} excluída.`)
+      const result = await deleteAdminAccount(deleteTarget.id)
+      setAccounts((current) => current.filter((row) => row.id !== deleteTarget.id))
+      setSuccess(result.message || `Conta de ${deleteTarget.nome} excluída.`)
+      setDeleteTarget(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao excluir a conta.')
     } finally {
+      setDeleting(false)
       setBusyId(null)
     }
   }
@@ -270,9 +280,9 @@ export default function AdminAccountsPage() {
                     type="button"
                     className="btn btn--danger"
                     disabled={busy}
-                    onClick={() => void handleDelete(account)}
+                    onClick={() => openDeleteModal(account)}
                   >
-                    {busy ? 'Excluindo...' : 'Excluir conta'}
+                    Excluir conta
                   </button>
                 </div>
               </article>
@@ -280,6 +290,21 @@ export default function AdminAccountsPage() {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Excluir conta"
+        message={
+          deleteTarget
+            ? `Excluir "${deleteTarget.nome}" (CNPJ ${formatCnpj(deleteTarget.cnpj)})?\n\nIsso apaga o login e todos os dados do posto (RAQ, drenagens, documentos etc.). Esta ação não pode ser desfeita.`
+            : ''
+        }
+        confirmLabel="Excluir definitivamente"
+        busyLabel="Excluindo..."
+        busy={deleting}
+        onConfirm={() => void confirmDeleteAccount()}
+        onCancel={closeDeleteModal}
+      />
 
       {passwordTarget && (
         <div className="reg-doc-modal" role="presentation" onClick={closePasswordModal}>
