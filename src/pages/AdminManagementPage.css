@@ -169,6 +169,39 @@
   word-break: break-word;
 }
 
+.admin-mgmt-zapi {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  padding: 1.1rem 1.2rem;
+  border-radius: 14px;
+  background: var(--white);
+  border: 1px solid rgba(61, 143, 212, 0.22);
+}
+
+.admin-mgmt-zapi--ok {
+  border-color: #22c55e;
+  background: #f0fdf4;
+}
+
+.admin-mgmt-zapi--down {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.admin-mgmt-zapi strong {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 1.25rem;
+  color: var(--blue-dark);
+}
+
+.admin-mgmt-zapi__msg p {
+  margin: 0.35rem 0 0;
+  font-size: 0.92rem;
+  color: var(--gray-700);
+}
+
 .admin-mgmt-domain {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

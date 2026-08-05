@@ -7,6 +7,7 @@ import {
   daysUntilDate,
   domainAlertMessage,
   fetchResendStats,
+  fetchZApiStatus,
   formatBytes,
   isAdminAccount,
   isNearLimit,
@@ -310,17 +311,22 @@ Deno.serve(async (req) => {
     if (action === 'get_dashboard') {
       const settings = await loadSettings(admin)
 
-      const [{ data: metrics, error: metricsError }, { data: postos, error: postosError }, resend] =
-        await Promise.all([
-          admin.rpc('admin_management_metrics'),
-          admin
-            .from('postos')
-            .select(
-              'id, nome, cnpj, email, telefone, subscription_status, subscription_ends_at, created_at',
-            )
-            .order('created_at', { ascending: false }),
-          fetchResendStats(),
-        ])
+      const [
+        { data: metrics, error: metricsError },
+        { data: postos, error: postosError },
+        resend,
+        zapi,
+      ] = await Promise.all([
+        admin.rpc('admin_management_metrics'),
+        admin
+          .from('postos')
+          .select(
+            'id, nome, cnpj, email, telefone, subscription_status, subscription_ends_at, created_at',
+          )
+          .order('created_at', { ascending: false }),
+        fetchResendStats(),
+        fetchZApiStatus(),
+      ])
 
       if (metricsError) {
         return jsonResponse({ ok: false, message: metricsError.message }, 500)
@@ -381,6 +387,7 @@ Deno.serve(async (req) => {
           inactive: inactive.length,
         },
         supabase: supabasePanel,
+        zapi,
         resend: {
           configured: resend.configured,
           message: resend.message,

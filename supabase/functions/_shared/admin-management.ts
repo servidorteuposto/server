@@ -151,6 +151,93 @@ export async function sendWhatsApp(phone: string, message: string) {
   return true
 }
 
+/** Extrai instanceId/token do WHATSAPP_WEBHOOK_URL e consulta /status na Z-API. */
+export async function fetchZApiStatus() {
+  const webhookUrl = Deno.env.get('WHATSAPP_WEBHOOK_URL')
+  const apiKey = Deno.env.get('WHATSAPP_API_KEY')
+
+  if (!webhookUrl) {
+    return {
+      configured: false as const,
+      connected: false,
+      smartphone_connected: null as boolean | null,
+      message: 'WHATSAPP_WEBHOOK_URL não configurada.',
+      detail: null as string | null,
+      checked_at: new Date().toISOString(),
+    }
+  }
+
+  const match = webhookUrl.match(/\/instances\/([^/]+)\/token\/([^/]+)/i)
+  if (!match) {
+    return {
+      configured: false as const,
+      connected: false,
+      smartphone_connected: null as boolean | null,
+      message: 'URL Z-API inválida (esperado .../instances/{id}/token/{token}/...).',
+      detail: null as string | null,
+      checked_at: new Date().toISOString(),
+    }
+  }
+
+  const [, instanceId, instanceToken] = match
+  const statusUrl = `https://api.z-api.io/instances/${instanceId}/token/${instanceToken}/status`
+
+  try {
+    const response = await fetch(statusUrl, {
+      method: 'GET',
+      headers: {
+        ...(apiKey
+          ? {
+              'Client-Token': apiKey,
+              Authorization: `Bearer ${apiKey}`,
+            }
+          : {}),
+      },
+    })
+
+    if (!response.ok) {
+      const text = (await response.text()).slice(0, 200)
+      return {
+        configured: true as const,
+        connected: false,
+        smartphone_connected: null as boolean | null,
+        message: `Falha ao consultar Z-API (HTTP ${response.status}).`,
+        detail: text || null,
+        checked_at: new Date().toISOString(),
+      }
+    }
+
+    const data = (await response.json()) as {
+      connected?: boolean
+      smartphoneConnected?: boolean
+      error?: string
+    }
+
+    const connected = Boolean(data.connected)
+    return {
+      configured: true as const,
+      connected,
+      smartphone_connected:
+        typeof data.smartphoneConnected === 'boolean' ? data.smartphoneConnected : null,
+      message: connected
+        ? 'Instância Z-API conectada ao WhatsApp.'
+        : 'Instância Z-API desconectada.',
+      detail: typeof data.error === 'string' ? data.error : null,
+      checked_at: new Date().toISOString(),
+    }
+  } catch (error) {
+    console.error('fetchZApiStatus', error)
+    return {
+      configured: true as const,
+      connected: false,
+      smartphone_connected: null as boolean | null,
+      message: 'Erro ao consultar status da Z-API.',
+      detail: String(error),
+      checked_at: new Date().toISOString(),
+    }
+  }
+}
+
 export function collectAdminAlertPhones(settings: {
   alert_whatsapp_1?: string | null
   alert_whatsapp_2?: string | null

@@ -45,6 +45,14 @@ export type ManagementDashboard = {
     tables: Array<{ schema: string; name: string; bytes: number }>
     flow_today: Record<string, number>
   }
+  zapi: {
+    configured: boolean
+    connected: boolean
+    smartphone_connected: boolean | null
+    message: string
+    detail: string | null
+    checked_at: string
+  }
   resend: {
     configured: boolean
     message?: string

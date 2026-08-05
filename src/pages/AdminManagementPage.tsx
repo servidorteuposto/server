@@ -338,6 +338,51 @@ export default function AdminManagementPage() {
           </section>
 
           <section className="admin-mgmt-section">
+            <h2>WhatsApp (Z-API)</h2>
+            <div
+              className={`admin-mgmt-zapi${
+                !dashboard.zapi.configured
+                  ? ''
+                  : dashboard.zapi.connected
+                    ? ' admin-mgmt-zapi--ok'
+                    : ' admin-mgmt-zapi--down'
+              }`}
+            >
+              <div>
+                <span className="admin-mgmt-stat__label">Status</span>
+                <strong>
+                  {!dashboard.zapi.configured
+                    ? 'Não configurada'
+                    : dashboard.zapi.connected
+                      ? 'Conectada'
+                      : 'Desconectada'}
+                </strong>
+              </div>
+              <div>
+                <span className="admin-mgmt-stat__label">Celular</span>
+                <strong>
+                  {dashboard.zapi.smartphone_connected == null
+                    ? '—'
+                    : dashboard.zapi.smartphone_connected
+                      ? 'Online'
+                      : 'Offline'}
+                </strong>
+              </div>
+              <div className="admin-mgmt-zapi__msg">
+                <span className="admin-mgmt-stat__label">Detalhe</span>
+                <p>{dashboard.zapi.message}</p>
+                {dashboard.zapi.detail && (
+                  <p className="admin-mgmt-muted">{dashboard.zapi.detail}</p>
+                )}
+              </div>
+            </div>
+            <p className="admin-mgmt-hint">
+              Atualiza junto com o painel a cada 45s. Sem conexão, avisos WhatsApp (conta bloqueada,
+              lembretes e alertas do Gerenciamento) não saem.
+            </p>
+          </section>
+
+          <section className="admin-mgmt-section">
             <h2>Supabase</h2>
             <p className="admin-mgmt-hint">
               Fluxo de hoje ({dashboard.supabase.today}) · cotas editáveis abaixo
