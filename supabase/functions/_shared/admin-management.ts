@@ -159,6 +159,13 @@ export async function sendWhatsApp(phone: string, message: string) {
   return true
 }
 
+/** ~6 msgs/min — evita rajada na Z-API (mesma regra dos lembretes operacionais). */
+const ADMIN_WHATSAPP_DELAY_MS = 10_000
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 /** Extrai instanceId/token do WHATSAPP_WEBHOOK_URL e consulta /status + /me na Z-API. */
 export function parseZApiDueMs(due: unknown): number | null {
   const n = typeof due === 'number' ? due : Number(due)
@@ -791,7 +798,9 @@ export async function collectAttentionReasons(admin: ManagementAlertClient): Pro
   }
 }
 
-/** Envia WhatsApp (se aplicável) + e-mail ao admin, com dedupe diário via last_alerts. */
+/** Envia WhatsApp (se aplicável) + e-mail ao admin, com dedupe diário via last_alerts.
+ *  Exceção: Z-API desconectada — se reconectar e cair de novo no mesmo dia, avisa outra vez.
+ */
 export async function processManagementAlerts(admin: ManagementAlertClient) {
   const attention = await collectAttentionReasons(admin)
   const phones = collectAdminAlertPhones(attention.settings)
@@ -799,6 +808,8 @@ export async function processManagementAlerts(admin: ManagementAlertClient) {
   const skipped: string[] = []
   const today = saoPauloTodayKey()
   const lastAlerts = { ...attention.settings.last_alerts }
+  let lastAlertsDirty = false
+  let whatsappCalls = 0
   const {
     db_bytes: dbBytes,
     storage_bytes: storageBytes,
@@ -809,6 +820,13 @@ export async function processManagementAlerts(admin: ManagementAlertClient) {
     resend_monthly_used: monthlyUsed,
     zapi,
   } = attention
+
+  // Reconectou: libera o aviso de desconexão para o próximo tombo no mesmo dia.
+  if (zapi.configured && zapi.connected && lastAlerts.zapi_disconnected) {
+    delete lastAlerts.zapi_disconnected
+    lastAlertsDirty = true
+    skipped.push('zapi_disconnected:cleared_on_reconnect')
+  }
 
   async function maybeNotify(
     key: string,
@@ -832,9 +850,13 @@ export async function processManagementAlerts(admin: ManagementAlertClient) {
       if (!phones.length) {
         skipped.push(`${key}:no_phones`)
       } else {
-        const results = await Promise.all(phones.map((p) => sendWhatsApp(p, message)))
-        if (results.some(Boolean)) delivered = true
-        else skipped.push(`${key}:whatsapp_failed`)
+        for (const phone of phones) {
+          if (whatsappCalls > 0) await sleep(ADMIN_WHATSAPP_DELAY_MS)
+          const ok = await sendWhatsApp(phone, message)
+          whatsappCalls += 1
+          if (ok) delivered = true
+        }
+        if (!delivered) skipped.push(`${key}:whatsapp_failed`)
       }
     }
 
@@ -844,6 +866,7 @@ export async function processManagementAlerts(admin: ManagementAlertClient) {
 
     if (delivered) {
       lastAlerts[key] = today
+      lastAlertsDirty = true
       sent.push(key)
     } else {
       skipped.push(`${key}:send_failed`)
@@ -949,7 +972,7 @@ export async function processManagementAlerts(admin: ManagementAlertClient) {
     skipped.push('domain:not_set')
   }
 
-  if (sent.length) {
+  if (sent.length || lastAlertsDirty) {
     await admin
       .from('admin_management_settings')
       .update({ last_alerts: lastAlerts, updated_at: new Date().toISOString() })

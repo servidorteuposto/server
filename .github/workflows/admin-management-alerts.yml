@@ -1,11 +1,13 @@
 # Alertas do admin (cotas, Resend, domínio, Z-API) + flush da fila WhatsApp.
-# Roda sozinho a cada 6 horas — não depende de login nem do botão do painel.
+# Roda a cada hora para detectar queda da Z-API rápido.
+# Cada tipo de alerta (cota, domínio, etc.) só envia 1x por dia.
+# Exceção: Z-API desconectada — se reconectar e cair de novo no mesmo dia, avisa outra vez.
 
 name: Admin management alerts
 
 on:
   schedule:
-    - cron: '15 */6 * * *'
+    - cron: '20 * * * *'
   workflow_dispatch:
 
 jobs:
