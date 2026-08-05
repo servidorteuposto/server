@@ -160,17 +160,28 @@ export async function sendWhatsApp(phone: string, message: string) {
 }
 
 /** Extrai instanceId/token do WHATSAPP_WEBHOOK_URL e consulta /status + /me na Z-API. */
-export function parseZApiDueTimestamp(due: unknown): string | null {
+export function parseZApiDueMs(due: unknown): number | null {
   const n = typeof due === 'number' ? due : Number(due)
   if (!Number.isFinite(n) || n <= 0) return null
   // Partner API às vezes manda ms; /me costuma mandar segundos.
-  const ms = n > 1e12 ? n : n * 1000
+  return n > 1e12 ? n : n * 1000
+}
+
+export function parseZApiDueTimestamp(due: unknown): string | null {
+  const ms = parseZApiDueMs(due)
+  if (ms == null) return null
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Sao_Paulo',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   }).format(new Date(ms))
+}
+
+/** Dias inteiros restantes (igual ao contador da Z-API: 29d 14h → 29). */
+export function daysLeftFromTimestamp(dueMs: number | null | undefined) {
+  if (dueMs == null || !Number.isFinite(dueMs)) return null
+  return Math.floor((dueMs - Date.now()) / 86_400_000)
 }
 
 export async function fetchZApiStatus() {
@@ -246,6 +257,7 @@ export async function fetchZApiStatus() {
     }
 
     let dueOn: string | null = null
+    let dueMs: number | null = null
     let paymentStatus: string | null = null
     let instanceName: string | null = null
 
@@ -256,6 +268,7 @@ export async function fetchZApiStatus() {
         name?: string
         connected?: boolean
       }
+      dueMs = parseZApiDueMs(me.due)
       dueOn = parseZApiDueTimestamp(me.due)
       paymentStatus = typeof me.paymentStatus === 'string' ? me.paymentStatus : null
       instanceName = typeof me.name === 'string' ? me.name : null
@@ -272,7 +285,8 @@ export async function fetchZApiStatus() {
       detail = text || detail
     }
 
-    const daysLeft = daysUntilDate(dueOn)
+    // Usa tempo real (floor), não diferença de calendário — alinha com "29d 14h" da Z-API.
+    const daysLeft = daysLeftFromTimestamp(dueMs)
 
     return {
       configured: true as const,
