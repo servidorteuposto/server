@@ -3,7 +3,8 @@ import { supabase } from './supabase'
 export type ManagementQuotas = {
   db_bytes: number
   storage_bytes: number
-  vercel_bandwidth_bytes: number
+  resend_daily: number
+  resend_monthly: number
 }
 
 export type ManagementSettings = {
@@ -24,6 +25,13 @@ export type UsageBar = {
   quota_label: string
 }
 
+export type ResendQuotaBar = {
+  used: number | null
+  quota: number
+  percent: number | null
+  near_limit: boolean
+}
+
 export type ManagementDashboard = {
   generated_at: string
   settings: ManagementSettings
@@ -37,17 +45,20 @@ export type ManagementDashboard = {
     tables: Array<{ schema: string; name: string; bytes: number }>
     flow_today: Record<string, number>
   }
-  vercel: {
+  resend: {
     configured: boolean
     message?: string
-    project?: { id?: unknown; name?: unknown; framework?: unknown; updatedAt?: unknown } | null
-    bandwidth_bytes: number | null
-    bandwidth_percent: number | null
-    bandwidth_near_limit: boolean
-    bandwidth_quota_bytes: number
-    bandwidth_used_label: string | null
-    bandwidth_quota_label: string
-    usage_error?: string | null
+    domains: Array<{ name: string; status: string }>
+    recent: Array<{
+      id: string
+      to: string
+      subject: string
+      created_at: string
+      last_event: string
+    }>
+    emails_today: number
+    daily: ResendQuotaBar
+    monthly: ResendQuotaBar
   }
   access: {
     security_alerts_today: number
@@ -152,7 +163,12 @@ export async function saveManagementSettings(input: {
   alert_whatsapp_1: string
   alert_whatsapp_2: string
   domain_expires_on: string
-  quotas_gb: { db_gb: number; storage_gb: number; vercel_bandwidth_gb: number }
+  quotas_gb: {
+    db_gb: number
+    storage_gb: number
+    resend_daily: number
+    resend_monthly: number
+  }
 }) {
   const { payload, invokeFailed } = await invokeManagement<{
     ok: boolean

@@ -7,7 +7,10 @@ export const WARN_REMAINING_RATIO = 0.1 // alerta quando resta ≤ 10%
 export type ManagementQuotas = {
   db_bytes: number
   storage_bytes: number
-  vercel_bandwidth_bytes: number
+  /** Cota diária Resend (free ≈ 100) */
+  resend_daily: number
+  /** Cota mensal Resend (free ≈ 3000) */
+  resend_monthly: number
 }
 
 export type ManagementSettings = {
@@ -22,9 +25,10 @@ export type ManagementSettings = {
 }
 
 export const DEFAULT_QUOTAS: ManagementQuotas = {
-  db_bytes: 8 * 1024 ** 3,
-  storage_bytes: 100 * 1024 ** 3,
-  vercel_bandwidth_bytes: 100 * 1024 ** 3,
+  db_bytes: 512 * 1024 ** 2, // 0.5 GB free
+  storage_bytes: 1 * 1024 ** 3, // 1 GB free
+  resend_daily: 100,
+  resend_monthly: 3000,
 }
 
 export function onlyDigits(value: string) {
@@ -55,10 +59,10 @@ export function normalizeQuotas(raw: unknown): ManagementQuotas {
     db_bytes: Number(obj.db_bytes) > 0 ? Number(obj.db_bytes) : DEFAULT_QUOTAS.db_bytes,
     storage_bytes:
       Number(obj.storage_bytes) > 0 ? Number(obj.storage_bytes) : DEFAULT_QUOTAS.storage_bytes,
-    vercel_bandwidth_bytes:
-      Number(obj.vercel_bandwidth_bytes) > 0
-        ? Number(obj.vercel_bandwidth_bytes)
-        : DEFAULT_QUOTAS.vercel_bandwidth_bytes,
+    resend_daily:
+      Number(obj.resend_daily) > 0 ? Number(obj.resend_daily) : DEFAULT_QUOTAS.resend_daily,
+    resend_monthly:
+      Number(obj.resend_monthly) > 0 ? Number(obj.resend_monthly) : DEFAULT_QUOTAS.resend_monthly,
   }
 }
 
@@ -171,18 +175,20 @@ export function alertAlreadySentToday(
 }
 
 export function resourceAlertMessage(
-  kind: 'supabase_db' | 'supabase_storage' | 'vercel_bandwidth',
+  kind: 'supabase_db' | 'supabase_storage' | 'resend_daily' | 'resend_monthly',
   used: number,
   quota: number,
   seed: string,
 ) {
   const pct = usagePercent(used, quota)
-  const usedLabel = formatBytes(used)
-  const quotaLabel = formatBytes(quota)
+  const isEmail = kind === 'resend_daily' || kind === 'resend_monthly'
+  const usedLabel = isEmail ? `${used} e-mails` : formatBytes(used)
+  const quotaLabel = isEmail ? `${quota} e-mails` : formatBytes(quota)
   const labels = {
     supabase_db: 'Banco de dados (Supabase)',
     supabase_storage: 'Storage / buckets (Supabase)',
-    vercel_bandwidth: 'Bandwidth (Vercel)',
+    resend_daily: 'Cota diária de e-mail (Resend)',
+    resend_monthly: 'Cota mensal de e-mail (Resend)',
   } as const
   const label = labels[kind]
 
@@ -234,109 +240,109 @@ export function domainAlertMessage(daysLeft: number, expiresOn: string, seed: st
   return variants[pickVariantIndex(seed, variants.length)]
 }
 
-export async function fetchVercelUsage() {
-  const token = Deno.env.get('VERCEL_TOKEN')
-  const projectId = Deno.env.get('VERCEL_PROJECT_ID')
-  const teamId = Deno.env.get('VERCEL_TEAM_ID')
-
-  if (!token) {
+export async function fetchResendStats() {
+  const apiKey = Deno.env.get('RESEND_API_KEY')
+  if (!apiKey) {
     return {
       configured: false as const,
-      message: 'Configure o secret VERCEL_TOKEN para ver limites da Vercel.',
+      message: 'Configure o secret RESEND_API_KEY para monitorar e-mails.',
+      daily_used: null as number | null,
+      monthly_used: null as number | null,
+      recent: [] as Array<{ id: string; to: string; subject: string; created_at: string; last_event: string }>,
+      domains: [] as Array<{ name: string; status: string }>,
+      emails_today: 0,
     }
   }
-
-  const qs = new URLSearchParams()
-  if (teamId) qs.set('teamId', teamId)
 
   try {
-    const projectUrl = projectId
-      ? `https://api.vercel.com/v9/projects/${projectId}?${qs}`
-      : null
+    const headers = { Authorization: `Bearer ${apiKey}` }
+    const [emailsRes, domainsRes] = await Promise.all([
+      fetch('https://api.resend.com/emails?limit=100', { headers }),
+      fetch('https://api.resend.com/domains', { headers }),
+    ])
 
-    const projectRes = projectUrl
-      ? await fetch(projectUrl, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-      : null
+    const dailyHeader = emailsRes.headers.get('x-resend-daily-quota')
+    const monthlyHeader = emailsRes.headers.get('x-resend-monthly-quota')
+    const dailyUsed = dailyHeader != null && dailyHeader !== '' ? Number(dailyHeader) : null
+    const monthlyUsed =
+      monthlyHeader != null && monthlyHeader !== '' ? Number(monthlyHeader) : null
 
-    let project: Record<string, unknown> | null = null
-    if (projectRes?.ok) {
-      project = (await projectRes.json()) as Record<string, unknown>
+    let recent: Array<{
+      id: string
+      to: string
+      subject: string
+      created_at: string
+      last_event: string
+    }> = []
+    let emailsToday = 0
+    const today = saoPauloTodayKey()
+
+    if (emailsRes.ok) {
+      const payload = (await emailsRes.json()) as {
+        data?: Array<{
+          id?: string
+          to?: string[] | string
+          subject?: string
+          created_at?: string
+          last_event?: string
+        }>
+      }
+      recent = (payload.data ?? []).slice(0, 8).map((row) => {
+        const toRaw = Array.isArray(row.to) ? row.to.join(', ') : String(row.to ?? '—')
+        return {
+          id: String(row.id ?? ''),
+          to: toRaw,
+          subject: String(row.subject ?? '(sem assunto)'),
+          created_at: String(row.created_at ?? ''),
+          last_event: String(row.last_event ?? '—'),
+        }
+      })
+      for (const row of payload.data ?? []) {
+        const created = String(row.created_at ?? '')
+        if (!created) continue
+        const key = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Sao_Paulo',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(new Date(created))
+        if (key === today) emailsToday += 1
+      }
     }
 
-    // Usage endpoint (billing period) — best effort
-    const now = Date.now()
-    const from = now - 30 * 24 * 60 * 60 * 1000
-    const usageQs = new URLSearchParams({
-      from: String(from),
-      to: String(now),
-    })
-    if (teamId) usageQs.set('teamId', teamId)
-
-    const usageRes = await fetch(`https://api.vercel.com/v4/usage?${usageQs}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-
-    let usage: unknown = null
-    let usageError: string | null = null
-    if (usageRes.ok) {
-      usage = await usageRes.json()
-    } else {
-      usageError = `HTTP ${usageRes.status}: ${(await usageRes.text()).slice(0, 200)}`
+    let domains: Array<{ name: string; status: string }> = []
+    if (domainsRes.ok) {
+      const payload = (await domainsRes.json()) as {
+        data?: Array<{ name?: string; status?: string }>
+      }
+      domains = (payload.data ?? []).map((d) => ({
+        name: String(d.name ?? '—'),
+        status: String(d.status ?? 'unknown'),
+      }))
     }
 
+    const ok = emailsRes.ok
     return {
       configured: true as const,
-      project: project
-        ? {
-            id: project.id,
-            name: project.name,
-            framework: project.framework,
-            updatedAt: project.updatedAt,
-          }
-        : null,
-      usage,
-      usage_error: usageError,
-      message: (() => {
-        if (project && !usageError) return 'Projeto Vercel conectado e usage disponível.'
-        if (project && usageError) {
-          return 'Projeto conectado. Bandwidth/usage não é exposto pela API no plano Hobby — acompanhe no painel da Vercel (Usage).'
-        }
-        if (!projectId) return 'Falta o secret VERCEL_PROJECT_ID.'
-        if (!project) return 'Token ok, mas não foi possível ler o projeto (confira PROJECT_ID / TEAM_ID).'
-        return 'Dados da Vercel carregados.'
-      })(),
+      message: ok
+        ? 'Resend conectado.'
+        : `Falha ao listar e-mails (HTTP ${emailsRes.status}).`,
+      daily_used: Number.isFinite(dailyUsed as number) ? dailyUsed : null,
+      monthly_used: Number.isFinite(monthlyUsed as number) ? monthlyUsed : null,
+      recent,
+      domains,
+      emails_today: emailsToday,
     }
   } catch (error) {
-    console.error('fetchVercelUsage', error)
+    console.error('fetchResendStats', error)
     return {
       configured: true as const,
-      project: null,
-      usage: null,
-      usage_error: String(error),
-      message: 'Falha ao consultar a API da Vercel.',
+      message: 'Falha ao consultar a API do Resend.',
+      daily_used: null as number | null,
+      monthly_used: null as number | null,
+      recent: [],
+      domains: [],
+      emails_today: 0,
     }
   }
-}
-
-export function extractVercelBandwidthBytes(usage: unknown): number | null {
-  if (!usage || typeof usage !== 'object') return null
-  const root = usage as Record<string, unknown>
-  // Formatos variam; tenta campos comuns
-  const candidates = [
-    root.bandwidth,
-    root.totalBandwidth,
-    (root.summary as Record<string, unknown> | undefined)?.bandwidth,
-    (root.metrics as Record<string, unknown> | undefined)?.bandwidth,
-  ]
-  for (const c of candidates) {
-    if (typeof c === 'number' && Number.isFinite(c)) return c
-    if (c && typeof c === 'object') {
-      const obj = c as Record<string, unknown>
-      if (typeof obj.value === 'number') return obj.value
-      if (typeof obj.total === 'number') return obj.total
-    }
-  }
-  return null
 }

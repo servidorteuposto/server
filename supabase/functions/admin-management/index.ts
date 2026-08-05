@@ -6,8 +6,7 @@ import {
   collectAdminAlertPhones,
   daysUntilDate,
   domainAlertMessage,
-  extractVercelBandwidthBytes,
-  fetchVercelUsage,
+  fetchResendStats,
   formatBytes,
   isAdminAccount,
   isNearLimit,
@@ -140,21 +139,31 @@ async function runAlertCheck(admin: ReturnType<typeof createClient>) {
     ),
   )
 
-  const vercel = await fetchVercelUsage()
-  const bandwidth = extractVercelBandwidthBytes(vercel.configured ? vercel.usage : null)
-  if (bandwidth != null) {
+  const resend = await fetchResendStats()
+  const dailyUsed = resend.daily_used ?? resend.emails_today
+  const monthlyUsed = resend.monthly_used
+  if (dailyUsed != null) {
     await maybeSend(
-      'vercel_bandwidth',
-      isNearLimit(bandwidth, quotas.vercel_bandwidth_bytes),
+      'resend_daily',
+      isNearLimit(dailyUsed, quotas.resend_daily),
+      resourceAlertMessage('resend_daily', dailyUsed, quotas.resend_daily, `${today}:resend:d`),
+    )
+  } else {
+    skipped.push('resend_daily:no_data')
+  }
+  if (monthlyUsed != null) {
+    await maybeSend(
+      'resend_monthly',
+      isNearLimit(monthlyUsed, quotas.resend_monthly),
       resourceAlertMessage(
-        'vercel_bandwidth',
-        bandwidth,
-        quotas.vercel_bandwidth_bytes,
-        `${today}:vercel:${bandwidth}`,
+        'resend_monthly',
+        monthlyUsed,
+        quotas.resend_monthly,
+        `${today}:resend:m`,
       ),
     )
   } else {
-    skipped.push('vercel_bandwidth:no_data')
+    skipped.push('resend_monthly:no_data')
   }
 
   const daysLeft = daysUntilDate(settings.domain_expires_on)
@@ -235,7 +244,7 @@ Deno.serve(async (req) => {
     if (action === 'get_dashboard') {
       const settings = await loadSettings(admin)
 
-      const [{ data: metrics, error: metricsError }, { data: postos, error: postosError }, vercel] =
+      const [{ data: metrics, error: metricsError }, { data: postos, error: postosError }, resend] =
         await Promise.all([
           admin.rpc('admin_management_metrics'),
           admin
@@ -244,7 +253,7 @@ Deno.serve(async (req) => {
               'id, nome, cnpj, email, telefone, subscription_status, subscription_ends_at, created_at',
             )
             .order('created_at', { ascending: false }),
-          fetchVercelUsage(),
+          fetchResendStats(),
         ])
 
       if (metricsError) {
@@ -261,7 +270,8 @@ Deno.serve(async (req) => {
       const quotas = settings.quotas
       const dbBytes = Number(metrics?.db_bytes ?? 0)
       const storageBytes = Number(metrics?.storage_bytes ?? 0)
-      const bandwidth = extractVercelBandwidthBytes(vercel.configured ? vercel.usage : null)
+      const dailyUsed = resend.daily_used ?? resend.emails_today
+      const monthlyUsed = resend.monthly_used
 
       const supabasePanel = {
         today: metrics?.today ?? saoPauloTodayKey(),
@@ -305,16 +315,26 @@ Deno.serve(async (req) => {
           inactive: inactive.length,
         },
         supabase: supabasePanel,
-        vercel: {
-          ...vercel,
-          bandwidth_bytes: bandwidth,
-          bandwidth_percent:
-            bandwidth != null ? usagePercent(bandwidth, quotas.vercel_bandwidth_bytes) : null,
-          bandwidth_near_limit:
-            bandwidth != null ? isNearLimit(bandwidth, quotas.vercel_bandwidth_bytes) : false,
-          bandwidth_quota_bytes: quotas.vercel_bandwidth_bytes,
-          bandwidth_used_label: bandwidth != null ? formatBytes(bandwidth) : null,
-          bandwidth_quota_label: formatBytes(quotas.vercel_bandwidth_bytes),
+        resend: {
+          configured: resend.configured,
+          message: resend.message,
+          domains: resend.domains,
+          recent: resend.recent,
+          emails_today: resend.emails_today,
+          daily: {
+            used: dailyUsed,
+            quota: quotas.resend_daily,
+            percent: dailyUsed != null ? usagePercent(dailyUsed, quotas.resend_daily) : null,
+            near_limit: dailyUsed != null ? isNearLimit(dailyUsed, quotas.resend_daily) : false,
+          },
+          monthly: {
+            used: monthlyUsed,
+            quota: quotas.resend_monthly,
+            percent:
+              monthlyUsed != null ? usagePercent(monthlyUsed, quotas.resend_monthly) : null,
+            near_limit:
+              monthlyUsed != null ? isNearLimit(monthlyUsed, quotas.resend_monthly) : false,
+          },
         },
         access: {
           security_alerts_today: Number(metrics?.flow_today?.security_alerts ?? 0),
@@ -398,15 +418,16 @@ Deno.serve(async (req) => {
         ...(body?.quotas && typeof body.quotas === 'object' ? body.quotas : {}),
       })
 
-      // Aceita quotas em GB se enviadas pela UI
+      // Aceita quotas em GB / e-mails se enviadas pela UI
       if (body?.quotas_gb && typeof body.quotas_gb === 'object') {
         const g = body.quotas_gb as Record<string, unknown>
         if (Number(g.db_gb) > 0) quotas.db_bytes = Math.round(Number(g.db_gb) * 1024 ** 3)
         if (Number(g.storage_gb) > 0) {
           quotas.storage_bytes = Math.round(Number(g.storage_gb) * 1024 ** 3)
         }
-        if (Number(g.vercel_bandwidth_gb) > 0) {
-          quotas.vercel_bandwidth_bytes = Math.round(Number(g.vercel_bandwidth_gb) * 1024 ** 3)
+        if (Number(g.resend_daily) > 0) quotas.resend_daily = Math.round(Number(g.resend_daily))
+        if (Number(g.resend_monthly) > 0) {
+          quotas.resend_monthly = Math.round(Number(g.resend_monthly))
         }
       }
 

@@ -4,8 +4,7 @@ import {
   collectAdminAlertPhones,
   daysUntilDate,
   domainAlertMessage,
-  extractVercelBandwidthBytes,
-  fetchVercelUsage,
+  fetchResendStats,
   isNearLimit,
   normalizeQuotas,
   resourceAlertMessage,
@@ -117,21 +116,36 @@ Deno.serve(async (req) => {
       ),
     )
 
-    const vercel = await fetchVercelUsage()
-    const bandwidth = extractVercelBandwidthBytes(vercel.configured ? vercel.usage : null)
-    if (bandwidth != null) {
+    const resend = await fetchResendStats()
+    const dailyUsed = resend.daily_used ?? resend.emails_today
+    const monthlyUsed = resend.monthly_used
+    if (dailyUsed != null) {
       await maybeSend(
-        'vercel_bandwidth',
-        isNearLimit(bandwidth, settings.quotas.vercel_bandwidth_bytes),
+        'resend_daily',
+        isNearLimit(dailyUsed, settings.quotas.resend_daily),
         resourceAlertMessage(
-          'vercel_bandwidth',
-          bandwidth,
-          settings.quotas.vercel_bandwidth_bytes,
-          `${today}:cron:vercel`,
+          'resend_daily',
+          dailyUsed,
+          settings.quotas.resend_daily,
+          `${today}:cron:resend:d`,
         ),
       )
     } else {
-      skipped.push('vercel_bandwidth:no_data')
+      skipped.push('resend_daily:no_data')
+    }
+    if (monthlyUsed != null) {
+      await maybeSend(
+        'resend_monthly',
+        isNearLimit(monthlyUsed, settings.quotas.resend_monthly),
+        resourceAlertMessage(
+          'resend_monthly',
+          monthlyUsed,
+          settings.quotas.resend_monthly,
+          `${today}:cron:resend:m`,
+        ),
+      )
+    } else {
+      skipped.push('resend_monthly:no_data')
     }
 
     const daysLeft = daysUntilDate(settings.domain_expires_on)
@@ -170,7 +184,8 @@ Deno.serve(async (req) => {
       phones: phones.length,
       db_bytes: dbBytes,
       storage_bytes: storageBytes,
-      vercel_bandwidth_bytes: bandwidth,
+      resend_daily_used: dailyUsed,
+      resend_monthly_used: monthlyUsed,
       domain_days_left: daysLeft,
     })
   } catch (error) {

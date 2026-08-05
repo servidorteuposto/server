@@ -61,9 +61,10 @@ export default function AdminManagementPage() {
   const [whatsapp1, setWhatsapp1] = useState('')
   const [whatsapp2, setWhatsapp2] = useState('')
   const [domainExpires, setDomainExpires] = useState('')
-  const [dbGb, setDbGb] = useState('8')
-  const [storageGb, setStorageGb] = useState('100')
-  const [vercelGb, setVercelGb] = useState('100')
+  const [dbGb, setDbGb] = useState('0.5')
+  const [storageGb, setStorageGb] = useState('1')
+  const [resendDaily, setResendDaily] = useState('100')
+  const [resendMonthly, setResendMonthly] = useState('3000')
 
   const [modalFilter, setModalFilter] = useState<PostoFilter | null>(null)
   const [modalRows, setModalRows] = useState<ManagementPosto[]>([])
@@ -75,7 +76,8 @@ export default function AdminManagementPage() {
     setDomainExpires(data.settings.domain_expires_on ?? '')
     setDbGb(String(bytesToGb(data.settings.quotas.db_bytes)))
     setStorageGb(String(bytesToGb(data.settings.quotas.storage_bytes)))
-    setVercelGb(String(bytesToGb(data.settings.quotas.vercel_bandwidth_bytes)))
+    setResendDaily(String(data.settings.quotas.resend_daily ?? 100))
+    setResendMonthly(String(data.settings.quotas.resend_monthly ?? 3000))
   }, [])
 
   const load = useCallback(async () => {
@@ -110,9 +112,10 @@ export default function AdminManagementPage() {
         alert_whatsapp_2: whatsapp2,
         domain_expires_on: domainExpires,
         quotas_gb: {
-          db_gb: Number(dbGb) || 8,
-          storage_gb: Number(storageGb) || 100,
-          vercel_bandwidth_gb: Number(vercelGb) || 100,
+          db_gb: Number(dbGb) || 0.5,
+          storage_gb: Number(storageGb) || 1,
+          resend_daily: Number(resendDaily) || 100,
+          resend_monthly: Number(resendMonthly) || 3000,
         },
       })
       setSuccess('Configurações salvas.')
@@ -291,35 +294,73 @@ export default function AdminManagementPage() {
           </section>
 
           <section className="admin-mgmt-section">
-            <h2>Vercel e acessos</h2>
+            <h2>E-mail (Resend) e acessos</h2>
             <div className="admin-mgmt-grid">
               <div className="admin-mgmt-panel">
-                <h3>Hospedagem Vercel</h3>
-                <p className="admin-mgmt-muted">{dashboard.vercel.message}</p>
-                {dashboard.vercel.configured && dashboard.vercel.project && (
-                  <p>
-                    Projeto:{' '}
-                    <strong>{String(dashboard.vercel.project.name ?? '—')}</strong>
-                  </p>
-                )}
-                {dashboard.vercel.bandwidth_bytes != null ? (
-                  <UsageMeter
-                    label="Bandwidth (estimado)"
-                    percent={dashboard.vercel.bandwidth_percent ?? 0}
-                    usedLabel={dashboard.vercel.bandwidth_used_label ?? '—'}
-                    quotaLabel={dashboard.vercel.bandwidth_quota_label}
-                    nearLimit={dashboard.vercel.bandwidth_near_limit}
-                  />
-                ) : dashboard.vercel.configured && dashboard.vercel.project ? (
+                <h3>Resend</h3>
+                <p className="admin-mgmt-muted">{dashboard.resend.message}</p>
+                {!dashboard.resend.configured ? (
                   <p className="admin-mgmt-muted">
-                    Sem medidor automático de bandwidth no Hobby. Limite típico: 100 GB/mês — veja em
-                    Vercel → projeto → Usage. A cota abaixo só serve se um dia a API liberar o número.
+                    O secret RESEND_API_KEY já usado nos e-mails do app também alimenta este painel.
                   </p>
                 ) : (
-                  <p className="admin-mgmt-muted">
-                    Configure VERCEL_TOKEN e VERCEL_PROJECT_ID (e TEAM_ID se tiver) nos secrets do
-                    Supabase.
-                  </p>
+                  <>
+                    {dashboard.resend.daily.used != null && (
+                      <UsageMeter
+                        label="Cota diária de e-mails"
+                        percent={dashboard.resend.daily.percent ?? 0}
+                        usedLabel={`${dashboard.resend.daily.used} e-mails`}
+                        quotaLabel={`${dashboard.resend.daily.quota}/dia`}
+                        nearLimit={dashboard.resend.daily.near_limit}
+                      />
+                    )}
+                    {dashboard.resend.monthly.used != null && (
+                      <UsageMeter
+                        label="Cota mensal de e-mails"
+                        percent={dashboard.resend.monthly.percent ?? 0}
+                        usedLabel={`${dashboard.resend.monthly.used} e-mails`}
+                        quotaLabel={`${dashboard.resend.monthly.quota}/mês`}
+                        nearLimit={dashboard.resend.monthly.near_limit}
+                      />
+                    )}
+                    <ul className="admin-mgmt-list">
+                      <li>
+                        <span>E-mails na lista de hoje (amostra)</span>
+                        <strong>{dashboard.resend.emails_today}</strong>
+                      </li>
+                    </ul>
+                    {dashboard.resend.domains.length > 0 && (
+                      <>
+                        <h3 style={{ marginTop: '1rem' }}>Domínios</h3>
+                        <ul className="admin-mgmt-list">
+                          {dashboard.resend.domains.map((d) => (
+                            <li key={d.name}>
+                              <span>{d.name}</span>
+                              <strong>{d.status}</strong>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                    {dashboard.resend.recent.length > 0 && (
+                      <>
+                        <h3 style={{ marginTop: '1rem' }}>Últimos envios</h3>
+                        <ul className="admin-mgmt-list">
+                          {dashboard.resend.recent.map((mail) => (
+                            <li key={mail.id}>
+                              <span>
+                                {mail.subject}
+                                <br />
+                                <small className="admin-mgmt-muted">
+                                  {mail.to} · {mail.last_event}
+                                </small>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                  </>
                 )}
               </div>
               <div className="admin-mgmt-panel">
@@ -434,13 +475,23 @@ export default function AdminManagementPage() {
                   />
                 </label>
                 <label>
-                  Cota Bandwidth Vercel (GB)
+                  Cota Resend / dia
                   <input
                     type="number"
-                    min={0.1}
-                    step={0.1}
-                    value={vercelGb}
-                    onChange={(e) => setVercelGb(e.target.value)}
+                    min={1}
+                    step={1}
+                    value={resendDaily}
+                    onChange={(e) => setResendDaily(e.target.value)}
+                  />
+                </label>
+                <label>
+                  Cota Resend / mês
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={resendMonthly}
+                    onChange={(e) => setResendMonthly(e.target.value)}
                   />
                 </label>
               </div>
