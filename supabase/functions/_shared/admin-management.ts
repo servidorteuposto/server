@@ -39,7 +39,6 @@ export function isAdminAccount(user: {
   email?: string | null
   app_metadata?: Record<string, unknown> | null
 }) {
-  if (user.app_metadata?.role === 'admin') return true
   return String(user.email ?? '')
     .trim()
     .toLowerCase() === ADMIN_EMAIL

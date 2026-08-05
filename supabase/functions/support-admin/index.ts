@@ -24,7 +24,6 @@ function isAdminAccount(user: {
   email?: string | null
   app_metadata?: Record<string, unknown> | null
 }) {
-  if (user.app_metadata?.role === 'admin') return true
   return String(user.email ?? '')
     .trim()
     .toLowerCase() === ADMIN_EMAIL
@@ -102,22 +101,23 @@ Deno.serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     })
 
-    let jwtRole: string | null = null
+    let jwtEmail: string | null = null
     let jwtSub: string | null = null
     try {
       const payloadPart = accessToken.split('.')[1]
       if (payloadPart) {
         const json = JSON.parse(atob(payloadPart.replace(/-/g, '+').replace(/_/g, '/')))
-        jwtRole = String(json?.app_metadata?.role ?? json?.role ?? '') || null
+        jwtEmail =
+          typeof json?.email === 'string' ? String(json.email).trim().toLowerCase() : null
         jwtSub = typeof json?.sub === 'string' ? json.sub : null
       }
     } catch {
-      jwtRole = null
+      jwtEmail = null
       jwtSub = null
     }
 
     const isAdmin =
-      (!userError && user && isAdminAccount(user)) || jwtRole === 'admin'
+      (!userError && user && isAdminAccount(user)) || jwtEmail === ADMIN_EMAIL
 
     if (!isAdmin) {
       return jsonResponse({ ok: false, message: 'Acesso restrito ao administrador.' }, 403)
