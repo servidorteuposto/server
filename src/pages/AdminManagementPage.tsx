@@ -325,7 +325,7 @@ export default function AdminManagementPage() {
                     <strong>{dashboard.access.active_postos}</strong>
                   </li>
                   <li>
-                    <span>Alertas de segurança hoje</span>
+                    <span>Alertas conta bloqueada hoje</span>
                     <strong>{dashboard.access.security_alerts_today}</strong>
                   </li>
                   <li>
@@ -341,8 +341,12 @@ export default function AdminManagementPage() {
                     <strong>{dashboard.access.mp_payments_today}</strong>
                   </li>
                   <li>
-                    <span>Avisos WhatsApp hoje</span>
+                    <span>Lembretes operacionais WhatsApp</span>
                     <strong>{dashboard.access.whatsapp_reminders_today}</strong>
+                  </li>
+                  <li>
+                    <span>Total WhatsApp hoje</span>
+                    <strong>{dashboard.access.whatsapp_sends_today}</strong>
                   </li>
                 </ul>
               </div>

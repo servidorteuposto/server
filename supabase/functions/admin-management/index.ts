@@ -322,6 +322,16 @@ Deno.serve(async (req) => {
           support_tickets_today: Number(metrics?.flow_today?.support_tickets ?? 0),
           mp_payments_today: Number(metrics?.flow_today?.mp_payments ?? 0),
           whatsapp_reminders_today: Number(metrics?.flow_today?.whatsapp_reminder_sends ?? 0),
+          whatsapp_account_locked_today: Number(
+            metrics?.flow_today?.whatsapp_account_locked ??
+              metrics?.flow_today?.security_alerts ??
+              0,
+          ),
+          whatsapp_sends_today: Number(
+            metrics?.flow_today?.whatsapp_sends_total ??
+              Number(metrics?.flow_today?.whatsapp_reminder_sends ?? 0) +
+                Number(metrics?.flow_today?.security_alerts ?? 0),
+          ),
           active_postos: active.length,
         },
         domain: {

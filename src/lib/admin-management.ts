@@ -55,6 +55,8 @@ export type ManagementDashboard = {
     support_tickets_today: number
     mp_payments_today: number
     whatsapp_reminders_today: number
+    whatsapp_account_locked_today: number
+    whatsapp_sends_today: number
     active_postos: number
   }
   domain: {
@@ -196,7 +198,9 @@ export const FLOW_LABELS: Record<string, string> = {
   nozzle_metrology_verifications: 'Metrologia',
   support_tickets: 'Chamados',
   mp_payments: 'Pagamentos MP',
-  security_alerts: 'Alertas de segurança',
+  security_alerts: 'Conta bloqueada (WhatsApp)',
   registration_attempts: 'Tentativas de cadastro',
-  whatsapp_reminder_sends: 'Avisos WhatsApp',
+  whatsapp_reminder_sends: 'Lembretes operacionais WhatsApp',
+  whatsapp_account_locked: 'Conta bloqueada (WhatsApp)',
+  whatsapp_sends_total: 'Total WhatsApp (dia)',
 }
