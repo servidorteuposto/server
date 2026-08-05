@@ -818,9 +818,6 @@ export default function AdminManagementPage() {
                       <strong>E-mail:</strong> {posto.email || '—'}
                     </p>
                     <p>
-                      <strong>Telefone:</strong> {posto.telefone || '—'}
-                    </p>
-                    <p>
                       <strong>WhatsApps aviso:</strong>{' '}
                       {posto.avisos.length ? posto.avisos.join(', ') : '—'}
                     </p>
