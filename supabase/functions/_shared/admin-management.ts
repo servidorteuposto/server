@@ -151,86 +151,141 @@ export async function sendWhatsApp(phone: string, message: string) {
   return true
 }
 
-/** Extrai instanceId/token do WHATSAPP_WEBHOOK_URL e consulta /status na Z-API. */
+/** Extrai instanceId/token do WHATSAPP_WEBHOOK_URL e consulta /status + /me na Z-API. */
+export function parseZApiDueTimestamp(due: unknown): string | null {
+  const n = typeof due === 'number' ? due : Number(due)
+  if (!Number.isFinite(n) || n <= 0) return null
+  // Partner API às vezes manda ms; /me costuma mandar segundos.
+  const ms = n > 1e12 ? n : n * 1000
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(ms))
+}
+
 export async function fetchZApiStatus() {
+  const empty = {
+    configured: false as const,
+    connected: false,
+    smartphone_connected: null as boolean | null,
+    message: 'WHATSAPP_WEBHOOK_URL não configurada.',
+    detail: null as string | null,
+    checked_at: new Date().toISOString(),
+    due_on: null as string | null,
+    days_left: null as number | null,
+    payment_status: null as string | null,
+    instance_name: null as string | null,
+    warn_7d: false,
+    warn_2d: false,
+    expired: false,
+  }
+
   const webhookUrl = Deno.env.get('WHATSAPP_WEBHOOK_URL')
   const apiKey = Deno.env.get('WHATSAPP_API_KEY')
 
-  if (!webhookUrl) {
-    return {
-      configured: false as const,
-      connected: false,
-      smartphone_connected: null as boolean | null,
-      message: 'WHATSAPP_WEBHOOK_URL não configurada.',
-      detail: null as string | null,
-      checked_at: new Date().toISOString(),
-    }
-  }
+  if (!webhookUrl) return empty
 
   const match = webhookUrl.match(/\/instances\/([^/]+)\/token\/([^/]+)/i)
   if (!match) {
     return {
-      configured: false as const,
-      connected: false,
-      smartphone_connected: null as boolean | null,
+      ...empty,
       message: 'URL Z-API inválida (esperado .../instances/{id}/token/{token}/...).',
-      detail: null as string | null,
-      checked_at: new Date().toISOString(),
     }
   }
 
   const [, instanceId, instanceToken] = match
+  const headers = {
+    ...(apiKey
+      ? {
+          'Client-Token': apiKey,
+          Authorization: `Bearer ${apiKey}`,
+        }
+      : {}),
+  }
   const statusUrl = `https://api.z-api.io/instances/${instanceId}/token/${instanceToken}/status`
+  const meUrl = `https://api.z-api.io/instances/${instanceId}/token/${instanceToken}/me`
 
   try {
-    const response = await fetch(statusUrl, {
-      method: 'GET',
-      headers: {
-        ...(apiKey
-          ? {
-              'Client-Token': apiKey,
-              Authorization: `Bearer ${apiKey}`,
-            }
-          : {}),
-      },
-    })
+    const [statusRes, meRes] = await Promise.all([
+      fetch(statusUrl, { method: 'GET', headers }),
+      fetch(meUrl, { method: 'GET', headers }),
+    ])
 
-    if (!response.ok) {
-      const text = (await response.text()).slice(0, 200)
-      return {
-        configured: true as const,
-        connected: false,
-        smartphone_connected: null as boolean | null,
-        message: `Falha ao consultar Z-API (HTTP ${response.status}).`,
-        detail: text || null,
-        checked_at: new Date().toISOString(),
+    let connected = false
+    let smartphoneConnected: boolean | null = null
+    let detail: string | null = null
+    let message = 'Instância Z-API consultada.'
+
+    if (statusRes.ok) {
+      const data = (await statusRes.json()) as {
+        connected?: boolean
+        smartphoneConnected?: boolean
+        error?: string
       }
+      connected = Boolean(data.connected)
+      smartphoneConnected =
+        typeof data.smartphoneConnected === 'boolean' ? data.smartphoneConnected : null
+      detail = typeof data.error === 'string' ? data.error : null
+      message = connected
+        ? 'Instância Z-API conectada ao WhatsApp.'
+        : 'Instância Z-API desconectada.'
+    } else {
+      const text = (await statusRes.text()).slice(0, 200)
+      message = `Falha ao consultar status Z-API (HTTP ${statusRes.status}).`
+      detail = text || null
     }
 
-    const data = (await response.json()) as {
-      connected?: boolean
-      smartphoneConnected?: boolean
-      error?: string
+    let dueOn: string | null = null
+    let paymentStatus: string | null = null
+    let instanceName: string | null = null
+
+    if (meRes.ok) {
+      const me = (await meRes.json()) as {
+        due?: number
+        paymentStatus?: string
+        name?: string
+        connected?: boolean
+      }
+      dueOn = parseZApiDueTimestamp(me.due)
+      paymentStatus = typeof me.paymentStatus === 'string' ? me.paymentStatus : null
+      instanceName = typeof me.name === 'string' ? me.name : null
+      // Se /status falhou mas /me respondeu, usa connected do /me.
+      if (!statusRes.ok && typeof me.connected === 'boolean') {
+        connected = me.connected
+        message = connected
+          ? 'Instância Z-API conectada ao WhatsApp.'
+          : 'Instância Z-API desconectada.'
+      }
+    } else if (!statusRes.ok) {
+      const text = (await meRes.text()).slice(0, 200)
+      message = `Falha ao consultar Z-API (HTTP ${statusRes.status}/${meRes.status}).`
+      detail = text || detail
     }
 
-    const connected = Boolean(data.connected)
+    const daysLeft = daysUntilDate(dueOn)
+
     return {
       configured: true as const,
       connected,
-      smartphone_connected:
-        typeof data.smartphoneConnected === 'boolean' ? data.smartphoneConnected : null,
-      message: connected
-        ? 'Instância Z-API conectada ao WhatsApp.'
-        : 'Instância Z-API desconectada.',
-      detail: typeof data.error === 'string' ? data.error : null,
+      smartphone_connected: smartphoneConnected,
+      message,
+      detail,
       checked_at: new Date().toISOString(),
+      due_on: dueOn,
+      days_left: daysLeft,
+      payment_status: paymentStatus,
+      instance_name: instanceName,
+      warn_7d: daysLeft === 7,
+      warn_2d: daysLeft != null && daysLeft <= 2 && daysLeft >= 0,
+      expired: daysLeft != null && daysLeft < 0,
     }
   } catch (error) {
     console.error('fetchZApiStatus', error)
     return {
+      ...empty,
       configured: true as const,
-      connected: false,
-      smartphone_connected: null as boolean | null,
       message: 'Erro ao consultar status da Z-API.',
       detail: String(error),
       checked_at: new Date().toISOString(),
@@ -446,6 +501,9 @@ export const ALERT_REASON_LABELS: Record<string, string> = {
   domain_2d: 'Domínio vence em 2 dias ou menos',
   domain_expired: 'Domínio expirado',
   zapi_disconnected: 'Z-API desconectada do WhatsApp',
+  zapi_due_7d: 'Z-API vence em 7 dias',
+  zapi_due_2d: 'Z-API vence em 2 dias ou menos',
+  zapi_expired: 'Z-API vencida / assinatura expirada',
 }
 
 export function alertEmailSubject(key: string) {
@@ -537,6 +595,55 @@ export function zapiDisconnectedMessage(seed: string) {
   return variants[pickVariantIndex(seed, variants.length)]
 }
 
+export function zapiDueAlertMessage(daysLeft: number, dueOn: string, seed: string) {
+  const when = dueOn.slice(0, 10).split('-').reverse().join('/')
+  if (daysLeft < 0) {
+    const variants = [
+      `🚨 *Z-API vencida — Teu Posto*\n\nAssinatura expirou em *${when}*.\nRenove no painel Z-API para manter os avisos.`,
+      `❗ *Instância Z-API expirada*\n\nVenceu em *${when}*. Renove a assinatura agora.`,
+      `🛑 *WhatsApp sem plano ativo*\n\nZ-API vencida desde *${when}*.`,
+      `📢 *Teu Posto Admin*\n\nPlano Z-API expirado (*${when}*). Renove para retomar envios.`,
+      `⚠️ *Renovação Z-API atrasada*\n\nVencimento: *${when}*. Regularize no painel Z-API.`,
+      `🔔 *Alerta de assinatura*\n\nZ-API fora da validade desde *${when}*.`,
+      `📣 *Infraestrutura*\n\nInstância Z-API vencida (*${when}*).`,
+      `🧰 *Manutenção*\n\nSem plano Z-API ativo (venceu *${when}*).`,
+      `📡 *Status de pagamento*\n\nZ-API expirada em *${when}*.`,
+      `🧨 *Ação necessária*\n\nRenove a Z-API — vencida em *${when}*.`,
+    ]
+    return variants[pickVariantIndex(seed, variants.length)]
+  }
+
+  if (daysLeft <= 2) {
+    const variants = [
+      `🚨 *Z-API — renovação urgente*\n\nFaltam *${daysLeft} dia(s)* (vence em ${when}).\nRenove no painel Z-API.`,
+      `❗ *Assinatura Z-API quase no fim*\n\nVencimento: *${when}* (${daysLeft} dia(s)).`,
+      `🛑 *Alerta Z-API*\n\nRestam *${daysLeft} dia(s)* até ${when}.`,
+      `📢 *Teu Posto — Z-API*\n\nPrazo crítico: *${daysLeft} dia(s)* até ${when}.`,
+      `⚠️ *Renovação pendente*\n\nZ-API vence em *${when}* (*${daysLeft} dia(s)*).`,
+      `🔑 *Plano Z-API em risco*\n\nSó *${daysLeft} dia(s)* até ${when}.`,
+      `📆 *Contador Z-API*\n\n${daysLeft} dia(s) restantes · ${when}.`,
+      `🔔 *Lembrete urgente*\n\nZ-API: *${daysLeft} dia(s)* (${when}).`,
+      `📣 *Admin — Z-API*\n\nVence em ${when}. Restam *${daysLeft} dia(s)*.`,
+      `🧨 *Últimos dias*\n\nZ-API expira em *${when}* (${daysLeft} dia(s)).`,
+    ]
+    return variants[pickVariantIndex(seed, variants.length)]
+  }
+
+  const variants = [
+    `📅 *Z-API — 1 semana*\n\nVence em *${when}* (faltam *${daysLeft} dias*).\nPrograme a renovação no painel Z-API.`,
+    `🔔 *Lembrete de Z-API*\n\nExpira em ${when} · *${daysLeft} dias* restantes.`,
+    `📢 *Gerenciamento*\n\nAssinatura Z-API próxima do fim: *${daysLeft} dias* (${when}).`,
+    `⚠️ *Renovação em breve*\n\nZ-API vence em ${when} (*${daysLeft} dias*).`,
+    `📆 *Aviso antecipado*\n\nFaltam *${daysLeft} dias* para a Z-API (${when}).`,
+    `🛠️ *Infraestrutura*\n\nLembrete: renovar Z-API até ${when} (${daysLeft} dias).`,
+    `📣 *Teu Posto Admin*\n\nZ-API: ${when} · ${daysLeft} dias restantes.`,
+    `📌 *Checklist*\n\nItem: renovar Z-API (*${daysLeft} dias* · ${when}).`,
+    `🗓️ *Calendário*\n\nZ-API em *${daysLeft} dias* (${when}).`,
+    `✅ *Previna interrupção*\n\nRenove a Z-API antes de ${when} (${daysLeft} dias).`,
+  ]
+  return variants[pickVariantIndex(seed, variants.length)]
+}
+
 export type AttentionReason = { code: string; label: string }
 
 // Cliente service_role (createClient) — tipagem frouxa para Deno Edge.
@@ -598,6 +705,15 @@ export async function collectAttentionReasons(admin: ManagementAlertClient): Pro
       code: 'zapi_disconnected',
       label: ALERT_REASON_LABELS.zapi_disconnected,
     })
+  }
+  if (zapi.due_on && zapi.days_left != null) {
+    if (zapi.days_left < 0) {
+      reasons.push({ code: 'zapi_expired', label: ALERT_REASON_LABELS.zapi_expired })
+    } else if (zapi.days_left === 7) {
+      reasons.push({ code: 'zapi_due_7d', label: ALERT_REASON_LABELS.zapi_due_7d })
+    } else if (zapi.days_left <= 2) {
+      reasons.push({ code: 'zapi_due_2d', label: ALERT_REASON_LABELS.zapi_due_2d })
+    }
   }
   if (isNearLimit(dbBytes, settings.quotas.db_bytes)) {
     reasons.push({ code: 'supabase_db', label: ALERT_REASON_LABELS.supabase_db })
@@ -701,6 +817,34 @@ export async function processManagementAlerts(admin: ManagementAlertClient) {
     zapiDisconnectedMessage(`${today}:zapi`),
     { whatsapp: false },
   )
+  if (zapi.due_on && zapi.days_left != null) {
+    if (zapi.days_left < 0) {
+      await maybeNotify(
+        'zapi_expired',
+        true,
+        zapiDueAlertMessage(zapi.days_left, zapi.due_on, `${today}:zapi:expired`),
+        { whatsapp: zapi.connected },
+      )
+    } else if (zapi.days_left === 7) {
+      await maybeNotify(
+        'zapi_due_7d',
+        true,
+        zapiDueAlertMessage(zapi.days_left, zapi.due_on, `${today}:zapi:d7`),
+        { whatsapp: zapi.connected },
+      )
+    } else if (zapi.days_left <= 2) {
+      await maybeNotify(
+        'zapi_due_2d',
+        true,
+        zapiDueAlertMessage(zapi.days_left, zapi.due_on, `${today}:zapi:d2`),
+        { whatsapp: zapi.connected },
+      )
+    } else {
+      skipped.push(`zapi_due:days_${zapi.days_left}`)
+    }
+  } else {
+    skipped.push('zapi_due:not_available')
+  }
   await maybeNotify(
     'supabase_db',
     isNearLimit(dbBytes, quotas.db_bytes),

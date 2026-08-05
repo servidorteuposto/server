@@ -214,12 +214,25 @@
 
 .admin-mgmt-domain {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 1rem;
   padding: 1.1rem 1.2rem;
   border-radius: 14px;
   background: var(--white);
   border: 1px solid rgba(61, 143, 212, 0.22);
+}
+
+.admin-mgmt-expiry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.admin-mgmt-expiry-title {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 1rem;
+  color: var(--blue-dark);
 }
 
 .admin-mgmt-domain--warn {

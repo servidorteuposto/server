@@ -52,6 +52,13 @@ export type ManagementDashboard = {
     message: string
     detail: string | null
     checked_at: string
+    due_on: string | null
+    days_left: number | null
+    payment_status: string | null
+    instance_name: string | null
+    warn_7d: boolean
+    warn_2d: boolean
+    expired: boolean
   }
   resend: {
     configured: boolean
