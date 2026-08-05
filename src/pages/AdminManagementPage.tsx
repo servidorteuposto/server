@@ -310,10 +310,15 @@ export default function AdminManagementPage() {
                     quotaLabel={dashboard.vercel.bandwidth_quota_label}
                     nearLimit={dashboard.vercel.bandwidth_near_limit}
                   />
+                ) : dashboard.vercel.configured && dashboard.vercel.project ? (
+                  <p className="admin-mgmt-muted">
+                    Sem medidor automático de bandwidth no Hobby. Limite típico: 100 GB/mês — veja em
+                    Vercel → projeto → Usage. A cota abaixo só serve se um dia a API liberar o número.
+                  </p>
                 ) : (
                   <p className="admin-mgmt-muted">
-                    Sem dado de bandwidth na API. Configure VERCEL_TOKEN / PROJECT_ID / TEAM_ID nos
-                    secrets e ajuste a cota abaixo.
+                    Configure VERCEL_TOKEN e VERCEL_PROJECT_ID (e TEAM_ID se tiver) nos secrets do
+                    Supabase.
                   </p>
                 )}
               </div>

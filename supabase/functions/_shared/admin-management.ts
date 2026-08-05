@@ -298,9 +298,15 @@ export async function fetchVercelUsage() {
         : null,
       usage,
       usage_error: usageError,
-      message: usageError
-        ? 'Token ok, mas a API de usage retornou erro (plano/permissão).'
-        : 'Dados da Vercel carregados.',
+      message: (() => {
+        if (project && !usageError) return 'Projeto Vercel conectado e usage disponível.'
+        if (project && usageError) {
+          return 'Projeto conectado. Bandwidth/usage não é exposto pela API no plano Hobby — acompanhe no painel da Vercel (Usage).'
+        }
+        if (!projectId) return 'Falta o secret VERCEL_PROJECT_ID.'
+        if (!project) return 'Token ok, mas não foi possível ler o projeto (confira PROJECT_ID / TEAM_ID).'
+        return 'Dados da Vercel carregados.'
+      })(),
     }
   } catch (error) {
     console.error('fetchVercelUsage', error)
