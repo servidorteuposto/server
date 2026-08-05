@@ -8,6 +8,7 @@ const corsHeaders = {
 
 const TIME_ZONE = 'America/Sao_Paulo'
 const DOC_MILESTONES = [30, 15, 7, 1, 0] as const
+const SUBSCRIPTION_MILESTONES = [7, 2] as const
 const METROLOGY_INTERVAL_DAYS = 15
 const DRAINAGE_INTERVAL_DAYS = 7
 const RAQ_INTERVAL_DAYS = 2
@@ -25,6 +26,8 @@ type PostoRow = {
   aviso_whatsapp_3: string | null
   aviso_whatsapp_4: string | null
   subscription_status: string | null
+  subscription_ends_at: string | null
+  billing_mode: string | null
 }
 
 type OutboundJob = {
@@ -760,6 +763,215 @@ function raqMessage(posto: PostoRow, seed: string) {
   )
 }
 
+function subscriptionMessage(
+  posto: PostoRow,
+  daysLeft: number,
+  endsKey: string,
+  seed: string,
+) {
+  const when = formatDateKeyPtBr(endsKey)
+  const header = postoHeader(posto.nome, posto.cnpj)
+  const dayLabel = daysLeft === 1 ? '1 dia' : `${daysLeft} dias`
+  const recurring = posto.billing_mode === 'recurring'
+  const cta = recurring
+    ? 'Se a cobrança for no cartão, confira se os dados estão válidos. Em caso de falha, renove pelo app.'
+    : 'Renove pelo app com *PIX* ou *boleto* para manter o acesso completo.'
+
+  if (daysLeft <= 2) {
+    return pick(
+      [
+        [
+          '⏳ *Plano quase vencendo — Teu Posto*',
+          '',
+          header,
+          '',
+          `Faltam *${dayLabel}* para o fim do plano (*${when}*).`,
+          '',
+          cta,
+        ].join('\n'),
+        [
+          '🚨 *Atenção: renovação próxima*',
+          '',
+          header,
+          '',
+          `Seu plano Teu Posto vence em *${when}* (*${dayLabel}*).`,
+          '',
+          cta,
+        ].join('\n'),
+        [
+          '📌 *Últimos dias do plano*',
+          '',
+          header,
+          '',
+          `Vencimento em *${when}* — restam *${dayLabel}*.`,
+          '',
+          cta,
+        ].join('\n'),
+        [
+          '🔔 *Lembrete urgente de assinatura*',
+          '',
+          header,
+          '',
+          `O acesso completo termina em *${dayLabel}* (${when}).`,
+          '',
+          cta,
+        ].join('\n'),
+        [
+          '⚠️ *Renovação em breve*',
+          '',
+          header,
+          '',
+          `Plano ativo até *${when}* (*${dayLabel}*).`,
+          '',
+          cta,
+        ].join('\n'),
+        [
+          '🗓️ *Calendário Teu Posto*',
+          '',
+          header,
+          '',
+          `Faltam *${dayLabel}* para renovar (*${when}*).`,
+          '',
+          cta,
+        ].join('\n'),
+        [
+          '💬 *Aviso de vencimento do plano*',
+          '',
+          header,
+          '',
+          `Seu período de 30 dias fecha em *${when}*.`,
+          '',
+          cta,
+        ].join('\n'),
+        [
+          '📣 *Não perca o acesso*',
+          '',
+          header,
+          '',
+          `Restam *${dayLabel}* até o fim do plano (*${when}*).`,
+          '',
+          cta,
+        ].join('\n'),
+        [
+          '🧾 *Assinatura Teu Posto*',
+          '',
+          header,
+          '',
+          `Vencimento: *${when}* · *${dayLabel}* restantes.`,
+          '',
+          cta,
+        ].join('\n'),
+        [
+          '✅ *Hora de renovar*',
+          '',
+          header,
+          '',
+          `O plano vence em *${dayLabel}* (${when}).`,
+          '',
+          cta,
+        ].join('\n'),
+      ],
+      seed,
+    )
+  }
+
+  return pick(
+    [
+      [
+        '🔔 *Lembrete de renovação — Teu Posto*',
+        '',
+        header,
+        '',
+        `Seu plano vence em *${dayLabel}* (*${when}*).`,
+        '',
+        cta,
+      ].join('\n'),
+      [
+        '📅 *Plano: 7 dias restantes*',
+        '',
+        header,
+        '',
+        `Data de vencimento: *${when}*.`,
+        '',
+        cta,
+      ].join('\n'),
+      [
+        '💡 *Aviso antecipado de assinatura*',
+        '',
+        header,
+        '',
+        `Faltam *${dayLabel}* para o fim do período atual (*${when}*).`,
+        '',
+        cta,
+      ].join('\n'),
+      [
+        '🏪 *Teu Posto — renovação*',
+        '',
+        header,
+        '',
+        `O plano completo segue ativo até *${when}* (*${dayLabel}*).`,
+        '',
+        cta,
+      ].join('\n'),
+      [
+        '📋 *Lembrete de plano*',
+        '',
+        header,
+        '',
+        `Vencimento em *${when}* · restam *${dayLabel}*.`,
+        '',
+        cta,
+      ].join('\n'),
+      [
+        '⏳ *Assinatura próxima do fim*',
+        '',
+        header,
+        '',
+        `Ainda há *${dayLabel}* até *${when}*.`,
+        '',
+        cta,
+      ].join('\n'),
+      [
+        '📣 *Comunicado de renovação*',
+        '',
+        header,
+        '',
+        `Seu ciclo de 30 dias termina em *${when}*.`,
+        '',
+        cta,
+      ].join('\n'),
+      [
+        '🗓️ *Agenda financeira*',
+        '',
+        header,
+        '',
+        `Reserve a renovação: vence em *${dayLabel}* (${when}).`,
+        '',
+        cta,
+      ].join('\n'),
+      [
+        '💬 *WhatsApp Teu Posto*',
+        '',
+        header,
+        '',
+        `Lembrete: plano vence em *${when}* (*${dayLabel}*).`,
+        '',
+        cta,
+      ].join('\n'),
+      [
+        '✅ *Mantenha o acesso ativo*',
+        '',
+        header,
+        '',
+        `Faltam *${dayLabel}* para renovar (*${when}*).`,
+        '',
+        cta,
+      ].join('\n'),
+    ],
+    seed,
+  )
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -793,7 +1005,7 @@ Deno.serve(async (req) => {
     const { data: postos, error: postosError } = await admin
       .from('postos')
       .select(
-        'id, nome, cnpj, telefone, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4, subscription_status',
+        'id, nome, cnpj, telefone, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4, subscription_status, subscription_ends_at, billing_mode',
       )
       .eq('subscription_status', 'active')
 
@@ -808,6 +1020,37 @@ Deno.serve(async (req) => {
     }
 
     const postoById = new Map(activePostos.map((p) => [p.id, p as PostoRow]))
+
+    // --- Renovação de plano (7 e 2 dias antes) ---
+    for (const raw of activePostos) {
+      const posto = raw as PostoRow
+      if (!posto.subscription_ends_at) continue
+      const endsKey = toSaoPauloDateKey(posto.subscription_ends_at)
+      if (!endsKey) continue
+
+      const daysLeft = daysBetweenKeys(todayKey, endsKey)
+      if (!(SUBSCRIPTION_MILESTONES as readonly number[]).includes(daysLeft)) continue
+
+      const milestone = `d${daysLeft}`
+      if (await alreadySent(admin, posto.id, 'subscription', endsKey, milestone)) continue
+
+      const phones = collectAvisoPhones(posto)
+      const seed = `${posto.id}:subscription:${endsKey}:${milestone}:${todayKey}`
+      queue.push({
+        phones,
+        message: subscriptionMessage(posto, daysLeft, endsKey, seed),
+        meta: {
+          type: 'subscription',
+          posto_id: posto.id,
+          ends_at: endsKey,
+          days_left: daysLeft,
+          billing_mode: posto.billing_mode ?? 'one_time',
+          milestone,
+        },
+        onSuccess: () =>
+          markSent(admin, posto.id, 'subscription', endsKey, milestone, todayKey).then(() => {}),
+      })
+    }
 
     // --- Documentos regulatórios + laudos ---
     const [{ data: regulatory }, { data: workSafety }] = await Promise.all([

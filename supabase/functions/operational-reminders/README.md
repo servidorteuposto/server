@@ -6,6 +6,7 @@ Edge Function diária que envia avisos WhatsApp para os números `aviso_whatsapp
 
 | Tipo | Regra | Frequência do aviso |
 | --- | --- | --- |
+| Renovação de plano | `subscription_ends_at` | 7 e 2 dias antes do vencimento (PIX/boleto e recorrente) |
 | Documentos regulatórios | `expires_at` | 30, 15, 7, 1 dia antes e no dia (expirado) |
 | Laudos (PGR/LTCAT/PCMSO) | `expires_at` | Idem |
 | Metrologia | última `verified_at` + 15 dias | 1x no dia do vencimento (renova se fizer antes) |
