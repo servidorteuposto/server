@@ -34,7 +34,8 @@ body,
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  background-color: #84b5e9;
+  /* Tom do asfalto do fundo_login — evita faixa branca no iOS */
+  background-color: #c6c4c6;
 }
 
 body {
@@ -42,14 +43,36 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
-  background-color: #84b5e9;
+  background-color: #c6c4c6;
 }
 
-/* Enquanto o login está aberto, o fundo fica transparente — a foto cobre tudo */
+/* Login/capa: trava scroll e mantém cor de fundo (nunca branco/transparente) */
 html.teuposto-login-active,
 html.teuposto-login-active body,
 html.teuposto-login-active #root {
-  background-color: transparent !important;
+  height: 100%;
+  height: 100dvh;
+  height: 100svh;
+  max-height: 100%;
+  max-height: 100dvh;
+  max-height: 100svh;
+  overflow: hidden !important;
+  overscroll-behavior: none;
+  background-color: #c6c4c6 !important;
+}
+
+html.teuposto-lock-active,
+html.teuposto-lock-active body,
+html.teuposto-lock-active #root {
+  height: 100%;
+  height: 100dvh;
+  height: 100svh;
+  max-height: 100%;
+  max-height: 100dvh;
+  max-height: 100svh;
+  overflow: hidden !important;
+  overscroll-behavior: none;
+  background-color: #000821 !important;
 }
 
 #root {

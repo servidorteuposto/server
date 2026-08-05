@@ -62,7 +62,7 @@ export default function MobileLockCover() {
       document.body.classList.remove('teuposto-lock-active')
       document.body.style.overflow = prevOverflow
       if (theme) {
-        theme.setAttribute('content', previousTheme || '#84b5e9')
+        theme.setAttribute('content', previousTheme || '#c6c4c6')
       }
     }
   }, [active])
