@@ -14,6 +14,7 @@ import {
   saveRegulatoryDocument,
   type RegulatoryDocument,
 } from '../lib/regulatory-documents'
+import { createPdfPreviewObjectUrl, revokePdfPreviewObjectUrl } from '../lib/pdf-preview'
 import './RegulatoryDocumentsPage.css'
 
 type RegulatoryDocumentsPageProps = {
@@ -175,14 +176,16 @@ export default function RegulatoryDocumentsPage({ isReadOnly }: RegulatoryDocume
   async function handlePreview(document: RegulatoryDocument) {
     setPreviewOpen(true)
     setPreviewTitle(document.title)
+    revokePdfPreviewObjectUrl(previewUrl)
     setPreviewUrl(null)
     setPreviewError(null)
     setPreviewLoading(true)
     setActionBusyId(document.id)
 
     try {
-      const url = await getRegulatoryDocumentUrl(getDocumentPreviewPath(document))
-      setPreviewUrl(url)
+      const signedUrl = await getRegulatoryDocumentUrl(getDocumentPreviewPath(document))
+      const objectUrl = await createPdfPreviewObjectUrl(signedUrl)
+      setPreviewUrl(objectUrl)
     } catch {
       setPreviewError('Não foi possível carregar a visualização do documento.')
     } finally {
@@ -192,6 +195,7 @@ export default function RegulatoryDocumentsPage({ isReadOnly }: RegulatoryDocume
   }
 
   function closePreview() {
+    revokePdfPreviewObjectUrl(previewUrl)
     setPreviewOpen(false)
     setPreviewUrl(null)
     setPreviewError(null)

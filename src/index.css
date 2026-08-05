@@ -34,8 +34,7 @@ body,
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  /* Tom do asfalto do fundo_login */
-  background-color: #c6c4c6;
+  background-color: #84b5e9;
 }
 
 body {
@@ -43,7 +42,14 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
-  background-color: #c6c4c6;
+  background-color: #84b5e9;
+}
+
+/* Enquanto o login está aberto, o fundo fica transparente — a foto cobre tudo */
+html.teuposto-login-active,
+html.teuposto-login-active body,
+html.teuposto-login-active #root {
+  background-color: transparent !important;
 }
 
 #root {

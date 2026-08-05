@@ -26,6 +26,7 @@ import {
   type WorkSafetyDocument,
 } from '../lib/work-safety-documents'
 import type { RegulatoryDocument } from '../lib/regulatory-documents'
+import { createPdfPreviewObjectUrl, revokePdfPreviewObjectUrl } from '../lib/pdf-preview'
 import '../pages/RegulatoryDocumentsPage.css'
 import './WorkSafetyPage.css'
 
@@ -167,14 +168,16 @@ export default function WorkSafetyPage({ isReadOnly }: WorkSafetyPageProps) {
   async function handlePreviewDocument(document: WorkSafetyDocument) {
     setPreviewOpen(true)
     setPreviewTitle(document.title)
+    revokePdfPreviewObjectUrl(previewUrl)
     setPreviewUrl(null)
     setPreviewError(null)
     setPreviewLoading(true)
     setActionBusyId(document.id)
 
     try {
-      const url = await getWorkSafetyDocumentUrl(getWorkSafetyDocumentPreviewPath(document))
-      setPreviewUrl(url)
+      const signedUrl = await getWorkSafetyDocumentUrl(getWorkSafetyDocumentPreviewPath(document))
+      const objectUrl = await createPdfPreviewObjectUrl(signedUrl)
+      setPreviewUrl(objectUrl)
     } catch {
       setPreviewError('Não foi possível carregar a visualização do documento.')
     } finally {
@@ -197,13 +200,15 @@ export default function WorkSafetyPage({ isReadOnly }: WorkSafetyPageProps) {
   async function handlePreviewFile(title: string, urlPromise: Promise<string>) {
     setPreviewOpen(true)
     setPreviewTitle(title)
+    revokePdfPreviewObjectUrl(previewUrl)
     setPreviewUrl(null)
     setPreviewError(null)
     setPreviewLoading(true)
 
     try {
-      const url = await urlPromise
-      setPreviewUrl(url)
+      const signedUrl = await urlPromise
+      const objectUrl = await createPdfPreviewObjectUrl(signedUrl)
+      setPreviewUrl(objectUrl)
     } catch {
       setPreviewError('Não foi possível carregar a visualização do documento.')
     } finally {
@@ -212,6 +217,7 @@ export default function WorkSafetyPage({ isReadOnly }: WorkSafetyPageProps) {
   }
 
   function closePreview() {
+    revokePdfPreviewObjectUrl(previewUrl)
     setPreviewOpen(false)
     setPreviewUrl(null)
     setPreviewError(null)

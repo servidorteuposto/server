@@ -528,10 +528,35 @@ export default function LoginPage() {
 
   // removed mock finalizePayment / handlePixConfirmed
 
+  useEffect(() => {
+    document.documentElement.classList.add('teuposto-login-active')
+    const theme = document.querySelector('meta[name="theme-color"]')
+    const previousTheme = theme?.getAttribute('content') ?? null
+    theme?.setAttribute('content', '#84b5e9')
+    return () => {
+      document.documentElement.classList.remove('teuposto-login-active')
+      if (theme) {
+        theme.setAttribute('content', previousTheme || '#0c3b7a')
+      }
+    }
+  }, [])
+
   return (
     <div className={`login-page${view !== 'login' ? ' login-page--focused' : ''}`}>
       <MobileLockCover />
-      <div className="login-page__bg" aria-hidden="true" />
+      <div className="login-page__bg" aria-hidden="true">
+        <picture>
+          <source srcSet="/imagens/fundo_login.webp?v=4" type="image/webp" />
+          <img
+            src="/imagens/fundo_login.jpg?v=4"
+            alt=""
+            className="login-page__bg-img"
+            draggable={false}
+            decoding="async"
+            fetchPriority="high"
+          />
+        </picture>
+      </div>
 
       <div
         className={`login-page__layout${view !== 'login' ? ' login-page__layout--focused' : ''}`}

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 
 type PdfPreviewModalProps = {
   open: boolean
@@ -17,7 +17,18 @@ export default function PdfPreviewModal({
   error,
   onClose,
 }: PdfPreviewModalProps) {
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [open, onClose])
+
   if (!open) return null
+
+  const viewerSrc = url ? `${url}#view=FitH&toolbar=1` : null
 
   return (
     <div className="reg-doc-modal reg-doc-preview" role="presentation" onClick={onClose}>
@@ -30,21 +41,30 @@ export default function PdfPreviewModal({
       >
         <header className="reg-doc-preview__header">
           <h2 id="pdf-preview-title">{title}</h2>
-          <button type="button" className="reg-doc-modal__close" onClick={onClose} aria-label="Fechar">
-            ×
-          </button>
+          <div className="reg-doc-preview__header-actions">
+            {url && (
+              <a
+                className="btn btn--secondary reg-doc-preview__open"
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Abrir PDF
+              </a>
+            )}
+            <button type="button" className="reg-doc-modal__close" onClick={onClose} aria-label="Fechar">
+              ×
+            </button>
+          </div>
         </header>
 
         <div className="reg-doc-preview__body">
           {loading && <p className="reg-doc-preview__status">Carregando documento...</p>}
           {error && <p className="reg-doc-form__error">{error}</p>}
-          {!loading && !error && url && (
-            <iframe
-              className="reg-doc-preview__frame"
-              src={url}
-              title={title}
-              loading="lazy"
-            />
+          {!loading && !error && viewerSrc && (
+            <object className="reg-doc-preview__frame" data={viewerSrc} type="application/pdf">
+              <iframe className="reg-doc-preview__frame" src={viewerSrc} title={title} />
+            </object>
           )}
         </div>
       </div>

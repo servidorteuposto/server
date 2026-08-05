@@ -11,31 +11,39 @@
   background: transparent;
 }
 
+/* Foto full-bleed: passa da safe-area pra não sobrar faixa cinza em cima/baixo */
 .login-page__bg {
   position: fixed;
-  top: 0;
-  left: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  top: calc(-1 * env(safe-area-inset-top, 0px) - 8px);
   right: 0;
-  bottom: 0;
+  bottom: calc(-1 * env(safe-area-inset-bottom, 0px) - 8px);
+  left: 0;
+  width: 100%;
+  height: auto;
+  min-height: calc(
+    100lvh + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px) + 16px
+  );
+  background: #84b5e9;
+}
+
+.login-page__bg picture,
+.login-page__bg-img {
+  position: absolute;
+  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
-  min-height: 100%;
-  min-height: 100dvh;
-  min-height: 100lvh;
-  min-height: -webkit-fill-available;
-  /* Estica um pouco além do home indicator no iOS/PWA */
-  min-height: calc(100lvh + env(safe-area-inset-bottom, 0px));
-  /* Asfalto da foto — só aparece se a imagem ainda não cobrir 1px */
-  background-color: #c6c4c6;
-  background-image: image-set(
-    url('/imagens/fundo_login.webp?v=3') type('image/webp'),
-    url('/imagens/fundo_login.jpg?v=3') type('image/jpeg'),
-    url('/imagens/fundo_login.png?v=3') type('image/png')
-  );
-  background-size: cover;
-  background-position: center center;
-  background-repeat: no-repeat;
-  z-index: 0;
+  max-width: none;
+}
+
+.login-page__bg-img {
+  object-fit: cover;
+  object-position: center center;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .login-page__bg::after {

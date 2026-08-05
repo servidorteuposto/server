@@ -51,13 +51,19 @@ export default function MobileLockCover() {
   useEffect(() => {
     if (!active) return
     const prevOverflow = document.body.style.overflow
+    const theme = document.querySelector('meta[name="theme-color"]')
+    const previousTheme = theme?.getAttribute('content') ?? null
     document.documentElement.classList.add('teuposto-lock-active')
     document.body.classList.add('teuposto-lock-active')
     document.body.style.overflow = 'hidden'
+    theme?.setAttribute('content', '#000821')
     return () => {
       document.documentElement.classList.remove('teuposto-lock-active')
       document.body.classList.remove('teuposto-lock-active')
       document.body.style.overflow = prevOverflow
+      if (theme) {
+        theme.setAttribute('content', previousTheme || '#84b5e9')
+      }
     }
   }, [active])
 
@@ -152,7 +158,7 @@ export default function MobileLockCover() {
       aria-label="Tela inicial Teu Posto. Arraste para cima para continuar."
     >
       <img
-        src="/imagens/capa_mobile.png?v=7"
+        src="/imagens/capa_mobile.png?v=8"
         alt=""
         aria-hidden="true"
         className="mobile-lock__art"
