@@ -34,8 +34,8 @@ body,
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  /* Tom do asfalto do fundo_login — evita faixa azul no PWA após o swipe */
-  background-color: #d8d8da;
+  /* Tom do asfalto do fundo_login */
+  background-color: #c6c4c6;
 }
 
 body {
@@ -43,7 +43,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
-  background-color: #d8d8da;
+  background-color: #c6c4c6;
 }
 
 #root {

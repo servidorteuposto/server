@@ -1,15 +1,11 @@
 .mobile-lock {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   width: 100%;
   height: 100%;
-  height: 100dvh;
-  height: 100svh;
   min-height: 100%;
   min-height: 100dvh;
+  min-height: 100lvh;
   min-height: -webkit-fill-available;
   z-index: 10000;
   display: none;
@@ -19,9 +15,10 @@
   padding:
     0
     1.5rem
-    calc(env(safe-area-inset-bottom, 0px) + 2.5rem);
+    max(2.5rem, calc(env(safe-area-inset-bottom, 0px) + 1.75rem));
   color: #fff;
-  background: #041428;
+  /* Mesmo tom da base da capa — evita faixa azul escura sob a setinha */
+  background: #00091e;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -41,14 +38,19 @@
   pointer-events: none;
 }
 
-/* Capa full-bleed — evita reescalar o PNG num recorte pequeno (fica borrado) */
+/* Capa full-bleed — cobre tela inteira inclusive safe-area / home indicator */
 .mobile-lock__art {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 0;
   display: block;
   width: 100%;
   height: 100%;
+  min-width: 100%;
+  min-height: 100%;
   max-width: none;
   object-fit: cover;
   object-position: center center;
@@ -137,11 +139,11 @@
   }
 }
 
-/* Azul só enquanto a capa está aberta — não vaza no login */
+/* Fundo da capa só enquanto ela está aberta — não vaza no login */
 html.teuposto-lock-active,
 body.teuposto-lock-active,
 html.teuposto-lock-active #root {
-  background: #041428 !important;
+  background: #00091e !important;
 }
 
 html.teuposto-lock-active .cookie-consent {

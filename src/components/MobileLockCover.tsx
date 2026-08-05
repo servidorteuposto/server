@@ -152,7 +152,7 @@ export default function MobileLockCover() {
       aria-label="Tela inicial Teu Posto. Arraste para cima para continuar."
     >
       <img
-        src="/imagens/capa_mobile.png?v=6"
+        src="/imagens/capa_mobile.png?v=7"
         alt=""
         aria-hidden="true"
         className="mobile-lock__art"
