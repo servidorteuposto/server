@@ -277,6 +277,64 @@
   color: var(--gray-700);
 }
 
+.admin-mgmt-secure-form {
+  margin-bottom: 1.1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 14px;
+  background: var(--white);
+  border: 1px solid rgba(61, 143, 212, 0.18);
+}
+
+.admin-mgmt-secure-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.admin-mgmt-secure-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 0.95rem 1.05rem;
+  border-radius: 12px;
+  background: var(--white);
+  border: 1px solid rgba(61, 143, 212, 0.18);
+}
+
+.admin-mgmt-secure-card h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  color: var(--blue-dark);
+}
+
+.admin-mgmt-secure-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.admin-mgmt-modal__panel--wide {
+  width: min(860px, 100%);
+}
+
+.admin-mgmt-txt-preview {
+  margin: 0;
+  max-height: min(60vh, 520px);
+  overflow: auto;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: #f8fbff;
+  border: 1px solid rgba(61, 143, 212, 0.16);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
 @media (max-width: 640px) {
   .admin-mgmt-header-actions {
     width: 100%;

@@ -27,6 +27,15 @@ npx supabase functions deploy admin-management-alerts --project-ref jilzklxnejzt
 
 Cotas sugeridas no free: DB **0.5 GB**, Storage **1 GB**, Resend **100/dia** e **3000/mês**.
 
+## Documentos seguros (cofre)
+
+Migration adicional (SQL Editor):
+
+`supabase/migrations/20260806140000_admin_secure_files.sql`
+
+Cria a tabela `admin_secure_files` e o bucket privado `admin-secure-files`.
+PDF/TXT com senha — ver/baixar só após desbloquear no Gerenciamento.
+
 ## Cron sugerido (a cada 6h)
 
 ```bash

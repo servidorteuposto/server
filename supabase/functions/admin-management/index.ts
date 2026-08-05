@@ -27,11 +27,77 @@ const corsHeaders = {
 const POSTO_LIST_SELECT =
   'id, nome, cnpj, email, telefone, endereco, cep, logradouro, numero, complemento, bairro, cidade, uf, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4, subscription_status, subscription_ends_at, created_at'
 
+const SECURE_BUCKET = 'admin-secure-files'
+const SECURE_MAX_BYTES = 10 * 1024 * 1024
+const SECURE_ALLOWED_MIME = new Set(['application/pdf', 'text/plain'])
+const UNLOCK_URL_SECONDS = 120
+const MAX_FAILED_ATTEMPTS = 5
+const LOCK_MINUTES = 15
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
+}
+
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+  return btoa(binary)
+}
+
+function base64ToBytes(value: string) {
+  const binary = atob(value)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+async function hashPassword(password: string) {
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits'],
+  )
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: 100_000, hash: 'SHA-256' },
+    keyMaterial,
+    256,
+  )
+  return `pbkdf2$100000$${bytesToBase64(salt)}$${bytesToBase64(new Uint8Array(bits))}`
+}
+
+async function verifyPassword(password: string, stored: string) {
+  const parts = stored.split('$')
+  if (parts.length !== 4 || parts[0] !== 'pbkdf2') return false
+  const iterations = Number(parts[1])
+  const salt = base64ToBytes(parts[2])
+  const expected = parts[3]
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits'],
+  )
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+    keyMaterial,
+    256,
+  )
+  return bytesToBase64(new Uint8Array(bits)) === expected
+}
+
+function detectMime(filename: string, provided?: string) {
+  const lower = filename.toLowerCase()
+  if (provided && SECURE_ALLOWED_MIME.has(provided)) return provided
+  if (lower.endsWith('.pdf')) return 'application/pdf'
+  if (lower.endsWith('.txt')) return 'text/plain'
+  return null
 }
 
 function isAdminPosto(row: { cnpj?: string | null; email?: string | null }) {
@@ -461,6 +527,187 @@ Deno.serve(async (req) => {
     if (action === 'run_alert_check') {
       const result = await runAlertCheck(admin)
       return jsonResponse({ ok: true, ...result })
+    }
+
+    if (action === 'list_secure_files') {
+      const { data, error } = await admin
+        .from('admin_secure_files')
+        .select('id, title, original_filename, mime_type, size_bytes, created_at, locked_until')
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        return jsonResponse({ ok: false, message: error.message }, 500)
+      }
+
+      return jsonResponse({ ok: true, files: data ?? [] })
+    }
+
+    if (action === 'upload_secure_file') {
+      const title = typeof body?.title === 'string' ? body.title.trim() : ''
+      const password = typeof body?.password === 'string' ? body.password : ''
+      const filename =
+        typeof body?.filename === 'string' ? body.filename.trim() : 'arquivo'
+      const contentBase64 =
+        typeof body?.content_base64 === 'string' ? body.content_base64.replace(/^data:[^;]+;base64,/, '') : ''
+
+      if (!title) {
+        return jsonResponse({ ok: false, message: 'Informe um título.' }, 400)
+      }
+      if (password.length < 4) {
+        return jsonResponse({ ok: false, message: 'A senha deve ter pelo menos 4 caracteres.' }, 400)
+      }
+      if (!contentBase64) {
+        return jsonResponse({ ok: false, message: 'Arquivo inválido.' }, 400)
+      }
+
+      const mime = detectMime(filename, typeof body?.mime_type === 'string' ? body.mime_type : undefined)
+      if (!mime) {
+        return jsonResponse({ ok: false, message: 'Somente arquivos PDF ou TXT.' }, 400)
+      }
+
+      let bytes: Uint8Array
+      try {
+        bytes = base64ToBytes(contentBase64)
+      } catch {
+        return jsonResponse({ ok: false, message: 'Não foi possível ler o arquivo.' }, 400)
+      }
+
+      if (!bytes.length || bytes.length > SECURE_MAX_BYTES) {
+        return jsonResponse({ ok: false, message: 'Arquivo deve ter até 10 MB.' }, 400)
+      }
+
+      const fileId = crypto.randomUUID()
+      const ext = mime === 'application/pdf' ? 'pdf' : 'txt'
+      const storagePath = `${user.id}/${fileId}.${ext}`
+      const passwordHash = await hashPassword(password)
+
+      const { error: uploadError } = await admin.storage
+        .from(SECURE_BUCKET)
+        .upload(storagePath, bytes, {
+          contentType: mime,
+          upsert: false,
+        })
+
+      if (uploadError) {
+        return jsonResponse({ ok: false, message: uploadError.message }, 500)
+      }
+
+      const { data: row, error: insertError } = await admin
+        .from('admin_secure_files')
+        .insert({
+          id: fileId,
+          title,
+          original_filename: filename.slice(0, 240),
+          mime_type: mime,
+          size_bytes: bytes.length,
+          storage_path: storagePath,
+          password_hash: passwordHash,
+          created_by: user.id,
+        })
+        .select('id, title, original_filename, mime_type, size_bytes, created_at, locked_until')
+        .single()
+
+      if (insertError) {
+        await admin.storage.from(SECURE_BUCKET).remove([storagePath])
+        return jsonResponse({ ok: false, message: insertError.message }, 500)
+      }
+
+      return jsonResponse({ ok: true, file: row })
+    }
+
+    if (action === 'unlock_secure_file') {
+      const fileId = typeof body?.file_id === 'string' ? body.file_id : ''
+      const password = typeof body?.password === 'string' ? body.password : ''
+      const mode = body?.mode === 'download' ? 'download' : 'view'
+
+      if (!fileId || !password) {
+        return jsonResponse({ ok: false, message: 'Informe o arquivo e a senha.' }, 400)
+      }
+
+      const { data: file, error: fileError } = await admin
+        .from('admin_secure_files')
+        .select('*')
+        .eq('id', fileId)
+        .maybeSingle()
+
+      if (fileError || !file) {
+        return jsonResponse({ ok: false, message: 'Arquivo não encontrado.' }, 404)
+      }
+
+      if (file.locked_until && new Date(file.locked_until).getTime() > Date.now()) {
+        return jsonResponse(
+          {
+            ok: false,
+            message: 'Arquivo temporariamente bloqueado por tentativas inválidas. Tente mais tarde.',
+          },
+          423,
+        )
+      }
+
+      const valid = await verifyPassword(password, file.password_hash)
+      if (!valid) {
+        const attempts = Number(file.failed_attempts ?? 0) + 1
+        const patch: Record<string, unknown> = { failed_attempts: attempts }
+        if (attempts >= MAX_FAILED_ATTEMPTS) {
+          patch.locked_until = new Date(Date.now() + LOCK_MINUTES * 60_000).toISOString()
+          patch.failed_attempts = 0
+        }
+        await admin.from('admin_secure_files').update(patch).eq('id', fileId)
+        return jsonResponse({ ok: false, message: 'Senha incorreta.' }, 401)
+      }
+
+      await admin
+        .from('admin_secure_files')
+        .update({ failed_attempts: 0, locked_until: null })
+        .eq('id', fileId)
+
+      const { data: signed, error: signedError } = await admin.storage
+        .from(SECURE_BUCKET)
+        .createSignedUrl(file.storage_path, UNLOCK_URL_SECONDS, {
+          download: mode === 'download' ? file.original_filename : undefined,
+        })
+
+      if (signedError || !signed?.signedUrl) {
+        return jsonResponse(
+          { ok: false, message: signedError?.message ?? 'Não foi possível liberar o arquivo.' },
+          500,
+        )
+      }
+
+      return jsonResponse({
+        ok: true,
+        url: signed.signedUrl,
+        mode,
+        mime_type: file.mime_type,
+        filename: file.original_filename,
+        title: file.title,
+        expires_in: UNLOCK_URL_SECONDS,
+      })
+    }
+
+    if (action === 'delete_secure_file') {
+      const fileId = typeof body?.file_id === 'string' ? body.file_id : ''
+      if (!fileId) {
+        return jsonResponse({ ok: false, message: 'Informe o arquivo.' }, 400)
+      }
+
+      const { data: file, error: fileError } = await admin
+        .from('admin_secure_files')
+        .select('id, storage_path')
+        .eq('id', fileId)
+        .maybeSingle()
+
+      if (fileError || !file) {
+        return jsonResponse({ ok: false, message: 'Arquivo não encontrado.' }, 404)
+      }
+
+      await admin.storage.from(SECURE_BUCKET).remove([file.storage_path])
+      const { error: deleteError } = await admin.from('admin_secure_files').delete().eq('id', fileId)
+      if (deleteError) {
+        return jsonResponse({ ok: false, message: deleteError.message }, 500)
+      }
+
+      return jsonResponse({ ok: true })
     }
 
     return jsonResponse({ ok: false, message: 'Ação inválida.' }, 400)

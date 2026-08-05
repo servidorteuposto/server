@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   bytesToGb,
+  deleteSecureFile,
   FLOW_LABELS,
+  formatSecureFileSize,
   getManagementDashboard,
   listManagementPostos,
+  listSecureFiles,
   runManagementAlertCheck,
   saveManagementSettings,
+  unlockSecureFile,
+  uploadSecureFile,
   type ManagementDashboard,
   type ManagementPosto,
+  type SecureFileMeta,
 } from '../lib/admin-management'
 import { formatCnpj } from '../lib/cnpj'
 import '../pages/RegulatoryDocumentsPage.css'
@@ -70,6 +76,21 @@ export default function AdminManagementPage() {
   const [modalRows, setModalRows] = useState<ManagementPosto[]>([])
   const [modalLoading, setModalLoading] = useState(false)
 
+  const [secureFiles, setSecureFiles] = useState<SecureFileMeta[]>([])
+  const [secureLoading, setSecureLoading] = useState(false)
+  const [secureUploading, setSecureUploading] = useState(false)
+  const [secureTitle, setSecureTitle] = useState('')
+  const [securePassword, setSecurePassword] = useState('')
+  const [securePassword2, setSecurePassword2] = useState('')
+  const [secureFile, setSecureFile] = useState<File | null>(null)
+  const [unlockTarget, setUnlockTarget] = useState<{
+    file: SecureFileMeta
+    mode: 'view' | 'download'
+  } | null>(null)
+  const [unlockPassword, setUnlockPassword] = useState('')
+  const [unlockBusy, setUnlockBusy] = useState(false)
+  const [txtPreview, setTxtPreview] = useState<{ title: string; content: string } | null>(null)
+
   const applyForm = useCallback((data: ManagementDashboard) => {
     setWhatsapp1(data.settings.alert_whatsapp_1 ?? '')
     setWhatsapp2(data.settings.alert_whatsapp_2 ?? '')
@@ -80,18 +101,31 @@ export default function AdminManagementPage() {
     setResendMonthly(String(data.settings.quotas.resend_monthly ?? 3000))
   }, [])
 
+  const loadSecureFiles = useCallback(async () => {
+    setSecureLoading(true)
+    try {
+      const files = await listSecureFiles()
+      setSecureFiles(files)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao carregar documentos seguros.')
+    } finally {
+      setSecureLoading(false)
+    }
+  }, [])
+
   const load = useCallback(async () => {
     setError(null)
     try {
       const data = await getManagementDashboard()
       setDashboard(data)
       applyForm(data)
+      await loadSecureFiles()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao carregar o painel.')
     } finally {
       setLoading(false)
     }
-  }, [applyForm])
+  }, [applyForm, loadSecureFiles])
 
   useEffect(() => {
     void load()
@@ -155,6 +189,87 @@ export default function AdminManagementPage() {
       setModalFilter(null)
     } finally {
       setModalLoading(false)
+    }
+  }
+
+  async function handleSecureUpload(e: React.FormEvent) {
+    e.preventDefault()
+    if (!secureFile) {
+      setError('Selecione um arquivo PDF ou TXT.')
+      return
+    }
+    if (securePassword !== securePassword2) {
+      setError('As senhas não coincidem.')
+      return
+    }
+    setSecureUploading(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await uploadSecureFile({
+        title: secureTitle.trim() || secureFile.name,
+        password: securePassword,
+        file: secureFile,
+      })
+      setSecureTitle('')
+      setSecurePassword('')
+      setSecurePassword2('')
+      setSecureFile(null)
+      setSuccess('Arquivo anexado com senha.')
+      await loadSecureFiles()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao anexar arquivo.')
+    } finally {
+      setSecureUploading(false)
+    }
+  }
+
+  async function handleUnlockSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!unlockTarget) return
+    const mode = unlockTarget.mode
+    setUnlockBusy(true)
+    setError(null)
+    try {
+      const unlocked = await unlockSecureFile({
+        fileId: unlockTarget.file.id,
+        password: unlockPassword,
+        mode,
+      })
+      setUnlockTarget(null)
+      setUnlockPassword('')
+
+      if (mode === 'download') {
+        window.open(unlocked.url, '_blank', 'noopener,noreferrer')
+        setSuccess('Download liberado.')
+        return
+      }
+
+      if (unlocked.mime_type === 'application/pdf') {
+        window.open(unlocked.url, '_blank', 'noopener,noreferrer')
+        setSuccess('PDF liberado em nova aba.')
+        return
+      }
+
+      const response = await fetch(unlocked.url)
+      const text = await response.text()
+      setTxtPreview({ title: unlocked.title, content: text })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível liberar o arquivo.')
+    } finally {
+      setUnlockBusy(false)
+    }
+  }
+
+  async function handleDeleteSecure(file: SecureFileMeta) {
+    if (!window.confirm(`Excluir “${file.title}”?`)) return
+    setError(null)
+    try {
+      await deleteSecureFile(file.id)
+      setSuccess('Arquivo excluído.')
+      await loadSecureFiles()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao excluir.')
     }
   }
 
@@ -424,6 +539,106 @@ export default function AdminManagementPage() {
           </section>
 
           <section className="admin-mgmt-section">
+            <h2>Documentos seguros</h2>
+            <p className="admin-mgmt-hint">
+              Anexe PDF ou TXT com senha. Só o admin consegue ver ou baixar após digitar a senha.
+            </p>
+            <form className="admin-mgmt-form admin-mgmt-secure-form" onSubmit={(e) => void handleSecureUpload(e)}>
+              <div className="admin-mgmt-form__grid">
+                <label>
+                  Título
+                  <input
+                    value={secureTitle}
+                    onChange={(e) => setSecureTitle(e.target.value)}
+                    placeholder="Ex.: Contrato confidencial"
+                  />
+                </label>
+                <label>
+                  Arquivo (PDF ou TXT)
+                  <input
+                    type="file"
+                    accept=".pdf,.txt,application/pdf,text/plain"
+                    onChange={(e) => setSecureFile(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+                <label>
+                  Senha
+                  <input
+                    type="password"
+                    value={securePassword}
+                    onChange={(e) => setSecurePassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </label>
+                <label>
+                  Confirmar senha
+                  <input
+                    type="password"
+                    value={securePassword2}
+                    onChange={(e) => setSecurePassword2(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </label>
+              </div>
+              <button type="submit" className="btn btn--primary" disabled={secureUploading}>
+                {secureUploading ? 'Anexando…' : 'Anexar com senha'}
+              </button>
+            </form>
+
+            {secureLoading ? (
+              <p className="admin-mgmt-muted">Carregando documentos…</p>
+            ) : secureFiles.length === 0 ? (
+              <p className="admin-mgmt-muted">Nenhum documento seguro ainda.</p>
+            ) : (
+              <ul className="admin-mgmt-secure-list">
+                {secureFiles.map((file) => (
+                  <li key={file.id} className="admin-mgmt-secure-card">
+                    <div>
+                      <h3>{file.title}</h3>
+                      <p className="admin-mgmt-muted">
+                        {file.original_filename} · {file.mime_type === 'application/pdf' ? 'PDF' : 'TXT'} ·{' '}
+                        {formatSecureFileSize(file.size_bytes)} ·{' '}
+                        {new Date(file.created_at).toLocaleString('pt-BR', {
+                          timeZone: 'America/Sao_Paulo',
+                        })}
+                      </p>
+                    </div>
+                    <div className="admin-mgmt-secure-actions">
+                      <button
+                        type="button"
+                        className="btn btn--secondary"
+                        onClick={() => {
+                          setUnlockPassword('')
+                          setUnlockTarget({ file, mode: 'view' })
+                        }}
+                      >
+                        Ver
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--secondary"
+                        onClick={() => {
+                          setUnlockPassword('')
+                          setUnlockTarget({ file, mode: 'download' })
+                        }}
+                      >
+                        Baixar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--secondary"
+                        onClick={() => void handleDeleteSecure(file)}
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="admin-mgmt-section">
             <h2>Alertas e cotas</h2>
             <form className="admin-mgmt-form" onSubmit={(e) => void handleSave(e)}>
               <div className="admin-mgmt-form__grid">
@@ -570,6 +785,73 @@ export default function AdminManagementPage() {
                 ))}
               </ul>
             )}
+          </div>
+        </div>
+      )}
+
+      {unlockTarget && (
+        <div
+          className="admin-mgmt-modal"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => {
+            if (!unlockBusy) {
+              setUnlockTarget(null)
+              setUnlockPassword('')
+            }
+          }}
+        >
+          <div className="admin-mgmt-modal__panel" onClick={(e) => e.stopPropagation()}>
+            <header className="admin-mgmt-modal__header">
+              <h3>
+                {unlockTarget.mode === 'download' ? 'Baixar' : 'Abrir'}: {unlockTarget.file.title}
+              </h3>
+              <button
+                type="button"
+                className="btn btn--secondary"
+                disabled={unlockBusy}
+                onClick={() => {
+                  setUnlockTarget(null)
+                  setUnlockPassword('')
+                }}
+              >
+                Fechar
+              </button>
+            </header>
+            <form className="admin-mgmt-form" onSubmit={(e) => void handleUnlockSubmit(e)}>
+              <label>
+                Senha do arquivo
+                <input
+                  type="password"
+                  value={unlockPassword}
+                  onChange={(e) => setUnlockPassword(e.target.value)}
+                  autoFocus
+                  autoComplete="current-password"
+                />
+              </label>
+              <button type="submit" className="btn btn--primary" disabled={unlockBusy || !unlockPassword}>
+                {unlockBusy ? 'Validando…' : 'Liberar'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {txtPreview && (
+        <div
+          className="admin-mgmt-modal"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setTxtPreview(null)}
+        >
+          <div className="admin-mgmt-modal__panel admin-mgmt-modal__panel--wide" onClick={(e) => e.stopPropagation()}>
+            <header className="admin-mgmt-modal__header">
+              <h3>{txtPreview.title}</h3>
+              <button type="button" className="btn btn--secondary" onClick={() => setTxtPreview(null)}>
+                Fechar
+              </button>
+            </header>
+            <pre className="admin-mgmt-txt-preview">{txtPreview.content}</pre>
           </div>
         </div>
       )}

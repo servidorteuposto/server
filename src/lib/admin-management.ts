@@ -92,6 +92,117 @@ export type ManagementPosto = {
   created_at: string
 }
 
+export type SecureFileMeta = {
+  id: string
+  title: string
+  original_filename: string
+  mime_type: 'application/pdf' | 'text/plain' | string
+  size_bytes: number
+  created_at: string
+  locked_until: string | null
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result ?? '')
+      const base64 = result.includes(',') ? result.split(',')[1] : result
+      resolve(base64)
+    }
+    reader.onerror = () => reject(new Error('Falha ao ler o arquivo.'))
+    reader.readAsDataURL(file)
+  })
+}
+
+export async function listSecureFiles(): Promise<SecureFileMeta[]> {
+  const { payload, invokeFailed } = await invokeManagement<{
+    ok: boolean
+    message?: string
+    files?: SecureFileMeta[]
+  }>({ action: 'list_secure_files' })
+
+  if (invokeFailed || !payload?.ok) {
+    throw new Error(payload?.message || 'Não foi possível listar os documentos seguros.')
+  }
+
+  return payload.files ?? []
+}
+
+export async function uploadSecureFile(input: {
+  title: string
+  password: string
+  file: File
+}): Promise<SecureFileMeta> {
+  const content_base64 = await fileToBase64(input.file)
+  const { payload, invokeFailed } = await invokeManagement<{
+    ok: boolean
+    message?: string
+    file?: SecureFileMeta
+  }>({
+    action: 'upload_secure_file',
+    title: input.title,
+    password: input.password,
+    filename: input.file.name,
+    mime_type: input.file.type,
+    content_base64,
+  })
+
+  if (invokeFailed || !payload?.ok || !payload.file) {
+    throw new Error(payload?.message || 'Não foi possível anexar o arquivo.')
+  }
+
+  return payload.file
+}
+
+export async function unlockSecureFile(input: {
+  fileId: string
+  password: string
+  mode: 'view' | 'download'
+}) {
+  const { payload, invokeFailed } = await invokeManagement<{
+    ok: boolean
+    message?: string
+    url?: string
+    mime_type?: string
+    filename?: string
+    title?: string
+  }>({
+    action: 'unlock_secure_file',
+    file_id: input.fileId,
+    password: input.password,
+    mode: input.mode,
+  })
+
+  if (invokeFailed || !payload?.ok || !payload.url) {
+    throw new Error(payload?.message || 'Senha incorreta ou arquivo indisponível.')
+  }
+
+  return {
+    url: payload.url,
+    mime_type: payload.mime_type ?? 'application/octet-stream',
+    filename: payload.filename ?? 'arquivo',
+    title: payload.title ?? 'Documento',
+  }
+}
+
+export async function deleteSecureFile(fileId: string) {
+  const { payload, invokeFailed } = await invokeManagement<{
+    ok: boolean
+    message?: string
+  }>({ action: 'delete_secure_file', file_id: fileId })
+
+  if (invokeFailed || !payload?.ok) {
+    throw new Error(payload?.message || 'Não foi possível excluir o arquivo.')
+  }
+}
+
+export function formatSecureFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 ** 2).toFixed(1)} MB`
+}
+
 async function parsePayload<T>(data: T | null, error: unknown): Promise<T | null> {
   if (data) return data
   if (!error || typeof error !== 'object' || !('context' in error)) return null
