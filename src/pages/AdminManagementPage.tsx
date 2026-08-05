@@ -491,6 +491,7 @@ export default function AdminManagementPage() {
                         usedLabel={`${dashboard.resend.daily.used} e-mails`}
                         quotaLabel={`${dashboard.resend.daily.quota}/dia`}
                         nearLimit={dashboard.resend.daily.near_limit}
+                        warnText="Restam ≤10 e-mails no dia — alerta WhatsApp, e-mail e banner no login."
                       />
                     )}
                     {dashboard.resend.monthly.used != null && (
