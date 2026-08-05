@@ -3,9 +3,9 @@
   inset: 0;
   width: 100%;
   height: 100%;
+  height: 100dvh;
   min-height: 100%;
   min-height: 100dvh;
-  min-height: 100lvh;
   min-height: -webkit-fill-available;
   z-index: 10000;
   display: none;
@@ -17,7 +17,7 @@
     1.5rem
     max(2.5rem, calc(env(safe-area-inset-bottom, 0px) + 1.75rem));
   color: #fff;
-  /* Mesmo tom da capa — só aparece se a imagem falhar */
+  /* Fallback só se a imagem não carregar */
   background: #000821;
   overflow: hidden;
   touch-action: none;
@@ -39,21 +39,14 @@
   pointer-events: none;
 }
 
-/* Capa full-bleed — passa da safe-area pra não quebrar tom em cima/baixo */
+/* Imagem 100% da tela — sem recorte estranho */
 .mobile-lock__art {
   position: absolute;
+  inset: 0;
   z-index: 0;
   display: block;
-  top: calc(-1 * env(safe-area-inset-top, 0px) - 12px);
-  right: -4px;
-  bottom: calc(-1 * env(safe-area-inset-bottom, 0px) - 12px);
-  left: -4px;
-  width: auto;
-  height: auto;
-  min-width: calc(100% + 8px);
-  min-height: calc(
-    100% + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px) + 24px
-  );
+  width: 100%;
+  height: 100%;
   max-width: none;
   object-fit: cover;
   object-position: center center;
