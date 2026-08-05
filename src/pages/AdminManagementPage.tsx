@@ -22,6 +22,30 @@ import './AdminManagementPage.css'
 
 type PostoFilter = 'active' | 'inactive' | 'all'
 
+function formatDateBr(value: string | null | undefined) {
+  if (!value) return '—'
+  const key = value.slice(0, 10)
+  const [y, m, d] = key.split('-')
+  if (!y || !m || !d) return value
+  return `${d}/${m}/${y}`
+}
+
+function formatZApiPaymentStatus(status: string | null | undefined) {
+  if (!status) return null
+  const key = status.trim().toUpperCase()
+  const map: Record<string, string> = {
+    ACTIVE: 'Ativo',
+    CANCELED: 'Cancelado',
+    CANCELLED: 'Cancelado',
+    CANCELLATION_PROC: 'Cancelamento em andamento',
+    CANCELLATION_PROCESS: 'Cancelamento em andamento',
+    PENDING: 'Pendente',
+    OVERDUE: 'Em atraso',
+    EXPIRED: 'Expirado',
+  }
+  return map[key] ?? status.replace(/_/g, ' ').toLowerCase()
+}
+
 function UsageMeter({
   label,
   percent,
@@ -274,7 +298,7 @@ export default function AdminManagementPage() {
   const domainLabel = (() => {
     if (!dashboard?.domain.expires_on) return 'Data não cadastrada'
     const d = dashboard.domain.days_left
-    if (d == null) return dashboard.domain.expires_on
+    if (d == null) return formatDateBr(dashboard.domain.expires_on)
     if (d < 0) return `Expirado há ${Math.abs(d)} dia(s)`
     if (d === 0) return 'Expira hoje'
     return `${d} dia(s) restantes`
@@ -282,13 +306,15 @@ export default function AdminManagementPage() {
 
   const zapiDueLabel = (() => {
     if (!dashboard?.zapi.configured) return 'Z-API não configurada'
-    if (!dashboard.zapi.due_on) return 'Vencimento indisponível na API'
+    if (!dashboard.zapi.due_on) return 'Indisponível na API'
     const d = dashboard.zapi.days_left
-    if (d == null) return dashboard.zapi.due_on
+    if (d == null) return formatDateBr(dashboard.zapi.due_on)
     if (d < 0) return `Expirada há ${Math.abs(d)} dia(s)`
     if (d === 0) return 'Expira hoje'
     return `${d} dia(s) restantes`
   })()
+
+  const zapiPaymentLabel = formatZApiPaymentStatus(dashboard?.zapi.payment_status)
 
   return (
     <section className="reg-docs-page admin-mgmt-page">
@@ -378,28 +404,16 @@ export default function AdminManagementPage() {
                       : 'Offline'}
                 </strong>
               </div>
-              <div>
-                <span className="admin-mgmt-stat__label">Vencimento</span>
-                <strong>{dashboard.zapi.due_on ?? '—'}</strong>
-              </div>
-              <div>
-                <span className="admin-mgmt-stat__label">Plano Z-API</span>
-                <strong>{zapiDueLabel}</strong>
-              </div>
               <div className="admin-mgmt-zapi__msg">
                 <span className="admin-mgmt-stat__label">Detalhe</span>
                 <p>{dashboard.zapi.message}</p>
-                {dashboard.zapi.payment_status && (
-                  <p className="admin-mgmt-muted">Pagamento: {dashboard.zapi.payment_status}</p>
-                )}
                 {dashboard.zapi.detail && (
                   <p className="admin-mgmt-muted">{dashboard.zapi.detail}</p>
                 )}
               </div>
             </div>
             <p className="admin-mgmt-hint">
-              Vencimento puxado automaticamente da API Z-API (`/me`). Atualiza a cada 45s. Sem
-              conexão, avisos WhatsApp não saem.
+              Status da conexão. Vencimento e pagamento da assinatura ficam em Vencimentos, abaixo.
             </p>
           </section>
 
@@ -581,54 +595,57 @@ export default function AdminManagementPage() {
           <section className="admin-mgmt-section">
             <h2>Vencimentos</h2>
             <div className="admin-mgmt-expiry-grid">
-              <div
-                className={`admin-mgmt-domain${
+              <article
+                className={`admin-mgmt-expiry-card${
                   dashboard.domain.expired || dashboard.domain.warn_2d
-                    ? ' admin-mgmt-domain--danger'
+                    ? ' admin-mgmt-expiry-card--danger'
                     : dashboard.domain.warn_7d
-                      ? ' admin-mgmt-domain--warn'
+                      ? ' admin-mgmt-expiry-card--warn'
                       : ''
                 }`}
               >
-                <h3 className="admin-mgmt-expiry-title">Domínio</h3>
-                <div>
-                  <span className="admin-mgmt-stat__label">Expiração</span>
-                  <strong>{dashboard.domain.expires_on ?? '—'}</strong>
-                </div>
-                <div>
-                  <span className="admin-mgmt-stat__label">Contador</span>
-                  <strong>{domainLabel}</strong>
-                </div>
-              </div>
-              <div
-                className={`admin-mgmt-domain${
-                  dashboard.zapi.expired || dashboard.zapi.warn_2d
-                    ? ' admin-mgmt-domain--danger'
-                    : dashboard.zapi.warn_7d
-                      ? ' admin-mgmt-domain--warn'
-                      : ''
-                }`}
-              >
-                <h3 className="admin-mgmt-expiry-title">Z-API</h3>
-                <div>
-                  <span className="admin-mgmt-stat__label">Expiração</span>
-                  <strong>{dashboard.zapi.due_on ?? '—'}</strong>
-                </div>
-                <div>
-                  <span className="admin-mgmt-stat__label">Contador</span>
-                  <strong>{zapiDueLabel}</strong>
-                </div>
-                {dashboard.zapi.payment_status && (
+                <h3>Domínio</h3>
+                <dl className="admin-mgmt-expiry-rows">
                   <div>
-                    <span className="admin-mgmt-stat__label">Pagamento</span>
-                    <strong>{dashboard.zapi.payment_status}</strong>
+                    <dt>Expiração</dt>
+                    <dd>{formatDateBr(dashboard.domain.expires_on)}</dd>
                   </div>
-                )}
-              </div>
+                  <div>
+                    <dt>Situação</dt>
+                    <dd>{domainLabel}</dd>
+                  </div>
+                </dl>
+              </article>
+              <article
+                className={`admin-mgmt-expiry-card${
+                  dashboard.zapi.expired || dashboard.zapi.warn_2d
+                    ? ' admin-mgmt-expiry-card--danger'
+                    : dashboard.zapi.warn_7d
+                      ? ' admin-mgmt-expiry-card--warn'
+                      : ''
+                }`}
+              >
+                <h3>Z-API</h3>
+                <dl className="admin-mgmt-expiry-rows">
+                  <div>
+                    <dt>Expiração</dt>
+                    <dd>{formatDateBr(dashboard.zapi.due_on)}</dd>
+                  </div>
+                  <div>
+                    <dt>Situação</dt>
+                    <dd>{zapiDueLabel}</dd>
+                  </div>
+                  {zapiPaymentLabel && (
+                    <div>
+                      <dt>Pagamento</dt>
+                      <dd>{zapiPaymentLabel}</dd>
+                    </div>
+                  )}
+                </dl>
+              </article>
             </div>
             <p className="admin-mgmt-hint">
-              Domínio: data manual abaixo. Z-API: automática via plataforma. Avisos (WhatsApp +
-              e-mail) 7 dias antes e com 2 dias ou menos.
+              Domínio: data manual nas configurações. Z-API: automática. Avisos 7 e ≤2 dias antes.
             </p>
           </section>
 
