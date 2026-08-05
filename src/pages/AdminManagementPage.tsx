@@ -85,7 +85,7 @@ export default function AdminManagementPage() {
   const [secureFile, setSecureFile] = useState<File | null>(null)
   const [unlockTarget, setUnlockTarget] = useState<{
     file: SecureFileMeta
-    mode: 'view' | 'download'
+    mode: 'view' | 'download' | 'delete'
   } | null>(null)
   const [unlockPassword, setUnlockPassword] = useState('')
   const [unlockBusy, setUnlockBusy] = useState(false)
@@ -228,11 +228,21 @@ export default function AdminManagementPage() {
     e.preventDefault()
     if (!unlockTarget) return
     const mode = unlockTarget.mode
+    const targetFile = unlockTarget.file
     setUnlockBusy(true)
     setError(null)
     try {
+      if (mode === 'delete') {
+        await deleteSecureFile(targetFile.id, unlockPassword)
+        setUnlockTarget(null)
+        setUnlockPassword('')
+        setSuccess('Arquivo excluído.')
+        await loadSecureFiles()
+        return
+      }
+
       const unlocked = await unlockSecureFile({
-        fileId: unlockTarget.file.id,
+        fileId: targetFile.id,
         password: unlockPassword,
         mode,
       })
@@ -258,18 +268,6 @@ export default function AdminManagementPage() {
       setError(err instanceof Error ? err.message : 'Não foi possível liberar o arquivo.')
     } finally {
       setUnlockBusy(false)
-    }
-  }
-
-  async function handleDeleteSecure(file: SecureFileMeta) {
-    if (!window.confirm(`Excluir “${file.title}”?`)) return
-    setError(null)
-    try {
-      await deleteSecureFile(file.id)
-      setSuccess('Arquivo excluído.')
-      await loadSecureFiles()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao excluir.')
     }
   }
 
@@ -627,7 +625,10 @@ export default function AdminManagementPage() {
                       <button
                         type="button"
                         className="btn btn--secondary"
-                        onClick={() => void handleDeleteSecure(file)}
+                        onClick={() => {
+                          setUnlockPassword('')
+                          setUnlockTarget({ file, mode: 'delete' })
+                        }}
                       >
                         Excluir
                       </button>
@@ -804,7 +805,12 @@ export default function AdminManagementPage() {
           <div className="admin-mgmt-modal__panel" onClick={(e) => e.stopPropagation()}>
             <header className="admin-mgmt-modal__header">
               <h3>
-                {unlockTarget.mode === 'download' ? 'Baixar' : 'Abrir'}: {unlockTarget.file.title}
+                {unlockTarget.mode === 'download'
+                  ? 'Baixar'
+                  : unlockTarget.mode === 'delete'
+                    ? 'Excluir'
+                    : 'Abrir'}
+                : {unlockTarget.file.title}
               </h3>
               <button
                 type="button"
@@ -818,6 +824,11 @@ export default function AdminManagementPage() {
                 Fechar
               </button>
             </header>
+            {unlockTarget.mode === 'delete' && (
+              <p className="admin-mgmt-hint">
+                Digite a senha do arquivo para confirmar a exclusão. Essa ação não pode ser desfeita.
+              </p>
+            )}
             <form className="admin-mgmt-form" onSubmit={(e) => void handleUnlockSubmit(e)}>
               <label>
                 Senha do arquivo
@@ -829,8 +840,16 @@ export default function AdminManagementPage() {
                   autoComplete="current-password"
                 />
               </label>
-              <button type="submit" className="btn btn--primary" disabled={unlockBusy || !unlockPassword}>
-                {unlockBusy ? 'Validando…' : 'Liberar'}
+              <button
+                type="submit"
+                className={`btn ${unlockTarget.mode === 'delete' ? 'btn--danger' : 'btn--primary'}`}
+                disabled={unlockBusy || !unlockPassword}
+              >
+                {unlockBusy
+                  ? 'Validando…'
+                  : unlockTarget.mode === 'delete'
+                    ? 'Excluir documento'
+                    : 'Liberar'}
               </button>
             </form>
           </div>

@@ -687,18 +687,44 @@ Deno.serve(async (req) => {
 
     if (action === 'delete_secure_file') {
       const fileId = typeof body?.file_id === 'string' ? body.file_id : ''
+      const password = typeof body?.password === 'string' ? body.password : ''
       if (!fileId) {
         return jsonResponse({ ok: false, message: 'Informe o arquivo.' }, 400)
+      }
+      if (!password) {
+        return jsonResponse({ ok: false, message: 'Informe a senha para excluir.' }, 400)
       }
 
       const { data: file, error: fileError } = await admin
         .from('admin_secure_files')
-        .select('id, storage_path')
+        .select('*')
         .eq('id', fileId)
         .maybeSingle()
 
       if (fileError || !file) {
         return jsonResponse({ ok: false, message: 'Arquivo não encontrado.' }, 404)
+      }
+
+      if (file.locked_until && new Date(file.locked_until).getTime() > Date.now()) {
+        return jsonResponse(
+          {
+            ok: false,
+            message: 'Arquivo temporariamente bloqueado por tentativas inválidas. Tente mais tarde.',
+          },
+          423,
+        )
+      }
+
+      const valid = await verifyPassword(password, file.password_hash)
+      if (!valid) {
+        const attempts = Number(file.failed_attempts ?? 0) + 1
+        const patch: Record<string, unknown> = { failed_attempts: attempts }
+        if (attempts >= MAX_FAILED_ATTEMPTS) {
+          patch.locked_until = new Date(Date.now() + LOCK_MINUTES * 60_000).toISOString()
+          patch.failed_attempts = 0
+        }
+        await admin.from('admin_secure_files').update(patch).eq('id', fileId)
+        return jsonResponse({ ok: false, message: 'Senha incorreta.' }, 401)
       }
 
       await admin.storage.from(SECURE_BUCKET).remove([file.storage_path])

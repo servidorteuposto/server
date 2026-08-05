@@ -186,11 +186,11 @@ export async function unlockSecureFile(input: {
   }
 }
 
-export async function deleteSecureFile(fileId: string) {
+export async function deleteSecureFile(fileId: string, password: string) {
   const { payload, invokeFailed } = await invokeManagement<{
     ok: boolean
     message?: string
-  }>({ action: 'delete_secure_file', file_id: fileId })
+  }>({ action: 'delete_secure_file', file_id: fileId, password })
 
   if (invokeFailed || !payload?.ok) {
     throw new Error(payload?.message || 'Não foi possível excluir o arquivo.')
