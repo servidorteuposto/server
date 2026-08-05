@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
   try {
     const cronSecret = Deno.env.get('DRAINAGE_CRON_SECRET')
     const providedSecret = req.headers.get('x-drainage-cron-secret')
-    if (cronSecret && providedSecret !== cronSecret) {
+    if (!cronSecret || providedSecret !== cronSecret) {
       return jsonResponse({ ok: false, message: 'Unauthorized' }, 401)
     }
 

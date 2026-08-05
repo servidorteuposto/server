@@ -1149,7 +1149,7 @@ Deno.serve(async (req) => {
     const provided =
       req.headers.get('x-operational-cron-secret') ??
       req.headers.get('x-drainage-cron-secret')
-    if (cronSecret && provided !== cronSecret) {
+    if (!cronSecret || provided !== cronSecret) {
       return jsonResponse({ ok: false, message: 'Unauthorized' }, 401)
     }
 

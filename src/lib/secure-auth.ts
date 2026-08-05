@@ -127,20 +127,3 @@ export async function secureRegister(input: {
 
   return payload
 }
-
-export async function secureActivatePayment(cnpj: string) {
-  const { payload, invokeFailed } = await invokeSecureAuth<{ ok: boolean; message?: string }>({
-    action: 'activate_payment',
-    cnpj,
-  })
-
-  if (invokeFailed || !payload?.ok) {
-    throw new Error(payload?.message ?? 'payment_activation_failed')
-  }
-}
-
-export async function clearLoginLockout(identifier: string) {
-  await supabase.functions.invoke('secure-auth', {
-    body: { action: 'clear_lockout', identifier },
-  })
-}

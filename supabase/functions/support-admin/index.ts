@@ -86,47 +86,20 @@ Deno.serve(async (req) => {
 
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.49.1')
 
-    // Cliente com o JWT do usuário (mais confiável que getUser via service role).
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
+    const admin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     })
 
     const {
       data: { user },
       error: userError,
-    } = await userClient.auth.getUser()
+    } = await admin.auth.getUser(accessToken)
 
-    const admin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
-
-    let jwtEmail: string | null = null
-    let jwtSub: string | null = null
-    try {
-      const payloadPart = accessToken.split('.')[1]
-      if (payloadPart) {
-        const json = JSON.parse(atob(payloadPart.replace(/-/g, '+').replace(/_/g, '/')))
-        jwtEmail =
-          typeof json?.email === 'string' ? String(json.email).trim().toLowerCase() : null
-        jwtSub = typeof json?.sub === 'string' ? json.sub : null
-      }
-    } catch {
-      jwtEmail = null
-      jwtSub = null
-    }
-
-    const isAdmin =
-      (!userError && user && isAdminAccount(user)) || jwtEmail === ADMIN_EMAIL
-
-    if (!isAdmin) {
+    if (userError || !user || !isAdminAccount(user)) {
       return jsonResponse({ ok: false, message: 'Acesso restrito ao administrador.' }, 403)
     }
 
-    const adminUserId = user?.id ?? jwtSub
-    if (!adminUserId) {
-      return jsonResponse({ ok: false, message: 'Não autenticado.' }, 401)
-    }
+    const adminUserId = user.id
 
     const body = await req.json()
     const action = body?.action

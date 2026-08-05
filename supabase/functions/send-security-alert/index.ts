@@ -329,6 +329,13 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const authHeader = req.headers.get('Authorization') ?? ''
+    // Só a própria infra (secure-auth com service_role) pode disparar este alerta.
+    if (!serviceRoleKey || authHeader !== `Bearer ${serviceRoleKey}`) {
+      return jsonResponse({ ok: false, message: 'Unauthorized' }, 401)
+    }
+
     const body = await req.json()
     const { type, email, phone, payload, alert_id: alertId } = body
 

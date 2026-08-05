@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
   try {
     const cronSecret = Deno.env.get('ADMIN_MGMT_CRON_SECRET')
     const provided = req.headers.get('x-admin-mgmt-cron-secret')
-    if (cronSecret && provided !== cronSecret) {
+    if (!cronSecret || provided !== cronSecret) {
       return jsonResponse({ ok: false, message: 'Unauthorized' }, 401)
     }
 

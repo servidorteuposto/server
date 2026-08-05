@@ -559,28 +559,6 @@ async function handleRegister(
   return { ok: true, needs_payment: true }
 }
 
-async function handleActivatePayment(admin: ReturnType<typeof createClient>, cnpj: string, ipHash: string) {
-  const rateLimit = await admin.rpc('security_check_registration_rate_limit', {
-    p_ip_hash: ipHash,
-    p_cnpj: cnpj,
-  })
-
-  const rateData = rateLimit.data as { allowed?: boolean; message?: string } | null
-  if (!rateData?.allowed) {
-    return {
-      ok: false,
-      message: rateData?.message ?? 'Muitas tentativas. Aguarde e tente novamente.',
-    }
-  }
-
-  const { error } = await admin.rpc('activate_subscription', { p_cnpj: cnpj })
-  if (error) {
-    return { ok: false, message: 'Não foi possível ativar a assinatura.' }
-  }
-
-  return { ok: true }
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -604,17 +582,8 @@ Deno.serve(async (req) => {
       return jsonResponse(result, 200)
     }
 
-    if (action === 'activate_payment') {
-      const result = await handleActivatePayment(admin, body.cnpj, ipHash)
-      return jsonResponse(result, 200)
-    }
-
-    if (action === 'clear_lockout') {
-      const { error } = await admin.rpc('security_clear_login_lockout', {
-        p_identifier: body.identifier,
-      })
-      return jsonResponse({ ok: !error }, error ? 400 : 200)
-    }
+    // activate_payment e clear_lockout removidos: ativação só via Mercado Pago (service_role);
+    // lockout só via security_clear_my_login_lockout (usuário autenticado) ou service_role.
 
     if (action === 'request_password_reset') {
       const result = await handlePasswordRecovery(admin, body.identifier ?? '', body.redirectTo)
