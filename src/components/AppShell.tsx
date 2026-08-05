@@ -26,6 +26,11 @@ import WorkSafetyPage from '../pages/WorkSafetyPage'
 import { endImpersonateMode, getImpersonateLabel, isImpersonating } from '../lib/supabase'
 import { supabase } from '../lib/supabase'
 import { getRenewalNoticeKind } from '../lib/payment'
+import {
+  getManagementAttention,
+  runManagementAlertCheck,
+  type ManagementAttention,
+} from '../lib/admin-management'
 import type { SubscriptionStatus } from '../lib/subscription'
 import './AppShell.css'
 
@@ -110,6 +115,7 @@ export default function AppShell({
     longitude: null,
     photoUrl: null,
   })
+  const [adminAttention, setAdminAttention] = useState<ManagementAttention | null>(null)
 
   const renewalNotice = isAdmin
     ? null
@@ -121,6 +127,33 @@ export default function AppShell({
   const isRecurring = billingMode === 'recurring'
   const mainMenuItems = getMainMenuItems(isAdmin)
   const activeModule = activeMenuId ? getMenuItem(activeMenuId) : null
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setAdminAttention(null)
+      return
+    }
+
+    let cancelled = false
+
+    async function checkAdminAttention() {
+      try {
+        const attention = await getManagementAttention()
+        if (cancelled) return
+        setAdminAttention(attention)
+        if (attention.needs_attention) {
+          void runManagementAlertCheck().catch(() => {})
+        }
+      } catch {
+        if (!cancelled) setAdminAttention(null)
+      }
+    }
+
+    void checkAdminAttention()
+    return () => {
+      cancelled = true
+    }
+  }, [isAdmin])
 
   useEffect(() => {
     let cancelled = false
@@ -302,6 +335,27 @@ export default function AppShell({
           </span>
           <button type="button" className="impersonate-banner__btn" onClick={() => void endImpersonateMode()}>
             Sair desta conta
+          </button>
+        </div>
+      )}
+      {isAdmin && adminAttention?.needs_attention && (
+        <div className="admin-attention-banner" role="status">
+          <span>
+            Há alertas de infraestrutura (Z-API, cotas ou domínio). Abra o{' '}
+            <strong>Gerenciamento</strong> para verificar.
+            {adminAttention.reasons.length > 0
+              ? ` ${adminAttention.reasons.map((r) => r.label).join(' · ')}.`
+              : ''}
+          </span>
+          <button
+            type="button"
+            className="admin-attention-banner__btn"
+            onClick={() => {
+              setActiveMenuId('gerenciamento')
+              setSidebarOpen(false)
+            }}
+          >
+            Abrir Gerenciamento
           </button>
         </div>
       )}

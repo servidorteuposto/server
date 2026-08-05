@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { fetchZApiStatus } from '../_shared/admin-management.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,11 +31,15 @@ type PostoRow = {
   billing_mode: string | null
 }
 
-type OutboundJob = {
+type ReminderJob = {
+  posto_id: string
+  category: string
+  reference_id: string
+  milestone: string
   phones: string[]
   message: string
-  meta: Record<string, unknown>
-  onSuccess: () => Promise<void>
+  due_on: string
+  meta?: Record<string, unknown>
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -212,42 +217,203 @@ async function markSent(
   return true
 }
 
-/** Processa a fila com delay de 10s entre cada envio à API (nunca em rajada). */
-async function flushQueue(jobs: OutboundJob[]) {
+async function enqueueReminder(
+  admin: ReturnType<typeof createClient>,
+  job: ReminderJob,
+) {
+  if (
+    await alreadySent(admin, job.posto_id, job.category, job.reference_id, job.milestone)
+  ) {
+    return false
+  }
+
+  const now = new Date().toISOString()
+  const { error } = await admin.from('whatsapp_reminder_queue').upsert(
+    {
+      posto_id: job.posto_id,
+      category: job.category,
+      reference_id: job.reference_id,
+      milestone: job.milestone,
+      message: job.message,
+      phones: job.phones,
+      due_on: job.due_on,
+      updated_at: now,
+    },
+    { onConflict: 'posto_id,category,reference_id,milestone' },
+  )
+
+  if (error) {
+    console.error('enqueueReminder failed', error)
+    return false
+  }
+  return true
+}
+
+async function hasPendingRaq(
+  admin: ReturnType<typeof createClient>,
+  postoId: string,
+) {
+  const { data } = await admin
+    .from('whatsapp_reminder_queue')
+    .select('id')
+    .eq('posto_id', postoId)
+    .eq('category', 'raq')
+    .limit(1)
+    .maybeSingle()
+  return Boolean(data?.id)
+}
+
+/** Envia pendências da fila; só marca como enviado após sucesso na Z-API. */
+async function flushReminderQueue(admin: ReturnType<typeof createClient>, todayKey: string) {
+  const zapi = await fetchZApiStatus()
   const details: Array<Record<string, unknown>> = []
   let apiCalls = 0
   let jobsSent = 0
   let deferred = 0
 
-  for (const job of jobs) {
+  if (!zapi.configured || !zapi.connected) {
+    const { count } = await admin
+      .from('whatsapp_reminder_queue')
+      .select('id', { count: 'exact', head: true })
+
+    return {
+      details: [
+        {
+          skipped: 'zapi_disconnected',
+          pending: count ?? 0,
+          zapi_message: zapi.message,
+        },
+      ],
+      apiCalls: 0,
+      jobsSent: 0,
+      deferred: count ?? 0,
+      zapi_connected: false,
+      zapi_message: zapi.message,
+      pending_left: count ?? 0,
+    }
+  }
+
+  const { data: pending, error: pendingError } = await admin
+    .from('whatsapp_reminder_queue')
+    .select(
+      'id, posto_id, category, reference_id, milestone, message, phones, due_on, attempts',
+    )
+    .order('due_on', { ascending: true })
+    .order('created_at', { ascending: true })
+    .limit(Math.max(MAX_SENDS_PER_RUN * 2, 40))
+
+  if (pendingError) throw pendingError
+
+  const rows = pending ?? []
+
+  for (const row of rows) {
     if (apiCalls >= MAX_SENDS_PER_RUN) {
       deferred += 1
-      details.push({ ...job.meta, skipped: 'rate_limit_batch', deferred: true })
+      details.push({
+        id: row.id,
+        category: row.category,
+        milestone: row.milestone,
+        skipped: 'rate_limit_batch',
+        deferred: true,
+      })
+      continue
+    }
+
+    if (
+      await alreadySent(
+        admin,
+        row.posto_id,
+        row.category,
+        row.reference_id,
+        row.milestone,
+      )
+    ) {
+      await admin.from('whatsapp_reminder_queue').delete().eq('id', row.id)
+      details.push({ id: row.id, category: row.category, skipped: 'already_sent' })
+      continue
+    }
+
+    const phones = Array.isArray(row.phones) ? row.phones.filter(Boolean) : []
+    if (!phones.length) {
+      await admin
+        .from('whatsapp_reminder_queue')
+        .update({
+          attempts: Number(row.attempts ?? 0) + 1,
+          last_error: 'no_phones',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', row.id)
+      details.push({ id: row.id, category: row.category, sent: false, error: 'no_phones' })
       continue
     }
 
     let ok = false
-    for (const phone of job.phones) {
+    let lastError: string | null = null
+    for (const phone of phones) {
       if (apiCalls >= MAX_SENDS_PER_RUN) break
       if (apiCalls > 0) await sleep(SEND_DELAY_MS)
-      const delivered = await sendWhatsApp(phone, job.message)
+      const delivered = await sendWhatsApp(String(phone), row.message)
       apiCalls += 1
       if (delivered) ok = true
+      else lastError = 'whatsapp_send_failed'
     }
 
     if (ok) {
-      await job.onSuccess()
+      await markSent(
+        admin,
+        row.posto_id,
+        row.category,
+        row.reference_id,
+        row.milestone,
+        todayKey,
+      )
+      await admin.from('whatsapp_reminder_queue').delete().eq('id', row.id)
       jobsSent += 1
-      details.push({ ...job.meta, sent: true })
-    } else if (apiCalls >= MAX_SENDS_PER_RUN && !ok) {
-      deferred += 1
-      details.push({ ...job.meta, skipped: 'rate_limit_batch', deferred: true })
+      details.push({
+        id: row.id,
+        category: row.category,
+        reference_id: row.reference_id,
+        milestone: row.milestone,
+        due_on: row.due_on,
+        sent: true,
+        catch_up: row.due_on !== todayKey,
+      })
     } else {
-      details.push({ ...job.meta, sent: false })
+      await admin
+        .from('whatsapp_reminder_queue')
+        .update({
+          attempts: Number(row.attempts ?? 0) + 1,
+          last_error: lastError ?? 'send_failed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', row.id)
+      deferred += 1
+      details.push({
+        id: row.id,
+        category: row.category,
+        sent: false,
+        deferred: true,
+        error: lastError,
+      })
+      // Se a Z-API caiu no meio do lote, para e deixa o resto na fila.
+      const statusAgain = await fetchZApiStatus()
+      if (!statusAgain.connected) break
     }
   }
 
-  return { details, apiCalls, jobsSent, deferred }
+  const { count: pendingLeft } = await admin
+    .from('whatsapp_reminder_queue')
+    .select('id', { count: 'exact', head: true })
+
+  return {
+    details,
+    apiCalls,
+    jobsSent,
+    deferred,
+    zapi_connected: true,
+    zapi_message: zapi.message,
+    pending_left: pendingLeft ?? 0,
+  }
 }
 
 function docMessage(
@@ -1013,10 +1179,21 @@ Deno.serve(async (req) => {
 
     const activePostos = (postos ?? []).filter((p) => collectAvisoPhones(p as PostoRow).length > 0)
     const postoIds = activePostos.map((p) => p.id)
-    const queue: OutboundJob[] = []
+    let enqueued = 0
 
     if (!postoIds.length) {
-      return jsonResponse({ ok: true, today: todayKey, sent: 0, checked_postos: 0, details: [] })
+      const flushEmpty = await flushReminderQueue(admin, todayKey)
+      return jsonResponse({
+        ok: true,
+        today: todayKey,
+        sent: flushEmpty.jobsSent,
+        checked_postos: 0,
+        enqueued: 0,
+        deferred: flushEmpty.deferred,
+        pending_left: flushEmpty.pending_left,
+        zapi_connected: flushEmpty.zapi_connected,
+        details: flushEmpty.details,
+      })
     }
 
     const postoById = new Map(activePostos.map((p) => [p.id, p as PostoRow]))
@@ -1032,24 +1209,19 @@ Deno.serve(async (req) => {
       if (!(SUBSCRIPTION_MILESTONES as readonly number[]).includes(daysLeft)) continue
 
       const milestone = `d${daysLeft}`
-      if (await alreadySent(admin, posto.id, 'subscription', endsKey, milestone)) continue
-
       const phones = collectAvisoPhones(posto)
       const seed = `${posto.id}:subscription:${endsKey}:${milestone}:${todayKey}`
-      queue.push({
+      const ok = await enqueueReminder(admin, {
+        posto_id: posto.id,
+        category: 'subscription',
+        reference_id: endsKey,
+        milestone,
         phones,
         message: subscriptionMessage(posto, daysLeft, endsKey, seed),
-        meta: {
-          type: 'subscription',
-          posto_id: posto.id,
-          ends_at: endsKey,
-          days_left: daysLeft,
-          billing_mode: posto.billing_mode ?? 'one_time',
-          milestone,
-        },
-        onSuccess: () =>
-          markSent(admin, posto.id, 'subscription', endsKey, milestone, todayKey).then(() => {}),
+        due_on: todayKey,
+        meta: { days_left: daysLeft, billing_mode: posto.billing_mode ?? 'one_time' },
       })
+      if (ok) enqueued += 1
     }
 
     // --- Documentos regulatórios + laudos ---
@@ -1088,21 +1260,23 @@ Deno.serve(async (req) => {
       if (!(DOC_MILESTONES as readonly number[]).includes(daysLeft)) continue
 
       const milestone = `d${daysLeft}`
-      if (await alreadySent(admin, doc.posto_id, doc.category, doc.id, milestone)) continue
-
       const posto = postoById.get(doc.posto_id)
       if (!posto) continue
       const phones = collectAvisoPhones(posto)
       const seed = `${doc.posto_id}:${doc.category}:${doc.id}:${milestone}:${todayKey}`
-      queue.push({
+      const ok = await enqueueReminder(admin, {
+        posto_id: doc.posto_id,
+        category: doc.category,
+        reference_id: doc.id,
+        milestone,
         phones,
         message: docMessage(posto, doc.title, daysLeft, doc.expires_at, seed),
-        meta: { type: doc.category, id: doc.id, milestone },
-        onSuccess: () => markSent(admin, doc.posto_id, doc.category, doc.id, milestone, todayKey).then(() => {}),
+        due_on: todayKey,
       })
+      if (ok) enqueued += 1
     }
 
-    // --- Metrologia ---
+    // --- Metrologia (hoje ou atrasado se Z-API estava offline) ---
     const { data: metroRows } = await admin
       .from('nozzle_metrology_verifications')
       .select('posto_id, verified_at')
@@ -1120,22 +1294,24 @@ Deno.serve(async (req) => {
       const lastKey = toSaoPauloDateKey(lastAt)
       if (!lastKey) continue
       const dueKey = addDaysToDateKey(lastKey, METROLOGY_INTERVAL_DAYS)
-      if (dueKey !== todayKey) continue
+      if (dueKey > todayKey) continue
 
       const milestone = `due:${dueKey}`
-      if (await alreadySent(admin, posto.id, 'metrology', 'posto', milestone)) continue
-
       const phones = collectAvisoPhones(posto as PostoRow)
       const seed = `${posto.id}:metrology:${milestone}`
-      queue.push({
+      const ok = await enqueueReminder(admin, {
+        posto_id: posto.id,
+        category: 'metrology',
+        reference_id: 'posto',
+        milestone,
         phones,
         message: metrologyMessage(posto as PostoRow, dueKey, seed),
-        meta: { type: 'metrology', posto_id: posto.id },
-        onSuccess: () => markSent(admin, posto.id, 'metrology', 'posto', milestone, todayKey).then(() => {}),
+        due_on: dueKey,
       })
+      if (ok) enqueued += 1
     }
 
-    // --- Drenagem ---
+    // --- Drenagem (hoje ou atrasado) ---
     const { data: tanks } = await admin
       .from('diesel_tanks')
       .select('id, name, posto_id, is_active')
@@ -1162,27 +1338,30 @@ Deno.serve(async (req) => {
         const lastKey = toSaoPauloDateKey(lastAt)
         if (!lastKey) continue
         const dueKey = addDaysToDateKey(lastKey, DRAINAGE_INTERVAL_DAYS)
-        if (dueKey !== todayKey) continue
+        if (dueKey > todayKey) continue
 
         const milestone = `due:${dueKey}`
-        if (await alreadySent(admin, tank.posto_id, 'drainage', tank.id, milestone)) continue
-
         const posto = postoById.get(tank.posto_id)
         if (!posto) continue
         const phones = collectAvisoPhones(posto)
         const seed = `${tank.posto_id}:drainage:${tank.id}:${milestone}`
-        queue.push({
+        const ok = await enqueueReminder(admin, {
+          posto_id: tank.posto_id,
+          category: 'drainage',
+          reference_id: tank.id,
+          milestone,
           phones,
           message: drainageMessage(posto, tank.name, dueKey, seed),
-          meta: { type: 'drainage', tank_id: tank.id },
-          onSuccess: () =>
-            markSent(admin, tank.posto_id, 'drainage', tank.id, milestone, todayKey).then(() => {}),
+          due_on: dueKey,
         })
+        if (ok) enqueued += 1
       }
     }
 
     // --- RAQ ---
     for (const posto of activePostos) {
+      if (await hasPendingRaq(admin, posto.id)) continue
+
       const { data: lastRaq } = await admin
         .from('whatsapp_reminder_sends')
         .select('sent_on')
@@ -1198,28 +1377,34 @@ Deno.serve(async (req) => {
       }
 
       const milestone = `day:${todayKey}`
-      if (await alreadySent(admin, posto.id, 'raq', 'periodic', milestone)) continue
-
       const phones = collectAvisoPhones(posto as PostoRow)
       const seed = `${posto.id}:raq:${milestone}`
-      queue.push({
+      const ok = await enqueueReminder(admin, {
+        posto_id: posto.id,
+        category: 'raq',
+        reference_id: 'periodic',
+        milestone,
         phones,
         message: raqMessage(posto as PostoRow, seed),
-        meta: { type: 'raq', posto_id: posto.id },
-        onSuccess: () => markSent(admin, posto.id, 'raq', 'periodic', milestone, todayKey).then(() => {}),
+        due_on: todayKey,
       })
+      if (ok) enqueued += 1
     }
 
-    const flush = await flushQueue(queue)
+    const flush = await flushReminderQueue(admin, todayKey)
 
     return jsonResponse({
       ok: true,
       today: todayKey,
       checked_postos: activePostos.length,
-      queued: queue.length,
+      enqueued,
+      queued: enqueued,
       sent: flush.jobsSent,
       api_calls: flush.apiCalls,
       deferred: flush.deferred,
+      pending_left: flush.pending_left,
+      zapi_connected: flush.zapi_connected,
+      zapi_message: flush.zapi_message,
       send_delay_ms: SEND_DELAY_MS,
       max_sends_per_run: MAX_SENDS_PER_RUN,
       details: flush.details,

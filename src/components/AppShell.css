@@ -73,6 +73,35 @@
   cursor: pointer;
 }
 
+.admin-attention-banner {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem 1rem;
+  padding: 0.75rem 1rem;
+  background: #fef2f2;
+  border-bottom: 1px solid #fecaca;
+  color: #991b1b;
+  font-size: clamp(0.82rem, 2.4vw, 0.9rem);
+  line-height: 1.45;
+  text-align: center;
+}
+
+.admin-attention-banner__btn {
+  appearance: none;
+  border: 1px solid rgba(153, 27, 27, 0.28);
+  border-radius: 8px;
+  padding: 0.35rem 0.75rem;
+  background: var(--white);
+  color: #991b1b;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .app-shell__body {
   flex: 1;
   min-height: 0;

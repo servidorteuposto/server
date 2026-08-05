@@ -432,3 +432,353 @@ export async function fetchResendStats() {
     }
   }
 }
+
+/** Remetente padrão dos alertas de infraestrutura. */
+const DEFAULT_FROM = 'Teu Posto <noreply@appteuposto.com.br>'
+const DEFAULT_REPLY_TO = 'Teu Posto Suporte <suporte@appteuposto.com.br>'
+
+export const ALERT_REASON_LABELS: Record<string, string> = {
+  supabase_db: 'Banco de dados perto do limite (≤10% restante)',
+  supabase_storage: 'Storage perto do limite (≤10% restante)',
+  resend_daily: 'Cota diária de e-mail perto do limite',
+  resend_monthly: 'Cota mensal de e-mail perto do limite',
+  domain_7d: 'Domínio vence em 7 dias',
+  domain_2d: 'Domínio vence em 2 dias ou menos',
+  domain_expired: 'Domínio expirado',
+  zapi_disconnected: 'Z-API desconectada do WhatsApp',
+}
+
+export function alertEmailSubject(key: string) {
+  const label = ALERT_REASON_LABELS[key] ?? key
+  return `Teu Posto — alerta: ${label}`
+}
+
+export function alertTextToHtml(text: string) {
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+  const withBold = escaped.replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
+  return [
+    '<div style="font-family:Segoe UI,Arial,sans-serif;line-height:1.5;color:#111;">',
+    '<p style="margin:0 0 12px;"><strong>Alerta de infraestrutura — Teu Posto</strong></p>',
+    `<p style="margin:0;white-space:pre-wrap;">${withBold.replace(/\n/g, '<br>')}</p>`,
+    '<p style="margin:16px 0 0;color:#555;font-size:13px;">Abra o menu <strong>Gerenciamento</strong> no site para revisar.</p>',
+    '</div>',
+  ].join('')
+}
+
+export async function sendResendEmail(options: {
+  to: string
+  subject: string
+  html: string
+  from?: string
+}): Promise<boolean> {
+  const resendKey = Deno.env.get('RESEND_API_KEY')
+  const from =
+    options.from ??
+    Deno.env.get('AUTH_EMAIL_FROM') ??
+    Deno.env.get('SECURITY_EMAIL_FROM') ??
+    DEFAULT_FROM
+  const replyTo =
+    Deno.env.get('SUPPORT_EMAIL_REPLY_TO') ??
+    Deno.env.get('SUPPORT_EMAIL') ??
+    DEFAULT_REPLY_TO
+
+  if (!resendKey) {
+    console.warn('RESEND_API_KEY not configured, skipping email')
+    return false
+  }
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resendKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from,
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      reply_to: replyTo,
+    }),
+  })
+
+  if (!response.ok) {
+    console.error('Failed to send email', await response.text())
+    return false
+  }
+
+  return true
+}
+
+export async function sendAdminAlertEmail(key: string, message: string) {
+  return sendResendEmail({
+    to: ADMIN_EMAIL,
+    subject: alertEmailSubject(key),
+    html: alertTextToHtml(message),
+  })
+}
+
+export function zapiDisconnectedMessage(seed: string) {
+  const variants = [
+    '🚨 *Z-API desconectada — Teu Posto*\n\nA instância WhatsApp está offline.\nReconecte no painel Z-API para retomar os avisos.',
+    '❗ *WhatsApp admin offline*\n\nZ-API sem conexão. Os lembretes automáticos ficam pausados até religar.',
+    '🛑 *Alerta de infraestrutura*\n\nInstância Z-API desconectada.\nAbra o Gerenciamento / Z-API e reconecte.',
+    '📢 *Teu Posto Admin*\n\nA API do WhatsApp (Z-API) está desconectada agora.',
+    '⚠️ *Conexão WhatsApp perdida*\n\nReconecte a Z-API para voltar a enviar avisos.',
+    '🔔 *Monitoramento*\n\nZ-API: status desconectado. Verifique o celular e a sessão.',
+    '📣 *Aviso automático*\n\nWhatsApp via Z-API offline — ação necessária no Gerenciamento.',
+    '🧰 *Manutenção*\n\nSem Z-API conectada, alertas e lembretes não saem.',
+    '📡 *Status Z-API*\n\nDesconectada. Religue a instância o quanto antes.',
+    '🧨 *Canal WhatsApp indisponível*\n\nZ-API offline. Reconecte para normalizar os envios.',
+  ]
+  return variants[pickVariantIndex(seed, variants.length)]
+}
+
+export type AttentionReason = { code: string; label: string }
+
+// Cliente service_role (createClient) — tipagem frouxa para Deno Edge.
+// deno-lint-ignore no-explicit-any
+export type ManagementAlertClient = any
+
+export async function loadManagementSettingsRow(admin: ManagementAlertClient) {
+  const { data, error } = await admin
+    .from('admin_management_settings')
+    .select('*')
+    .eq('id', 1)
+    .maybeSingle()
+
+  if (error) throw error
+
+  const row = data ?? {}
+  return {
+    alert_whatsapp_1: (row.alert_whatsapp_1 as string | null) ?? null,
+    alert_whatsapp_2: (row.alert_whatsapp_2 as string | null) ?? null,
+    domain_expires_on: (row.domain_expires_on as string | null) ?? null,
+    quotas: normalizeQuotas(row.quotas),
+    last_alerts:
+      row.last_alerts && typeof row.last_alerts === 'object'
+        ? (row.last_alerts as Record<string, string>)
+        : {},
+  }
+}
+
+export async function collectAttentionReasons(admin: ManagementAlertClient): Promise<{
+  needs_attention: boolean
+  reasons: AttentionReason[]
+  db_bytes: number
+  storage_bytes: number
+  quotas: ManagementQuotas
+  domain_expires_on: string | null
+  domain_days_left: number | null
+  resend_daily_used: number | null
+  resend_monthly_used: number | null
+  zapi: Awaited<ReturnType<typeof fetchZApiStatus>>
+  settings: Awaited<ReturnType<typeof loadManagementSettingsRow>>
+}> {
+  const settings = await loadManagementSettingsRow(admin)
+  const [{ data: metrics, error: metricsError }, resend, zapi] = await Promise.all([
+    admin.rpc('admin_management_metrics'),
+    fetchResendStats(),
+    fetchZApiStatus(),
+  ])
+  if (metricsError) throw metricsError
+
+  const dbBytes = Number(metrics?.db_bytes ?? 0)
+  const storageBytes = Number(metrics?.storage_bytes ?? 0)
+  const dailyUsed = resend.daily_used ?? resend.emails_today
+  const monthlyUsed = resend.monthly_used
+  const daysLeft = daysUntilDate(settings.domain_expires_on)
+  const reasons: AttentionReason[] = []
+
+  if (zapi.configured && !zapi.connected) {
+    reasons.push({
+      code: 'zapi_disconnected',
+      label: ALERT_REASON_LABELS.zapi_disconnected,
+    })
+  }
+  if (isNearLimit(dbBytes, settings.quotas.db_bytes)) {
+    reasons.push({ code: 'supabase_db', label: ALERT_REASON_LABELS.supabase_db })
+  }
+  if (isNearLimit(storageBytes, settings.quotas.storage_bytes)) {
+    reasons.push({ code: 'supabase_storage', label: ALERT_REASON_LABELS.supabase_storage })
+  }
+  if (dailyUsed != null && isNearLimit(dailyUsed, settings.quotas.resend_daily)) {
+    reasons.push({ code: 'resend_daily', label: ALERT_REASON_LABELS.resend_daily })
+  }
+  if (monthlyUsed != null && isNearLimit(monthlyUsed, settings.quotas.resend_monthly)) {
+    reasons.push({ code: 'resend_monthly', label: ALERT_REASON_LABELS.resend_monthly })
+  }
+  if (daysLeft != null && settings.domain_expires_on) {
+    if (daysLeft < 0) {
+      reasons.push({ code: 'domain_expired', label: ALERT_REASON_LABELS.domain_expired })
+    } else if (daysLeft === 7) {
+      reasons.push({ code: 'domain_7d', label: ALERT_REASON_LABELS.domain_7d })
+    } else if (daysLeft <= 2) {
+      reasons.push({ code: 'domain_2d', label: ALERT_REASON_LABELS.domain_2d })
+    }
+  }
+
+  return {
+    needs_attention: reasons.length > 0,
+    reasons,
+    db_bytes: dbBytes,
+    storage_bytes: storageBytes,
+    quotas: settings.quotas,
+    domain_expires_on: settings.domain_expires_on,
+    domain_days_left: daysLeft,
+    resend_daily_used: dailyUsed,
+    resend_monthly_used: monthlyUsed,
+    zapi,
+    settings,
+  }
+}
+
+/** Envia WhatsApp (se aplicável) + e-mail ao admin, com dedupe diário via last_alerts. */
+export async function processManagementAlerts(admin: ManagementAlertClient) {
+  const attention = await collectAttentionReasons(admin)
+  const phones = collectAdminAlertPhones(attention.settings)
+  const sent: string[] = []
+  const skipped: string[] = []
+  const today = saoPauloTodayKey()
+  const lastAlerts = { ...attention.settings.last_alerts }
+  const {
+    db_bytes: dbBytes,
+    storage_bytes: storageBytes,
+    quotas,
+    domain_expires_on: domainExpires,
+    domain_days_left: daysLeft,
+    resend_daily_used: dailyUsed,
+    resend_monthly_used: monthlyUsed,
+    zapi,
+  } = attention
+
+  async function maybeNotify(
+    key: string,
+    shouldSend: boolean,
+    message: string,
+    options?: { whatsapp?: boolean },
+  ) {
+    const useWhatsApp = options?.whatsapp !== false
+    if (!shouldSend) {
+      skipped.push(`${key}:ok`)
+      return
+    }
+    if (alertAlreadySentToday(lastAlerts, key)) {
+      skipped.push(`${key}:already_sent`)
+      return
+    }
+
+    let delivered = false
+
+    if (useWhatsApp) {
+      if (!phones.length) {
+        skipped.push(`${key}:no_phones`)
+      } else {
+        const results = await Promise.all(phones.map((p) => sendWhatsApp(p, message)))
+        if (results.some(Boolean)) delivered = true
+        else skipped.push(`${key}:whatsapp_failed`)
+      }
+    }
+
+    const emailOk = await sendAdminAlertEmail(key, message)
+    if (emailOk) delivered = true
+    else skipped.push(`${key}:email_failed`)
+
+    if (delivered) {
+      lastAlerts[key] = today
+      sent.push(key)
+    } else {
+      skipped.push(`${key}:send_failed`)
+    }
+  }
+
+  await maybeNotify(
+    'zapi_disconnected',
+    zapi.configured && !zapi.connected,
+    zapiDisconnectedMessage(`${today}:zapi`),
+    { whatsapp: false },
+  )
+  await maybeNotify(
+    'supabase_db',
+    isNearLimit(dbBytes, quotas.db_bytes),
+    resourceAlertMessage('supabase_db', dbBytes, quotas.db_bytes, `${today}:db:${dbBytes}`),
+  )
+  await maybeNotify(
+    'supabase_storage',
+    isNearLimit(storageBytes, quotas.storage_bytes),
+    resourceAlertMessage(
+      'supabase_storage',
+      storageBytes,
+      quotas.storage_bytes,
+      `${today}:storage:${storageBytes}`,
+    ),
+  )
+  if (dailyUsed != null) {
+    await maybeNotify(
+      'resend_daily',
+      isNearLimit(dailyUsed, quotas.resend_daily),
+      resourceAlertMessage('resend_daily', dailyUsed, quotas.resend_daily, `${today}:resend:d`),
+    )
+  } else {
+    skipped.push('resend_daily:no_data')
+  }
+  if (monthlyUsed != null) {
+    await maybeNotify(
+      'resend_monthly',
+      isNearLimit(monthlyUsed, quotas.resend_monthly),
+      resourceAlertMessage(
+        'resend_monthly',
+        monthlyUsed,
+        quotas.resend_monthly,
+        `${today}:resend:m`,
+      ),
+    )
+  } else {
+    skipped.push('resend_monthly:no_data')
+  }
+
+  if (daysLeft != null && domainExpires) {
+    if (daysLeft < 0) {
+      await maybeNotify(
+        'domain_expired',
+        true,
+        domainAlertMessage(0, domainExpires, `${today}:domain:expired`),
+      )
+    } else if (daysLeft === 7) {
+      await maybeNotify(
+        'domain_7d',
+        true,
+        domainAlertMessage(daysLeft, domainExpires, `${today}:domain7`),
+      )
+    } else if (daysLeft <= 2) {
+      await maybeNotify(
+        'domain_2d',
+        true,
+        domainAlertMessage(daysLeft, domainExpires, `${today}:domain2:${daysLeft}`),
+      )
+    } else {
+      skipped.push(`domain:days_${daysLeft}`)
+    }
+  } else {
+    skipped.push('domain:not_set')
+  }
+
+  if (sent.length) {
+    await admin
+      .from('admin_management_settings')
+      .update({ last_alerts: lastAlerts, updated_at: new Date().toISOString() })
+      .eq('id', 1)
+  }
+
+  return {
+    sent,
+    skipped,
+    phones: phones.length,
+    last_alerts: lastAlerts,
+    needs_attention: attention.needs_attention,
+    reasons: attention.reasons,
+  }
+}

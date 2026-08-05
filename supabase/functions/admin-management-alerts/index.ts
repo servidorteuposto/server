@@ -1,16 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
-import {
-  alertAlreadySentToday,
-  collectAdminAlertPhones,
-  daysUntilDate,
-  domainAlertMessage,
-  fetchResendStats,
-  isNearLimit,
-  normalizeQuotas,
-  resourceAlertMessage,
-  saoPauloTodayKey,
-  sendWhatsApp,
-} from '../_shared/admin-management.ts'
+import { processManagementAlerts, saoPauloTodayKey } from '../_shared/admin-management.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,6 +12,26 @@ function jsonResponse(body: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
+}
+
+async function triggerOperationalRemindersFlush() {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const secret =
+    Deno.env.get('OPERATIONAL_CRON_SECRET') ?? Deno.env.get('DRAINAGE_CRON_SECRET')
+  if (!supabaseUrl || !secret) return
+
+  try {
+    await fetch(`${supabaseUrl}/functions/v1/operational-reminders`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-operational-cron-secret': secret,
+      },
+      body: '{}',
+    })
+  } catch (error) {
+    console.error('triggerOperationalRemindersFlush', error)
+  }
 }
 
 Deno.serve(async (req) => {
@@ -47,146 +56,14 @@ Deno.serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     })
 
-    const { data: settingsRow, error: settingsError } = await admin
-      .from('admin_management_settings')
-      .select('*')
-      .eq('id', 1)
-      .maybeSingle()
-
-    if (settingsError) throw settingsError
-
-    const settings = {
-      alert_whatsapp_1: settingsRow?.alert_whatsapp_1 ?? null,
-      alert_whatsapp_2: settingsRow?.alert_whatsapp_2 ?? null,
-      domain_expires_on: settingsRow?.domain_expires_on ?? null,
-      quotas: normalizeQuotas(settingsRow?.quotas),
-      last_alerts:
-        settingsRow?.last_alerts && typeof settingsRow.last_alerts === 'object'
-          ? (settingsRow.last_alerts as Record<string, string>)
-          : {},
-    }
-
-    const phones = collectAdminAlertPhones(settings)
-    const sent: string[] = []
-    const skipped: string[] = []
-    const today = saoPauloTodayKey()
-    const lastAlerts = { ...settings.last_alerts }
-
-    const { data: metrics, error: metricsError } = await admin.rpc('admin_management_metrics')
-    if (metricsError) throw metricsError
-
-    const dbBytes = Number(metrics?.db_bytes ?? 0)
-    const storageBytes = Number(metrics?.storage_bytes ?? 0)
-
-    async function maybeSend(key: string, shouldSend: boolean, message: string) {
-      if (!shouldSend) {
-        skipped.push(`${key}:ok`)
-        return
-      }
-      if (alertAlreadySentToday(lastAlerts, key)) {
-        skipped.push(`${key}:already_sent`)
-        return
-      }
-      if (!phones.length) {
-        skipped.push(`${key}:no_phones`)
-        return
-      }
-      const results = await Promise.all(phones.map((p) => sendWhatsApp(p, message)))
-      if (results.some(Boolean)) {
-        lastAlerts[key] = today
-        sent.push(key)
-      } else {
-        skipped.push(`${key}:send_failed`)
-      }
-    }
-
-    await maybeSend(
-      'supabase_db',
-      isNearLimit(dbBytes, settings.quotas.db_bytes),
-      resourceAlertMessage('supabase_db', dbBytes, settings.quotas.db_bytes, `${today}:cron:db`),
-    )
-    await maybeSend(
-      'supabase_storage',
-      isNearLimit(storageBytes, settings.quotas.storage_bytes),
-      resourceAlertMessage(
-        'supabase_storage',
-        storageBytes,
-        settings.quotas.storage_bytes,
-        `${today}:cron:storage`,
-      ),
-    )
-
-    const resend = await fetchResendStats()
-    const dailyUsed = resend.daily_used ?? resend.emails_today
-    const monthlyUsed = resend.monthly_used
-    if (dailyUsed != null) {
-      await maybeSend(
-        'resend_daily',
-        isNearLimit(dailyUsed, settings.quotas.resend_daily),
-        resourceAlertMessage(
-          'resend_daily',
-          dailyUsed,
-          settings.quotas.resend_daily,
-          `${today}:cron:resend:d`,
-        ),
-      )
-    } else {
-      skipped.push('resend_daily:no_data')
-    }
-    if (monthlyUsed != null) {
-      await maybeSend(
-        'resend_monthly',
-        isNearLimit(monthlyUsed, settings.quotas.resend_monthly),
-        resourceAlertMessage(
-          'resend_monthly',
-          monthlyUsed,
-          settings.quotas.resend_monthly,
-          `${today}:cron:resend:m`,
-        ),
-      )
-    } else {
-      skipped.push('resend_monthly:no_data')
-    }
-
-    const daysLeft = daysUntilDate(settings.domain_expires_on)
-    if (daysLeft != null && settings.domain_expires_on) {
-      if (daysLeft === 7) {
-        await maybeSend(
-          'domain_7d',
-          true,
-          domainAlertMessage(daysLeft, settings.domain_expires_on, `${today}:cron:d7`),
-        )
-      } else if (daysLeft <= 2 && daysLeft >= 0) {
-        await maybeSend(
-          'domain_2d',
-          true,
-          domainAlertMessage(daysLeft, settings.domain_expires_on, `${today}:cron:d2`),
-        )
-      } else {
-        skipped.push(`domain:days_${daysLeft}`)
-      }
-    } else {
-      skipped.push('domain:not_set')
-    }
-
-    if (sent.length) {
-      await admin
-        .from('admin_management_settings')
-        .update({ last_alerts: lastAlerts, updated_at: new Date().toISOString() })
-        .eq('id', 1)
-    }
+    const result = await processManagementAlerts(admin)
+    // Tenta descarregar avisos de usuários que ficaram na fila (no-op se Z-API offline).
+    await triggerOperationalRemindersFlush()
 
     return jsonResponse({
       ok: true,
-      today,
-      sent,
-      skipped,
-      phones: phones.length,
-      db_bytes: dbBytes,
-      storage_bytes: storageBytes,
-      resend_daily_used: dailyUsed,
-      resend_monthly_used: monthlyUsed,
-      domain_days_left: daysLeft,
+      today: saoPauloTodayKey(),
+      ...result,
     })
   } catch (error) {
     console.error('admin-management-alerts error', error)

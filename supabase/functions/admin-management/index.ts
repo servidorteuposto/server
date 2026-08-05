@@ -2,10 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import {
   ADMIN_CNPJ_DIGITS,
   ADMIN_EMAIL,
-  alertAlreadySentToday,
-  collectAdminAlertPhones,
+  collectAttentionReasons,
   daysUntilDate,
-  domainAlertMessage,
   fetchResendStats,
   fetchZApiStatus,
   formatBytes,
@@ -13,9 +11,8 @@ import {
   isNearLimit,
   normalizeQuotas,
   onlyDigits,
-  resourceAlertMessage,
+  processManagementAlerts,
   saoPauloTodayKey,
-  sendWhatsApp,
   usagePercent,
   type ManagementSettings,
 } from '../_shared/admin-management.ts'
@@ -150,118 +147,28 @@ async function loadSettings(admin: ReturnType<typeof createClient>): Promise<Man
 }
 
 async function runAlertCheck(admin: ReturnType<typeof createClient>) {
-  const settings = await loadSettings(admin)
-  const phones = collectAdminAlertPhones(settings)
-  const sent: string[] = []
-  const skipped: string[] = []
+  return processManagementAlerts(admin)
+}
 
-  const { data: metrics, error: metricsError } = await admin.rpc('admin_management_metrics')
-  if (metricsError) throw metricsError
+/** Dispara a function de lembretes para descarregar a fila (Z-API reconectada). */
+async function triggerOperationalRemindersFlush() {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const secret =
+    Deno.env.get('OPERATIONAL_CRON_SECRET') ?? Deno.env.get('DRAINAGE_CRON_SECRET')
+  if (!supabaseUrl || !secret) return
 
-  const dbBytes = Number(metrics?.db_bytes ?? 0)
-  const storageBytes = Number(metrics?.storage_bytes ?? 0)
-  const quotas = settings.quotas
-  const lastAlerts = { ...settings.last_alerts }
-  const today = saoPauloTodayKey()
-
-  async function maybeSend(
-    key: string,
-    shouldSend: boolean,
-    message: string,
-  ) {
-    if (!shouldSend) {
-      skipped.push(`${key}:ok`)
-      return
-    }
-    if (alertAlreadySentToday(lastAlerts, key)) {
-      skipped.push(`${key}:already_sent`)
-      return
-    }
-    if (!phones.length) {
-      skipped.push(`${key}:no_phones`)
-      return
-    }
-    const results = await Promise.all(phones.map((p) => sendWhatsApp(p, message)))
-    if (results.some(Boolean)) {
-      lastAlerts[key] = today
-      sent.push(key)
-    } else {
-      skipped.push(`${key}:send_failed`)
-    }
+  try {
+    await fetch(`${supabaseUrl}/functions/v1/operational-reminders`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-operational-cron-secret': secret,
+      },
+      body: '{}',
+    })
+  } catch (error) {
+    console.error('triggerOperationalRemindersFlush', error)
   }
-
-  await maybeSend(
-    'supabase_db',
-    isNearLimit(dbBytes, quotas.db_bytes),
-    resourceAlertMessage('supabase_db', dbBytes, quotas.db_bytes, `${today}:db:${dbBytes}`),
-  )
-  await maybeSend(
-    'supabase_storage',
-    isNearLimit(storageBytes, quotas.storage_bytes),
-    resourceAlertMessage(
-      'supabase_storage',
-      storageBytes,
-      quotas.storage_bytes,
-      `${today}:storage:${storageBytes}`,
-    ),
-  )
-
-  const resend = await fetchResendStats()
-  const dailyUsed = resend.daily_used ?? resend.emails_today
-  const monthlyUsed = resend.monthly_used
-  if (dailyUsed != null) {
-    await maybeSend(
-      'resend_daily',
-      isNearLimit(dailyUsed, quotas.resend_daily),
-      resourceAlertMessage('resend_daily', dailyUsed, quotas.resend_daily, `${today}:resend:d`),
-    )
-  } else {
-    skipped.push('resend_daily:no_data')
-  }
-  if (monthlyUsed != null) {
-    await maybeSend(
-      'resend_monthly',
-      isNearLimit(monthlyUsed, quotas.resend_monthly),
-      resourceAlertMessage(
-        'resend_monthly',
-        monthlyUsed,
-        quotas.resend_monthly,
-        `${today}:resend:m`,
-      ),
-    )
-  } else {
-    skipped.push('resend_monthly:no_data')
-  }
-
-  const daysLeft = daysUntilDate(settings.domain_expires_on)
-  if (daysLeft != null && settings.domain_expires_on) {
-    if (daysLeft === 7) {
-      await maybeSend(
-        'domain_7d',
-        true,
-        domainAlertMessage(daysLeft, settings.domain_expires_on, `${today}:domain7`),
-      )
-    } else if (daysLeft <= 2 && daysLeft >= 0) {
-      await maybeSend(
-        'domain_2d',
-        true,
-        domainAlertMessage(daysLeft, settings.domain_expires_on, `${today}:domain2:${daysLeft}`),
-      )
-    } else {
-      skipped.push(`domain:days_${daysLeft}`)
-    }
-  } else {
-    skipped.push('domain:not_set')
-  }
-
-  if (sent.length) {
-    await admin
-      .from('admin_management_settings')
-      .update({ last_alerts: lastAlerts, updated_at: new Date().toISOString() })
-      .eq('id', 1)
-  }
-
-  return { sent, skipped, phones: phones.length, last_alerts: lastAlerts }
 }
 
 Deno.serve(async (req) => {
@@ -527,6 +434,24 @@ Deno.serve(async (req) => {
         settings: {
           ...data,
           quotas: normalizeQuotas(data.quotas),
+        },
+      })
+    }
+
+    if (action === 'get_attention') {
+      const attention = await collectAttentionReasons(admin)
+      // Se a Z-API voltou, descarrega a fila de avisos que ficaram pendentes.
+      if (attention.zapi.configured && attention.zapi.connected) {
+        void triggerOperationalRemindersFlush()
+      }
+      return jsonResponse({
+        ok: true,
+        needs_attention: attention.needs_attention,
+        reasons: attention.reasons,
+        zapi: {
+          configured: attention.zapi.configured,
+          connected: attention.zapi.connected,
+          message: attention.zapi.message,
         },
       })
     }

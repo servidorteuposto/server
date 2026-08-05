@@ -320,6 +320,32 @@ export async function runManagementAlertCheck() {
   return payload
 }
 
+export type ManagementAttention = {
+  needs_attention: boolean
+  reasons: Array<{ code: string; label: string }>
+  zapi?: {
+    configured: boolean
+    connected: boolean
+    message: string
+  }
+}
+
+export async function getManagementAttention(): Promise<ManagementAttention> {
+  const { payload, invokeFailed } = await invokeManagement<
+    ManagementAttention & { ok: boolean; message?: string }
+  >({ action: 'get_attention' })
+
+  if (invokeFailed || !payload?.ok) {
+    throw new Error(payload?.message || 'Não foi possível verificar alertas do Gerenciamento.')
+  }
+
+  return {
+    needs_attention: Boolean(payload.needs_attention),
+    reasons: payload.reasons ?? [],
+    zapi: payload.zapi,
+  }
+}
+
 export function bytesToGb(bytes: number) {
   return Math.round((bytes / 1024 ** 3) * 100) / 100
 }

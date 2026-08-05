@@ -1,7 +1,14 @@
 # Gerenciamento (admin)
 
-Painel em tempo real: Supabase (DB/storage/fluxo do dia), **Resend** (cota e últimos e-mails), domínio e cards de postos.
-Alertas WhatsApp via Z-API quando resta ≤10% da cota (DB, storage, Resend) ou domínio em 7 / ≤2 dias.
+Painel em tempo real: Supabase (DB/storage/fluxo do dia), **Resend** (cota e últimos e-mails), domínio, Z-API e cards de postos.
+
+Alertas (WhatsApp + e-mail `servidorteuposto@gmail.com`) quando:
+- resta ≤10% da cota (DB, storage, Resend);
+- domínio em 7 / ≤2 dias ou expirado;
+- Z-API desconectada (**só e-mail**, pois o WhatsApp está offline).
+
+No login do admin, se houver alerta ativo, aparece um banner pedindo para abrir o Gerenciamento.
+Dedupe: 1 envio por motivo por dia (SP), via `last_alerts`.
 
 ## Migration
 
@@ -21,8 +28,8 @@ npx supabase functions deploy admin-management-alerts --project-ref jilzklxnejzt
 
 | Secret | Obrigatório | Uso |
 |---|---|---|
-| `RESEND_API_KEY` | Sim (já existe) | Métricas de e-mail no painel |
-| `WHATSAPP_WEBHOOK_URL` / `WHATSAPP_API_KEY` | Para alertas | Z-API |
+| `RESEND_API_KEY` | Sim | Métricas + e-mail de alerta ao admin |
+| `WHATSAPP_WEBHOOK_URL` / `WHATSAPP_API_KEY` | Para alertas WA | Z-API |
 | `ADMIN_MGMT_CRON_SECRET` | Sim (cron) | Header `x-admin-mgmt-cron-secret` |
 
 Cotas sugeridas no free: DB **0.5 GB**, Storage **1 GB**, Resend **100/dia** e **3000/mês**.
