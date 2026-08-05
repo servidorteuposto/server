@@ -341,10 +341,12 @@ export default function AppShell({
       {isAdmin && adminAttention?.needs_attention && (
         <div className="admin-attention-banner" role="status">
           <span>
-            Há alertas de infraestrutura (Z-API, cotas ou domínio). Abra o{' '}
-            <strong>Gerenciamento</strong> para verificar.
-            {adminAttention.reasons.length > 0
-              ? ` ${adminAttention.reasons.map((r) => r.label).join(' · ')}.`
+            <strong>Alerta de infraestrutura.</strong>{' '}
+            {adminAttention.reasons[0]?.label
+              ? `${adminAttention.reasons[0].label}.`
+              : 'Verifique Z-API, cotas ou domínio.'}
+            {adminAttention.reasons.length > 1
+              ? ` (+${adminAttention.reasons.length - 1})`
               : ''}
           </span>
           <button

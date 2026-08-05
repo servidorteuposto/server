@@ -89,6 +89,11 @@
   text-align: center;
 }
 
+.admin-attention-banner > span {
+  min-width: 0;
+  max-width: 42rem;
+}
+
 .admin-attention-banner__btn {
   appearance: none;
   border: 1px solid rgba(153, 27, 27, 0.28);
@@ -100,6 +105,7 @@
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .app-shell__body {
@@ -547,14 +553,39 @@
     padding-top: 0;
   }
 
-  .app-shell:has(.readonly-banner) .readonly-banner,
-  .app-shell:has(.impersonate-banner):not(:has(.readonly-banner)) .impersonate-banner {
+  /* O primeiro banner sob o notch absorve a safe-area (status bar / PWA) */
+  .app-shell > .impersonate-banner:first-child,
+  .app-shell > .admin-attention-banner:first-child,
+  .app-shell > .readonly-banner:first-child,
+  .app-shell > .renewal-banner:first-child {
     padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
   }
 
-  .app-shell:has(.readonly-banner) .app-topbar,
-  .app-shell:has(.impersonate-banner) .app-topbar {
+  .app-shell:has(> .impersonate-banner:first-child) .app-topbar,
+  .app-shell:has(> .admin-attention-banner:first-child) .app-topbar,
+  .app-shell:has(> .readonly-banner:first-child) .app-topbar,
+  .app-shell:has(> .renewal-banner:first-child) .app-topbar {
     padding-top: 0.35rem;
+  }
+
+  .admin-attention-banner {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0.55rem;
+    padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
+    padding-bottom: 0.85rem;
+    padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+    text-align: left;
+  }
+
+  .admin-attention-banner > span {
+    max-width: none;
+  }
+
+  .admin-attention-banner__btn {
+    width: 100%;
+    padding: 0.55rem 0.85rem;
   }
 
   .app-sidebar {

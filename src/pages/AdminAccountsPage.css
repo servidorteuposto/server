@@ -99,6 +99,31 @@
   gap: 0.55rem;
 }
 
+.admin-accounts-card__actions .btn {
+  min-width: 0;
+}
+
+@media (max-width: 899px) {
+  .admin-accounts-page .reg-docs-page__header {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-accounts-page .reg-docs-page__header .btn {
+    width: 100%;
+  }
+
+  .admin-accounts-card__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .admin-accounts-card__actions .btn {
+    width: 100%;
+  }
+}
+
 @media (min-width: 900px) {
   .admin-accounts-card {
     grid-template-columns: 1fr auto;
