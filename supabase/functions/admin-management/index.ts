@@ -9,6 +9,7 @@ import {
   formatBytes,
   isAdminAccount,
   isNearLimit,
+  isResendDailyNearLimit,
   normalizeQuotas,
   onlyDigits,
   processManagementAlerts,
@@ -305,7 +306,8 @@ Deno.serve(async (req) => {
             used: dailyUsed,
             quota: quotas.resend_daily,
             percent: dailyUsed != null ? usagePercent(dailyUsed, quotas.resend_daily) : null,
-            near_limit: dailyUsed != null ? isNearLimit(dailyUsed, quotas.resend_daily) : false,
+            near_limit:
+              dailyUsed != null ? isResendDailyNearLimit(dailyUsed, quotas.resend_daily) : false,
           },
           monthly: {
             used: monthlyUsed,

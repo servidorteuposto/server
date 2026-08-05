@@ -28,12 +28,14 @@ function UsageMeter({
   usedLabel,
   quotaLabel,
   nearLimit,
+  warnText = 'Restam ≤10% da cota — alerta WhatsApp e e-mail habilitados.',
 }: {
   label: string
   percent: number
   usedLabel: string
   quotaLabel: string
   nearLimit: boolean
+  warnText?: string
 }) {
   return (
     <div className={`admin-mgmt-meter${nearLimit ? ' admin-mgmt-meter--warn' : ''}`}>
@@ -49,9 +51,7 @@ function UsageMeter({
           style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
         />
       </div>
-      {nearLimit && (
-        <p className="admin-mgmt-meter__warn">Restam ≤10% da cota — alerta WhatsApp habilitado.</p>
-      )}
+      {nearLimit && <p className="admin-mgmt-meter__warn">{warnText}</p>}
     </div>
   )
 }

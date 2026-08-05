@@ -3,6 +3,8 @@
 export const ADMIN_CNPJ_DIGITS = '99999999000199'
 export const ADMIN_EMAIL = 'servidorteuposto@gmail.com'
 export const WARN_REMAINING_RATIO = 0.1 // alerta quando resta ≤ 10%
+/** Plano free Resend: avisa quando restam ≤ 10 e-mails no dia (cota padrão 100). */
+export const RESEND_DAILY_WARN_REMAINING = 10
 
 export type ManagementQuotas = {
   db_bytes: number
@@ -77,6 +79,12 @@ export function remainingRatio(used: number, quota: number) {
 
 export function isNearLimit(used: number, quota: number) {
   return remainingRatio(used, quota) <= WARN_REMAINING_RATIO
+}
+
+/** Cota diária Resend: alerta com ≤10 e-mails restantes no dia. */
+export function isResendDailyNearLimit(used: number, quota: number) {
+  if (!Number.isFinite(used) || !Number.isFinite(quota) || quota <= 0) return false
+  return quota - used <= RESEND_DAILY_WARN_REMAINING
 }
 
 export function saoPauloTodayKey() {
@@ -345,6 +353,23 @@ export function resourceAlertMessage(
     `🧰 *Manutenção preventiva*\n\n*${label}* com pouco espaço restante (*${pct}%* usado).\nCota: ${quotaLabel}.`,
     `📣 *Alerta automático*\n\n${label}: ${usedLabel} de ${quotaLabel} (*${pct}%*).\nPainel: Gerenciamento no Teu Posto.`,
   ]
+
+  if (kind === 'resend_daily') {
+    const left = Math.max(0, quota - used)
+    return [
+      `📧 *Resend — cota diária quase no fim*\n\nUsados *${used}* de *${quota}*/dia.\nRestam cerca de *${left}* e-mails hoje. Evite disparos extras.`,
+      `⚠️ *Limite diário de e-mail*\n\nResend free: *${used}/${quota}* hoje.\nFaltam ≤10 para bater a cota. WhatsApp + Gerenciamento.`,
+      `🚨 *Teu Posto Admin — Resend*\n\nCota diária em *${pct}%* (${used} de ${quota}).\nRestam ~${left} envios até zerar o dia.`,
+      `📢 *Alerta Resend*\n\nHoje já saíram *${used}* e-mails (limite ${quota}).\nSobram ~${left}. Pause envios não essenciais.`,
+      `🛑 *Free Resend perto do teto*\n\n*${used}/${quota}* no dia · restam *${left}*.\nAmanhã a cota renova; hoje economize.`,
+      `🔔 *Monitoramento de e-mail*\n\nResend diário: ${used} usados, ~${left} restantes (de ${quota}).`,
+      `📣 *Gerenciamento*\n\nCota diária Resend quase cheia (*${pct}%*).\n${used} de ${quota} · ~${left} restantes.`,
+      `📊 *Uso de e-mail elevado*\n\nDia atual: *${used}/${quota}*.\nFaltam poucos envios (~${left}).`,
+      `❗ *Atenção Resend*\n\nRestam ≤10 e-mails na cota diária free.\nUso: ${used}/${quota}.`,
+      `🧰 *Previna bloqueio diário*\n\nResend: ${used} enviados hoje (limite ${quota}).\n~${left} restantes.`,
+    ][pickVariantIndex(seed, 10)]
+  }
+
   return variants[pickVariantIndex(seed, variants.length)]
 }
 
@@ -495,7 +520,7 @@ const DEFAULT_REPLY_TO = 'Teu Posto Suporte <suporte@appteuposto.com.br>'
 export const ALERT_REASON_LABELS: Record<string, string> = {
   supabase_db: 'Banco de dados perto do limite (≤10% restante)',
   supabase_storage: 'Storage perto do limite (≤10% restante)',
-  resend_daily: 'Cota diária de e-mail perto do limite',
+  resend_daily: 'Cota diária Resend: restam ≤10 e-mails no dia',
   resend_monthly: 'Cota mensal de e-mail perto do limite',
   domain_7d: 'Domínio vence em 7 dias',
   domain_2d: 'Domínio vence em 2 dias ou menos',
@@ -721,7 +746,7 @@ export async function collectAttentionReasons(admin: ManagementAlertClient): Pro
   if (isNearLimit(storageBytes, settings.quotas.storage_bytes)) {
     reasons.push({ code: 'supabase_storage', label: ALERT_REASON_LABELS.supabase_storage })
   }
-  if (dailyUsed != null && isNearLimit(dailyUsed, settings.quotas.resend_daily)) {
+  if (dailyUsed != null && isResendDailyNearLimit(dailyUsed, settings.quotas.resend_daily)) {
     reasons.push({ code: 'resend_daily', label: ALERT_REASON_LABELS.resend_daily })
   }
   if (monthlyUsed != null && isNearLimit(monthlyUsed, settings.quotas.resend_monthly)) {
@@ -863,7 +888,7 @@ export async function processManagementAlerts(admin: ManagementAlertClient) {
   if (dailyUsed != null) {
     await maybeNotify(
       'resend_daily',
-      isNearLimit(dailyUsed, quotas.resend_daily),
+      isResendDailyNearLimit(dailyUsed, quotas.resend_daily),
       resourceAlertMessage('resend_daily', dailyUsed, quotas.resend_daily, `${today}:resend:d`),
     )
   } else {
