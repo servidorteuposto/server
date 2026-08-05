@@ -9,6 +9,7 @@ export type MenuId =
   | 'suporte'
   | 'painel-suporte'
   | 'contas-usuarios'
+  | 'gerenciamento'
   | 'configuracoes'
 
 export type MenuItem = {
@@ -70,6 +71,12 @@ export const MENU_ITEMS: MenuItem[] = [
     id: 'contas-usuarios',
     label: 'Contas dos Usuários',
     description: 'Liberar acesso e entrar no sistema de cada posto.',
+    adminOnly: true,
+  },
+  {
+    id: 'gerenciamento',
+    label: 'Gerenciamento',
+    description: 'Monitoramento Supabase, Vercel, domínio e postos em tempo real.',
     adminOnly: true,
   },
   {

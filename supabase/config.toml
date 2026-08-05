@@ -6,3 +6,9 @@ verify_jwt = true
 
 [functions.support-admin]
 verify_jwt = false
+
+[functions.admin-management]
+verify_jwt = true
+
+[functions.admin-management-alerts]
+verify_jwt = false

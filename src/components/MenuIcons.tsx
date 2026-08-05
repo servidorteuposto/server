@@ -103,6 +103,12 @@ const icons: Record<MenuId, (props: IconProps) => ReactNode> = {
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </IconBase>
   ),
+  gerenciamento: ({ className }) => (
+    <IconBase className={className}>
+      <path d="M3 3v18h18" />
+      <path d="M7 14l4-4 4 3 5-6" />
+    </IconBase>
+  ),
   configuracoes: ({ className }) => (
     <IconBase className={className}>
       <circle cx="12" cy="12" r="3" />

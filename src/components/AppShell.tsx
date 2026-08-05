@@ -19,6 +19,7 @@ import ModulePage from '../pages/ModulePage'
 import RegulatoryDocumentsPage from '../pages/RegulatoryDocumentsPage'
 import SettingsPage from '../pages/SettingsPage'
 import AdminAccountsPage from '../pages/AdminAccountsPage'
+import AdminManagementPage from '../pages/AdminManagementPage'
 import AdminSupportPage from '../pages/AdminSupportPage'
 import SupportPage from '../pages/SupportPage'
 import WorkSafetyPage from '../pages/WorkSafetyPage'
@@ -282,6 +283,9 @@ export default function AppShell({
     }
     if (activeMenuId === 'contas-usuarios' && isAdmin) {
       return <AdminAccountsPage />
+    }
+    if (activeMenuId === 'gerenciamento' && isAdmin) {
+      return <AdminManagementPage />
     }
     if (activeMenuId === 'configuracoes') {
       return <SettingsPage isReadOnly={isReadOnly} />
