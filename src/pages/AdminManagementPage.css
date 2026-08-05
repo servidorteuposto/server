@@ -1,12 +1,22 @@
 .admin-mgmt-page .reg-docs-page__header {
-  align-items: flex-start;
+  align-items: center;
   gap: 1rem;
 }
 
 .admin-mgmt-header-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
   gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.admin-mgmt-header-actions .btn {
+  width: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .admin-mgmt-section {
@@ -371,9 +381,11 @@
 @media (max-width: 640px) {
   .admin-mgmt-header-actions {
     width: 100%;
+    flex-wrap: nowrap;
   }
 
   .admin-mgmt-header-actions .btn {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
