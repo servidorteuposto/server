@@ -24,7 +24,7 @@ const corsHeaders = {
 }
 
 const POSTO_LIST_SELECT =
-  'id, nome, cnpj, email, telefone, endereco, cep, logradouro, numero, complemento, bairro, cidade, uf, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4, subscription_status, subscription_ends_at, created_at'
+  'id, nome, cnpj, email, telefone, endereco, cep, logradouro, numero, complemento, bairro, cidade, uf, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4, aviso_whatsapp_5, subscription_status, subscription_ends_at, created_at'
 
 const SECURE_BUCKET = 'admin-secure-files'
 const SECURE_MAX_BYTES = 10 * 1024 * 1024
@@ -377,6 +377,7 @@ Deno.serve(async (req) => {
           row.aviso_whatsapp_2,
           row.aviso_whatsapp_3,
           row.aviso_whatsapp_4,
+          row.aviso_whatsapp_5,
         ].filter(Boolean),
         subscription_status: row.subscription_status,
         subscription_ends_at: row.subscription_ends_at,

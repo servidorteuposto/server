@@ -34,6 +34,7 @@ function collectAvisoPhones(posto: {
   aviso_whatsapp_2?: string | null
   aviso_whatsapp_3?: string | null
   aviso_whatsapp_4?: string | null
+  aviso_whatsapp_5?: string | null
   telefone?: string | null
 }) {
   const avisos = [
@@ -41,6 +42,7 @@ function collectAvisoPhones(posto: {
     posto.aviso_whatsapp_2,
     posto.aviso_whatsapp_3,
     posto.aviso_whatsapp_4,
+    posto.aviso_whatsapp_5,
   ]
   const candidates = avisos.some(Boolean) ? avisos : [posto.telefone]
   const unique = new Set<string>()
@@ -172,7 +174,7 @@ Deno.serve(async (req) => {
         supabase
           .from('postos')
           .select(
-            'id, nome, email, telefone, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4',
+            'id, nome, email, telefone, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4, aviso_whatsapp_5',
           )
           .in('id', postoIds),
         supabase

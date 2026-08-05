@@ -26,6 +26,7 @@ type PostoRow = {
   aviso_whatsapp_2: string | null
   aviso_whatsapp_3: string | null
   aviso_whatsapp_4: string | null
+  aviso_whatsapp_5: string | null
   subscription_status: string | null
   subscription_ends_at: string | null
   billing_mode: string | null
@@ -77,6 +78,7 @@ function collectAvisoPhones(posto: PostoRow) {
     posto.aviso_whatsapp_2,
     posto.aviso_whatsapp_3,
     posto.aviso_whatsapp_4,
+    posto.aviso_whatsapp_5,
   ]
   const candidates = avisos.some(Boolean) ? avisos : [posto.telefone]
   const unique = new Set<string>()
@@ -1171,7 +1173,7 @@ Deno.serve(async (req) => {
     const { data: postos, error: postosError } = await admin
       .from('postos')
       .select(
-        'id, nome, cnpj, telefone, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4, subscription_status, subscription_ends_at, billing_mode',
+        'id, nome, cnpj, telefone, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4, aviso_whatsapp_5, subscription_status, subscription_ends_at, billing_mode',
       )
       .eq('subscription_status', 'active')
 

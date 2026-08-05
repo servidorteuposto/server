@@ -71,6 +71,7 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
   const [avisoWhatsapp2, setAvisoWhatsapp2] = useState('')
   const [avisoWhatsapp3, setAvisoWhatsapp3] = useState('')
   const [avisoWhatsapp4, setAvisoWhatsapp4] = useState('')
+  const [avisoWhatsapp5, setAvisoWhatsapp5] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [removePhoto, setRemovePhoto] = useState(false)
@@ -96,6 +97,7 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
     setAvisoWhatsapp2(data.aviso_whatsapp_2 ? formatPhone(data.aviso_whatsapp_2) : '')
     setAvisoWhatsapp3(data.aviso_whatsapp_3 ? formatPhone(data.aviso_whatsapp_3) : '')
     setAvisoWhatsapp4(data.aviso_whatsapp_4 ? formatPhone(data.aviso_whatsapp_4) : '')
+    setAvisoWhatsapp5(data.aviso_whatsapp_5 ? formatPhone(data.aviso_whatsapp_5) : '')
     setPhotoFile(null)
     setRemovePhoto(false)
   }, [])
@@ -271,7 +273,8 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
       !isValidWhatsappPhone(avisoWhatsapp1) ||
       !isValidWhatsappPhone(avisoWhatsapp2) ||
       !isValidWhatsappPhone(avisoWhatsapp3) ||
-      !isValidWhatsappPhone(avisoWhatsapp4)
+      !isValidWhatsappPhone(avisoWhatsapp4) ||
+      !isValidWhatsappPhone(avisoWhatsapp5)
     ) {
       setFormError('Informe telefones de WhatsApp válidos com DDD (10 ou 11 dígitos).')
       return
@@ -322,6 +325,7 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
         avisoWhatsapp2,
         avisoWhatsapp3,
         avisoWhatsapp4,
+        avisoWhatsapp5,
         photoFile,
         existingPhotoPath: profile.foto_storage_path,
         removePhoto,
@@ -482,7 +486,7 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
         <section className="settings-section">
           <h2>Contato de Avisos</h2>
           <p className="settings-section__hint">
-            Cadastre até 4 números de WhatsApp para receber avisos automáticos: renovação do plano
+            Cadastre até 5 números de WhatsApp para receber avisos automáticos: renovação do plano
             (7 e 2 dias antes), documentos e laudos (30/15/7/1 dia e no vencimento), metrologia
             (a cada 15 dias), drenagem (semanal) e RAQ (a cada 2 dias). A instância Z-API precisa
             estar conectada.
@@ -532,6 +536,18 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
                 autoComplete="tel"
                 value={avisoWhatsapp4}
                 onChange={(event) => setAvisoWhatsapp4(formatPhone(event.target.value))}
+                disabled={isReadOnly || busy}
+                placeholder="(00) 00000-0000"
+              />
+            </label>
+            <label className="reg-doc-form__field">
+              <span>WhatsApp 5</span>
+              <input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={avisoWhatsapp5}
+                onChange={(event) => setAvisoWhatsapp5(formatPhone(event.target.value))}
                 disabled={isReadOnly || busy}
                 placeholder="(00) 00000-0000"
               />
