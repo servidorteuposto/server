@@ -1,0 +1,30 @@
+# Alertas do admin (cotas, Resend, domínio, Z-API) + flush da fila WhatsApp.
+# Roda sozinho a cada 6 horas — não depende de login nem do botão do painel.
+
+name: Admin management alerts
+
+on:
+  schedule:
+    - cron: '15 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar admin-management-alerts
+        env:
+          SECRET: ${{ secrets.ADMIN_MGMT_CRON_SECRET }}
+        run: |
+          if [ -z "$SECRET" ]; then
+            echo "Falta o secret ADMIN_MGMT_CRON_SECRET no GitHub."
+            exit 1
+          fi
+          code=$(curl -sS -o /tmp/cron-body.json -w "%{http_code}" -X POST \
+            "https://jilzklxnejztpphbryti.supabase.co/functions/v1/admin-management-alerts" \
+            -H "Content-Type: application/json" \
+            -H "x-admin-mgmt-cron-secret: ${SECRET}" \
+            -d '{}')
+          echo "HTTP $code"
+          cat /tmp/cron-body.json
+          test "$code" = "200"
