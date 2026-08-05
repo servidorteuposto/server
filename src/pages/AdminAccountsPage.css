@@ -110,3 +110,26 @@
     min-width: 180px;
   }
 }
+
+.admin-accounts-password-modal {
+  max-width: 420px;
+}
+
+.admin-accounts-password-modal__hint {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: var(--gray-600);
+  line-height: 1.45;
+}
+
+.admin-accounts-password-modal__form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.admin-accounts-password-modal__rule {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  line-height: 1.4;
+}

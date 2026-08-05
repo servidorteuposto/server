@@ -200,6 +200,67 @@ Deno.serve(async (req) => {
       })
     }
 
+    if (action === 'set_password') {
+      const postoId = body?.posto_id
+      const password = typeof body?.password === 'string' ? body.password : ''
+
+      if (!postoId || typeof postoId !== 'string') {
+        return jsonResponse({ ok: false, message: 'Informe o posto.' }, 400)
+      }
+
+      if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password) || !/[^a-zA-Z0-9]/.test(password)) {
+        return jsonResponse(
+          {
+            ok: false,
+            message:
+              'A senha deve ter no mínimo 8 caracteres, incluindo letras, números e um caractere especial.',
+          },
+          400,
+        )
+      }
+
+      const { data: posto, error: postoError } = await admin
+        .from('postos')
+        .select('id, nome, cnpj, email, user_id')
+        .eq('id', postoId)
+        .maybeSingle()
+
+      if (postoError || !posto) {
+        return jsonResponse({ ok: false, message: 'Posto não encontrado.' }, 404)
+      }
+
+      if (
+        onlyDigits(posto.cnpj ?? '') === ADMIN_CNPJ_DIGITS ||
+        String(posto.email ?? '').trim().toLowerCase() === ADMIN_EMAIL
+      ) {
+        return jsonResponse(
+          { ok: false, message: 'Senha da conta administrativa não pode ser alterada por aqui.' },
+          400,
+        )
+      }
+
+      if (!posto.user_id) {
+        return jsonResponse({ ok: false, message: 'Esta conta ainda não possui usuário de login.' }, 400)
+      }
+
+      const { error: updateError } = await admin.auth.admin.updateUserById(posto.user_id, {
+        password,
+      })
+
+      if (updateError) {
+        return jsonResponse(
+          { ok: false, message: updateError.message || 'Não foi possível alterar a senha.' },
+          500,
+        )
+      }
+
+      return jsonResponse({
+        ok: true,
+        message: `Senha de ${posto.nome} alterada com sucesso.`,
+        posto_id: postoId,
+      })
+    }
+
     if (action === 'delete_account') {
       const postoId = body?.posto_id
       if (!postoId || typeof postoId !== 'string') {

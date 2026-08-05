@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   deleteAdminAccount,
   listAdminAccounts,
+  setAdminAccountPassword,
   startAdminImpersonation,
   subscriptionStatusLabel,
   unlockAdminAccount,
@@ -9,6 +10,7 @@ import {
 } from '../lib/admin-ops'
 import { formatCnpj } from '../lib/cnpj'
 import { formatDateTimePtBr } from '../config/fuel-analyses'
+import { isValidPassword, PASSWORD_RULE_MESSAGE } from '../lib/password'
 import '../pages/RegulatoryDocumentsPage.css'
 import './SettingsPage.css'
 import './AdminAccountsPage.css'
@@ -20,6 +22,11 @@ export default function AdminAccountsPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
+  const [passwordTarget, setPasswordTarget] = useState<AdminAccount | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [savingPassword, setSavingPassword] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -55,6 +62,23 @@ export default function AdminAccountsPage() {
       return haystack.includes(q)
     })
   }, [accounts, filter])
+
+  function closePasswordModal() {
+    if (savingPassword) return
+    setPasswordTarget(null)
+    setNewPassword('')
+    setConfirmPassword('')
+    setPasswordError(null)
+  }
+
+  function openPasswordModal(account: AdminAccount) {
+    setError(null)
+    setSuccess(null)
+    setPasswordTarget(account)
+    setNewPassword('')
+    setConfirmPassword('')
+    setPasswordError(null)
+  }
 
   async function handleUnlock(account: AdminAccount) {
     setBusyId(account.id)
@@ -110,14 +134,44 @@ export default function AdminAccountsPage() {
     }
   }
 
+  async function handleSetPassword(event: FormEvent) {
+    event.preventDefault()
+    if (!passwordTarget) return
+
+    if (!isValidPassword(newPassword)) {
+      setPasswordError(PASSWORD_RULE_MESSAGE)
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('As senhas não coincidem.')
+      return
+    }
+
+    setSavingPassword(true)
+    setPasswordError(null)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const result = await setAdminAccountPassword(passwordTarget.id, newPassword)
+      setSuccess(result.message || `Senha de ${passwordTarget.nome} alterada.`)
+      setPasswordTarget(null)
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'Falha ao alterar a senha.')
+    } finally {
+      setSavingPassword(false)
+    }
+  }
+
   return (
     <section className="settings-page admin-accounts-page">
       <header className="reg-docs-page__header settings-page__header">
         <div className="reg-docs-page__header-text">
           <h1>Contas dos usuários</h1>
           <p>
-            Liberar acesso sem pagamento, entrar no sistema de qualquer posto e excluir contas
-            do sistema.
+            Liberar acesso, entrar no sistema, alterar senha e excluir contas dos postos.
           </p>
         </div>
         <button type="button" className="btn btn--primary" onClick={() => void load()} disabled={loading}>
@@ -206,6 +260,14 @@ export default function AdminAccountsPage() {
                   </button>
                   <button
                     type="button"
+                    className="btn btn--secondary"
+                    disabled={busy || !account.user_id}
+                    onClick={() => openPasswordModal(account)}
+                  >
+                    Alterar senha
+                  </button>
+                  <button
+                    type="button"
                     className="btn btn--danger"
                     disabled={busy}
                     onClick={() => void handleDelete(account)}
@@ -216,6 +278,76 @@ export default function AdminAccountsPage() {
               </article>
             )
           })}
+        </div>
+      )}
+
+      {passwordTarget && (
+        <div className="reg-doc-modal" role="presentation" onClick={closePasswordModal}>
+          <div
+            className="reg-doc-modal__dialog admin-accounts-password-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-set-password-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="reg-doc-modal__header">
+              <h2 id="admin-set-password-title">Alterar senha</h2>
+              <button
+                type="button"
+                className="reg-doc-modal__close"
+                onClick={closePasswordModal}
+                aria-label="Fechar"
+                disabled={savingPassword}
+              >
+                ×
+              </button>
+            </header>
+
+            <p className="admin-accounts-password-modal__hint">
+              Defina uma nova senha para <strong>{passwordTarget.nome}</strong>
+              {passwordTarget.email ? ` (${passwordTarget.email})` : ''}.
+            </p>
+
+            <form className="admin-accounts-password-modal__form" onSubmit={handleSetPassword}>
+              <label className="reg-doc-form__field">
+                <span>Nova senha</span>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  autoComplete="new-password"
+                  disabled={savingPassword}
+                  required
+                />
+              </label>
+              <label className="reg-doc-form__field">
+                <span>Confirmar senha</span>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  autoComplete="new-password"
+                  disabled={savingPassword}
+                  required
+                />
+              </label>
+              <p className="admin-accounts-password-modal__rule">{PASSWORD_RULE_MESSAGE}</p>
+              {passwordError && <p className="reg-doc-form__error">{passwordError}</p>}
+              <div className="reg-doc-modal__actions">
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={closePasswordModal}
+                  disabled={savingPassword}
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn--primary" disabled={savingPassword}>
+                  {savingPassword ? 'Salvando...' : 'Salvar senha'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </section>

@@ -114,6 +114,20 @@ export async function deleteAdminAccount(postoId: string) {
   return payload
 }
 
+export async function setAdminAccountPassword(postoId: string, password: string) {
+  const { payload, invokeFailed } = await invokeAdminOps<{
+    ok: boolean
+    message?: string
+    posto_id?: string
+  }>({ action: 'set_password', posto_id: postoId, password })
+
+  if (invokeFailed || !payload?.ok) {
+    throw new Error(payload?.message || 'Não foi possível alterar a senha.')
+  }
+
+  return payload
+}
+
 export function subscriptionStatusLabel(status: AdminAccount['subscription_status']) {
   if (status === 'active') return 'Ativo'
   if (status === 'expired') return 'Expirado'
