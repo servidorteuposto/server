@@ -345,13 +345,12 @@ export default function AdminManagementPage() {
                     {dashboard.resend.recent.length > 0 && (
                       <>
                         <h3 style={{ marginTop: '1rem' }}>Últimos envios</h3>
-                        <ul className="admin-mgmt-list">
+                        <ul className="admin-mgmt-list admin-mgmt-list--compact">
                           {dashboard.resend.recent.map((mail) => (
                             <li key={mail.id}>
                               <span>
                                 {mail.subject}
-                                <br />
-                                <small className="admin-mgmt-muted">
+                                <small>
                                   {mail.to} · {mail.last_event}
                                 </small>
                               </span>

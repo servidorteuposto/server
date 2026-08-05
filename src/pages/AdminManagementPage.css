@@ -115,6 +115,7 @@
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 0.85rem;
   margin-top: 0.75rem;
+  align-items: start;
 }
 
 .admin-mgmt-panel {
@@ -139,6 +140,12 @@
   gap: 0.45rem;
 }
 
+.admin-mgmt-list--compact {
+  max-height: 11rem;
+  overflow: auto;
+  padding-right: 0.25rem;
+}
+
 .admin-mgmt-list li {
   display: flex;
   justify-content: space-between;
@@ -151,6 +158,15 @@
 .admin-mgmt-list li:last-child {
   border-bottom: none;
   padding-bottom: 0;
+}
+
+.admin-mgmt-list small {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--gray-600);
+  word-break: break-word;
 }
 
 .admin-mgmt-domain {

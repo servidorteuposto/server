@@ -287,7 +287,7 @@ export async function fetchResendStats() {
           last_event?: string
         }>
       }
-      recent = (payload.data ?? []).slice(0, 8).map((row) => {
+      recent = (payload.data ?? []).slice(0, 3).map((row) => {
         const toRaw = Array.isArray(row.to) ? row.to.join(', ') : String(row.to ?? '—')
         return {
           id: String(row.id ?? ''),
