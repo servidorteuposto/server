@@ -5,6 +5,7 @@ import {
   getDrainageSignatureUrl,
   type DieselDrainageReport,
 } from './diesel-drainages'
+import { drawCenteredBrandLogo, embedTeuPostoLogo } from './pdf-brand'
 
 const PAGE_WIDTH = 595.28
 const PAGE_HEIGHT = 841.89
@@ -331,6 +332,7 @@ export async function generateDrainagePrintPdf(
   const doc = await PDFDocument.create()
   const font = await doc.embedFont(StandardFonts.Helvetica)
   const fontBold = await doc.embedFont(StandardFonts.HelveticaBold)
+  const brandLogo = await embedTeuPostoLogo(doc)
 
   if (!reports.length) {
     const page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
@@ -343,6 +345,7 @@ export async function generateDrainagePrintPdf(
       pageNumber: 1,
     }
     drawPageChrome(ctx)
+    ctx.y = drawCenteredBrandLogo(ctx.page, brandLogo, ctx.y)
     ctx.page.drawText('Nenhuma drenagem disponivel para exportacao.', {
       x: MARGIN_X,
       y: ctx.y,
@@ -371,14 +374,7 @@ export async function generateDrainagePrintPdf(
 
     const tankName = report.tank?.name ?? 'Tanque removido'
 
-    ctx.page.drawText('TEU POSTO', {
-      x: MARGIN_X,
-      y: ctx.y,
-      size: 10,
-      font: fontBold,
-      color: COLOR.accent,
-    })
-    ctx.y -= 16
+    ctx.y = drawCenteredBrandLogo(ctx.page, brandLogo, ctx.y)
 
     ctx.page.drawText(sanitize(`Drenagem - ${tankName}`), {
       x: MARGIN_X,

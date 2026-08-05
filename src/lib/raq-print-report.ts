@@ -8,6 +8,7 @@ import {
 } from '../config/fuel-analyses'
 import { DENSITY_CONFORMITY_LABELS } from '../config/fuel-density'
 import { formatDatePtBr } from '../config/regulatory-documents'
+import { drawCenteredBrandLogo, embedTeuPostoLogo } from './pdf-brand'
 import { getPublicFuelFileUrl, type PublicPostoBoard } from './public-posto'
 
 const PAGE_WIDTH = 595.28
@@ -291,6 +292,7 @@ export async function generateRaqPrintPdf(board: PrintBoard): Promise<Uint8Array
   const doc = await PDFDocument.create()
   const font = await doc.embedFont(StandardFonts.Helvetica)
   const fontBold = await doc.embedFont(StandardFonts.HelveticaBold)
+  const brandLogo = await embedTeuPostoLogo(doc)
   const products = productKeysFromBoard(board)
 
   if (!products.length) {
@@ -304,6 +306,7 @@ export async function generateRaqPrintPdf(board: PrintBoard): Promise<Uint8Array
       pageNumber: 1,
     }
     drawPageChrome(ctx)
+    ctx.y = drawCenteredBrandLogo(ctx.page, brandLogo, ctx.y)
     ctx.page.drawText('Nenhum RAQ disponivel para exportacao.', {
       x: MARGIN_X,
       y: ctx.y,
@@ -348,14 +351,7 @@ export async function generateRaqPrintPdf(board: PrintBoard): Promise<Uint8Array
       board.report?.signature_storage_path ||
       null
 
-    ctx.page.drawText('TEU POSTO', {
-      x: MARGIN_X,
-      y: ctx.y,
-      size: 10,
-      font: fontBold,
-      color: COLOR.accent,
-    })
-    ctx.y -= 16
+    ctx.y = drawCenteredBrandLogo(ctx.page, brandLogo, ctx.y)
 
     ctx.page.drawText(sanitize(`RAQ - ${FUEL_PRODUCT_LABELS[productKey]}`), {
       x: MARGIN_X,
