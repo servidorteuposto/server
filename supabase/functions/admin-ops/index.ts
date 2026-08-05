@@ -26,6 +26,29 @@ function isAdminAccount(user: {
     .toLowerCase() === ADMIN_EMAIL
 }
 
+/** Lockout fica por e-mail/CNPJ e sobrevive à exclusão do posto — precisa limpar explicitamente. */
+async function clearLoginLockout(
+  admin: {
+    rpc: (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ error: { message: string } | null }>
+  },
+  posto: { email?: string | null; cnpj?: string | null },
+) {
+  const email = String(posto.email ?? '')
+    .trim()
+    .toLowerCase()
+  if (email) {
+    await admin.rpc('security_clear_login_lockout', { p_identifier: email })
+  }
+
+  const cnpj = onlyDigits(posto.cnpj ?? '')
+  if (cnpj) {
+    await admin.rpc('security_clear_login_lockout', { p_identifier: cnpj })
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -254,9 +277,11 @@ Deno.serve(async (req) => {
         )
       }
 
+      await clearLoginLockout(admin, posto)
+
       return jsonResponse({
         ok: true,
-        message: `Senha de ${posto.nome} alterada com sucesso.`,
+        message: `Senha de ${posto.nome} alterada com sucesso. Bloqueio por tentativas foi liberado.`,
         posto_id: postoId,
       })
     }
@@ -285,6 +310,9 @@ Deno.serve(async (req) => {
       }
 
       const userId = typeof posto.user_id === 'string' ? posto.user_id : null
+
+      // Libera lockout do e-mail/CNPJ antes de apagar — senão o próximo cadastro fica bloqueado.
+      await clearLoginLockout(admin, posto)
 
       // Apaga o posto (cascade nos dados operacionais). Depois remove o login no Auth.
       const { error: deletePostoError } = await admin.from('postos').delete().eq('id', postoId)

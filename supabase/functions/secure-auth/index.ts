@@ -549,6 +549,10 @@ async function handleRegister(
     }
   }
 
+  // Cadastro novo (ou recriação do mesmo e-mail) não herda bloqueio antigo por tentativas.
+  await admin.rpc('security_clear_login_lockout', { p_identifier: payload.email })
+  await admin.rpc('security_clear_login_lockout', { p_identifier: payload.cnpj })
+
   // Conta já nasce confirmada (sem e-mail de verificação). Envia só boas-vindas.
   try {
     await sendWelcomeEmail(payload.email, payload.postoName)
