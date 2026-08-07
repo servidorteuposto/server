@@ -494,10 +494,18 @@ async function drawProductCardPage(
   const rightBottom = drawStackedFields(ctx, rightX, fieldsTop, colW, rightRows)
   ctx.y = Math.min(leftBottom, rightBottom) - 8
 
-  const signoffReserve = signature || author ? 88 : 42
-  const availableForPhoto = ctx.y - (cardBottom + signoffReserve + 18)
+  // Foto completa (sem crop) + assinatura ao lado, para caber na página
+  const mediaTop = ctx.y
+  const mediaBottomLimit = cardBottom + 12
+  const mediaAvail = mediaTop - mediaBottomLimit
 
-  if (photo && availableForPhoto > 70) {
+  if (photo || signature) {
+    const labelH = 12
+    const gap = 14
+    const photoColW = signature ? (innerW - gap) * 0.62 : innerW
+    const sigColW = (innerW - gap) * 0.38
+    const maxPhotoH = Math.max(90, mediaAvail - labelH - 8)
+
     ctx.page.drawText('FOTO DO LOCAL', {
       x: innerX,
       y: ctx.y,
@@ -505,62 +513,95 @@ async function drawProductCardPage(
       font: fontBold,
       color: COLOR.muted,
     })
-    ctx.y -= 10
+    if (signature) {
+      ctx.page.drawText('ASSINATURA', {
+        x: innerX + photoColW + gap,
+        y: ctx.y,
+        size: 8,
+        font: fontBold,
+        color: COLOR.muted,
+      })
+    }
+    ctx.y -= labelH
 
-    const photoSize = fitImageSize(
-      photo,
-      innerW,
-      Math.min(210, Math.max(70, availableForPhoto - 12)),
-    )
-    ctx.y -= photoSize.height
-    ctx.page.drawImage(photo, {
-      x: innerX,
-      y: ctx.y,
-      width: photoSize.width,
-      height: photoSize.height,
-    })
-    ctx.y -= 14
-  }
+    if (signature) {
+      const authorCaption = wrapText(sanitize(author), font, 8, sigColW).slice(0, 2)
+      authorCaption.forEach((line, index) => {
+        ctx.page.drawText(line, {
+          x: innerX + photoColW + gap,
+          y: ctx.y - index * 10,
+          size: 8,
+          font,
+          color: COLOR.ink,
+        })
+      })
+    }
 
-  ctx.page.drawLine({
-    start: { x: innerX, y: ctx.y },
-    end: { x: innerX + innerW, y: ctx.y },
-    thickness: 0.8,
-    color: COLOR.line,
-  })
-  ctx.y -= 16
+    const imagesTop = signature ? ctx.y - 22 : ctx.y
+    let usedH = 0
 
-  const signoffTop = ctx.y
-  drawSectionTitle(ctx, 'Responsavel', leftX, signoffTop)
-  const authorLines = wrapText(author, fontBold, 11, colW).slice(0, 2)
-  authorLines.forEach((line, index) => {
-    ctx.page.drawText(line, {
+    if (photo) {
+      // contain: imagem inteira, sem cortar
+      const photoSize = fitImageSize(photo, photoColW, maxPhotoH)
+      const photoY = imagesTop - photoSize.height
+      ctx.page.drawImage(photo, {
+        x: innerX,
+        y: photoY,
+        width: photoSize.width,
+        height: photoSize.height,
+      })
+      usedH = Math.max(usedH, photoSize.height)
+    }
+
+    if (signature) {
+      const sigSize = fitImageSize(signature, sigColW - 8, Math.min(70, maxPhotoH - 24))
+      const sigY = imagesTop - 4 - sigSize.height
+      ctx.page.drawRectangle({
+        x: innerX + photoColW + gap,
+        y: sigY - 4,
+        width: sigSize.width + 8,
+        height: sigSize.height + 8,
+        color: COLOR.white,
+        borderColor: COLOR.line,
+        borderWidth: 0.8,
+      })
+      ctx.page.drawImage(signature, {
+        x: innerX + photoColW + gap + 4,
+        y: sigY,
+        width: sigSize.width,
+        height: sigSize.height,
+      })
+      usedH = Math.max(usedH, sigSize.height + 8)
+    }
+
+    if (!signature) {
+      ctx.y = imagesTop - usedH - 12
+      ctx.page.drawLine({
+        start: { x: innerX, y: ctx.y },
+        end: { x: innerX + innerW, y: ctx.y },
+        thickness: 0.8,
+        color: COLOR.line,
+      })
+      ctx.y -= 14
+      drawSectionTitle(ctx, 'Responsavel', leftX, ctx.y)
+      ctx.page.drawText(sanitize(author).slice(0, 60), {
+        x: leftX,
+        y: ctx.y - 14,
+        size: 11,
+        font: fontBold,
+        color: COLOR.ink,
+      })
+    } else {
+      ctx.y = imagesTop - usedH - 8
+    }
+  } else {
+    drawSectionTitle(ctx, 'Responsavel', leftX, ctx.y)
+    ctx.page.drawText(sanitize(author).slice(0, 60), {
       x: leftX,
-      y: signoffTop - 14 - index * 13,
+      y: ctx.y - 14,
       size: 11,
       font: fontBold,
       color: COLOR.ink,
-    })
-  })
-
-  if (signature) {
-    drawSectionTitle(ctx, 'Assinatura', rightX, signoffTop)
-    const sigSize = fitImageSize(signature, colW, 52)
-    const sigY = signoffTop - 14 - sigSize.height
-    ctx.page.drawRectangle({
-      x: rightX,
-      y: sigY - 4,
-      width: sigSize.width + 8,
-      height: sigSize.height + 8,
-      color: COLOR.white,
-      borderColor: COLOR.line,
-      borderWidth: 0.8,
-    })
-    ctx.page.drawImage(signature, {
-      x: rightX + 4,
-      y: sigY,
-      width: sigSize.width,
-      height: sigSize.height,
     })
   }
 
@@ -624,21 +665,46 @@ export function downloadRaqPdf(bytes: Uint8Array, fileName: string) {
   URL.revokeObjectURL(url)
 }
 
-/** Abre o PDF e dispara a impressão (fallback: download se a impressão falhar). */
+/** Abre o diálogo de impressão do PDF (sem baixar o arquivo). */
 export function openRaqPdfForPrint(bytes: Uint8Array, fileName = 'RAQ.pdf') {
   const blob = new Blob(
     [bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer],
     { type: 'application/pdf' },
   )
   const url = URL.createObjectURL(blob)
+
+  const printWindow = window.open(url, '_blank', 'noopener,noreferrer')
+  if (printWindow) {
+    const tryPrint = () => {
+      try {
+        printWindow.focus()
+        printWindow.print()
+      } catch {
+        /* navegador bloqueou; usuário ainda vê o PDF na aba */
+      }
+    }
+
+    printWindow.addEventListener('load', () => {
+      window.setTimeout(tryPrint, 300)
+    })
+    // Alguns browsers não disparam load em blob PDF
+    window.setTimeout(tryPrint, 1200)
+    window.setTimeout(() => URL.revokeObjectURL(url), 120_000)
+    return
+  }
+
+  // Popup bloqueado: iframe oculto só para print, sem download
   const iframe = document.createElement('iframe')
   iframe.setAttribute('title', fileName)
+  iframe.setAttribute('aria-hidden', 'true')
   iframe.style.position = 'fixed'
-  iframe.style.right = '0'
-  iframe.style.bottom = '0'
-  iframe.style.width = '0'
-  iframe.style.height = '0'
+  iframe.style.inset = '0'
+  iframe.style.width = '100%'
+  iframe.style.height = '100%'
   iframe.style.border = '0'
+  iframe.style.opacity = '0'
+  iframe.style.pointerEvents = 'none'
+  iframe.style.zIndex = '-1'
   iframe.src = url
   document.body.appendChild(iframe)
 
@@ -647,27 +713,20 @@ export function openRaqPdfForPrint(bytes: Uint8Array, fileName = 'RAQ.pdf') {
     URL.revokeObjectURL(url)
   }
 
-  iframe.onload = () => {
+  const tryPrintIframe = () => {
     try {
       iframe.contentWindow?.focus()
       iframe.contentWindow?.print()
     } catch {
-      downloadRaqPdf(bytes, fileName)
-    } finally {
-      window.setTimeout(cleanup, 60_000)
+      /* sem fallback de download */
     }
   }
 
-  window.setTimeout(() => {
-    if (document.body.contains(iframe)) {
-      try {
-        iframe.contentWindow?.print()
-      } catch {
-        downloadRaqPdf(bytes, fileName)
-        cleanup()
-      }
-    }
-  }, 2500)
+  iframe.onload = () => {
+    window.setTimeout(tryPrintIframe, 300)
+  }
+  window.setTimeout(tryPrintIframe, 1200)
+  window.setTimeout(cleanup, 120_000)
 }
 
 export function buildRaqPdfFileName(board: PrintBoard) {

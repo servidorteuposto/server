@@ -347,11 +347,15 @@
 
 .public-posto__photo {
   width: 100%;
+  height: auto;
+  max-height: none;
   margin-top: 0.75rem;
   border-radius: 12px;
   border: 1px solid var(--gray-300);
-  object-fit: cover;
-  max-height: 220px;
+  object-fit: contain;
+  object-position: center;
+  background: #fff;
+  display: block;
 }
 
 .public-posto__author {
