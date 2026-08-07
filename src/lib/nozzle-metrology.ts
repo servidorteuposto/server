@@ -19,6 +19,8 @@ export type NozzleMetrologyItem = {
   flow_max_liters: number
   seals_ok: boolean
   leakage: boolean
+  hose_ok: boolean
+  display_burned: boolean
   item_status: MetrologyStatus
   created_at: string
 }
@@ -50,6 +52,8 @@ export type SaveNozzleMetrologyItemInput = {
   flowMaxLiters: number
   sealsOk: boolean
   leakage: boolean
+  hoseOk: boolean
+  displayBurned: boolean
   itemStatus: MetrologyStatus
 }
 
@@ -170,6 +174,8 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
         flow_max_liters: item.flowMaxLiters,
         seals_ok: item.sealsOk,
         leakage: item.leakage,
+        hose_ok: item.hoseOk,
+        display_burned: item.displayBurned,
         item_status: item.itemStatus,
       })),
     )

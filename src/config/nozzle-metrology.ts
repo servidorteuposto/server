@@ -21,7 +21,7 @@ export const VOLUMETRY_TOLERANCE_MAX = 100
 export const VOLUMETRY_PERCENT_PER_STEP = 0.1
 export const VOLUMETRY_SPREAD_MAX_PERCENT = 0.5
 
-/** Vazão mínima: em 1 minuto, no máximo 5 L (5 L em pelo menos 60 s). */
+/** Vazão mínima: em 1 minuto, no mínimo 5 L. */
 export const FLOW_MIN_LITERS_LIMIT = 5
 
 /** Vazão máxima: em 12 segundos, no mínimo 5 L. */
@@ -105,7 +105,7 @@ export function isVolumetrySpreadApproved(a: number, b: number) {
 }
 
 export function isFlowMinApproved(liters: number) {
-  return Number.isFinite(liters) && liters > 0 && liters <= FLOW_MIN_LITERS_LIMIT
+  return Number.isFinite(liters) && liters >= FLOW_MIN_LITERS_LIMIT
 }
 
 export function isFlowMaxApproved(liters: number) {
@@ -126,6 +126,8 @@ export type NozzleDraftInput = {
   flowMaxLiters: number | null
   sealsOk: boolean | null
   leakage: boolean | null
+  hoseOk: boolean | null
+  displayBurned: boolean | null
 }
 
 export function evaluateNozzleDraft(input: NozzleDraftInput): NozzleDraftEvaluation {
@@ -138,7 +140,9 @@ export function evaluateNozzleDraft(input: NozzleDraftInput): NozzleDraftEvaluat
     input.flowMinLiters == null ||
     input.flowMaxLiters == null ||
     input.sealsOk == null ||
-    input.leakage == null
+    input.leakage == null ||
+    input.hoseOk == null ||
+    input.displayBurned == null
 
   if (incomplete) {
     return { status: 'pendente', reasons: ['Preencha todos os campos do bico.'] }
@@ -163,7 +167,7 @@ export function evaluateNozzleDraft(input: NozzleDraftInput): NozzleDraftEvaluat
   }
   if (!isFlowMinApproved(input.flowMinLiters!)) {
     reasons.push(
-      `Vazão mínima: em ${FLOW_MIN_TIME_LABEL} deve entregar no máximo ${FLOW_MIN_LITERS_LIMIT} L.`,
+      `Vazão mínima: em ${FLOW_MIN_TIME_LABEL} deve entregar no mínimo ${FLOW_MIN_LITERS_LIMIT} L.`,
     )
   }
   if (!isFlowMaxApproved(input.flowMaxLiters!)) {
@@ -176,6 +180,12 @@ export function evaluateNozzleDraft(input: NozzleDraftInput): NozzleDraftEvaluat
   }
   if (input.leakage === true) {
     reasons.push('Há vazamento.')
+  }
+  if (input.hoseOk === false) {
+    reasons.push('Mangueira não está OK.')
+  }
+  if (input.displayBurned === true) {
+    reasons.push('Display queimado.')
   }
 
   return {
