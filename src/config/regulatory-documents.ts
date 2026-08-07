@@ -7,7 +7,7 @@ export type RegulatoryTemplateKey =
   | 'projeto-simplificado-anp'
   | 'certificado-revendedor-anp'
   | 'ficha-cadastral-anp'
-  | 'laudos-ambientais'
+  | 'certidao-negativa-debitos-prefeitura'
 
 export type RegulatoryTemplate = {
   key: RegulatoryTemplateKey
@@ -23,7 +23,7 @@ export const REGULATORY_DOCUMENT_TEMPLATES: RegulatoryTemplate[] = [
   { key: 'projeto-simplificado-anp', title: 'Projeto Simplificado ANP' },
   { key: 'certificado-revendedor-anp', title: 'Certificado de Revendedor ANP' },
   { key: 'ficha-cadastral-anp', title: 'Ficha Cadastral ANP' },
-  { key: 'laudos-ambientais', title: 'Laudos Ambientais' },
+  { key: 'certidao-negativa-debitos-prefeitura', title: 'Certidão Negativa de Débitos da Prefeitura' },
 ]
 
 export const REGULATORY_STORAGE_BUCKET = 'regulatory-documents'

@@ -1226,7 +1226,7 @@ Deno.serve(async (req) => {
       if (ok) enqueued += 1
     }
 
-    // --- Documentos regulatórios + laudos ---
+    // --- Documentos regulatórios ---
     const [{ data: regulatory }, { data: workSafety }] = await Promise.all([
       admin
         .from('regulatory_documents')
