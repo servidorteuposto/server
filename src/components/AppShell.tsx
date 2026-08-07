@@ -128,6 +128,20 @@ export default function AppShell({
   const mainMenuItems = getMainMenuItems(isAdmin)
   const activeModule = activeMenuId ? getMenuItem(activeMenuId) : null
 
+  // Evita faixa cinza (#c6c4c6 do login) no rodapé em celular/PWA
+  useEffect(() => {
+    document.documentElement.classList.add('teuposto-app-active')
+    const theme = document.querySelector('meta[name="theme-color"]')
+    const previousTheme = theme?.getAttribute('content') ?? null
+    theme?.setAttribute('content', '#f3f4f6')
+    return () => {
+      document.documentElement.classList.remove('teuposto-app-active')
+      if (theme) {
+        theme.setAttribute('content', previousTheme || '#0c3b7a')
+      }
+    }
+  }, [])
+
   useEffect(() => {
     if (!isAdmin) {
       setAdminAttention(null)
