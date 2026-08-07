@@ -393,59 +393,6 @@
   gap: 0.65rem;
 }
 
-.fuel-invoice-attach {
-  display: grid;
-  gap: 0.55rem;
-}
-
-.fuel-invoice-attach__modes {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.4rem;
-}
-
-.fuel-invoice-attach__mode {
-  appearance: none;
-  border: 1px solid var(--gray-300);
-  background: #fff;
-  color: var(--gray-700);
-  border-radius: 10px;
-  padding: 0.55rem 0.65rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.fuel-invoice-attach__mode:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.fuel-invoice-attach__mode--active {
-  border-color: rgba(61, 143, 212, 0.65);
-  background: #edf6ff;
-  color: var(--blue-dark);
-}
-
-.fuel-invoice-attach__name {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  flex-wrap: wrap;
-  color: var(--gray-600);
-}
-
-.fuel-invoice-attach__clear {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: #b91c1c;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-}
-
 .fuel-camera {
   display: grid;
   gap: 0.55rem;

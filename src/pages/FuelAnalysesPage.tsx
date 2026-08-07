@@ -9,7 +9,6 @@ import {
   formatDateTimePtBr,
   formatRaqVolumeLabel,
   FUEL_PRODUCT_LABELS,
-  isPdfOrImageFile,
   isRaqVolumePreset,
   productAlcoholKind,
   productHasAlcoholContent,
@@ -72,9 +71,6 @@ type RaqDraft = {
   transporterName: string
   transporterCnpj: string
   invoiceNumber: string
-  invoiceFile: File | null
-  invoicePreviewUrl: string | null
-  invoiceAttachMode: 'file' | 'camera'
   truckPlate: string
   driverName: string
   distributorName: string
@@ -110,9 +106,6 @@ function emptyRaq(): RaqDraft {
     transporterName: '',
     transporterCnpj: '',
     invoiceNumber: '',
-    invoiceFile: null,
-    invoicePreviewUrl: null,
-    invoiceAttachMode: 'file',
     truckPlate: '',
     driverName: '',
     distributorName: '',
@@ -504,8 +497,6 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
 
     if (removing) {
       setRaqDrafts((drafts) => {
-        const previous = drafts[key]
-        if (previous?.invoicePreviewUrl) URL.revokeObjectURL(previous.invoicePreviewUrl)
         const copy = { ...drafts }
         delete copy[key]
         return copy
@@ -530,66 +521,10 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
   }
 
   function updateRaq(key: FuelProductKey, patch: Partial<RaqDraft>) {
-    setRaqDrafts((current) => {
-      const previous = current[key] ?? emptyRaq()
-      const nextPreview =
-        'invoicePreviewUrl' in patch ? (patch.invoicePreviewUrl ?? null) : previous.invoicePreviewUrl
-      if (previous.invoicePreviewUrl && previous.invoicePreviewUrl !== nextPreview) {
-        URL.revokeObjectURL(previous.invoicePreviewUrl)
-      }
-
-      return {
-        ...current,
-        [key]: { ...previous, ...patch },
-      }
-    })
-  }
-
-  function setInvoiceAttachMode(key: FuelProductKey, mode: 'file' | 'camera') {
-    const previous = raqDrafts[key] ?? emptyRaq()
-    if (previous.invoiceAttachMode === mode) return
-    updateRaq(key, {
-      invoiceAttachMode: mode,
-      invoiceFile: null,
-      invoicePreviewUrl: null,
-    })
-  }
-
-  function handleInvoiceFileSelect(key: FuelProductKey, file: File | null) {
-    if (!file) {
-      updateRaq(key, { invoiceFile: null, invoicePreviewUrl: null })
-      return
-    }
-    updateRaq(key, {
-      invoiceFile: file,
-      invoicePreviewUrl: null,
-      invoiceAttachMode: 'file',
-    })
-  }
-
-  function handleInvoicePhotoCapture(key: FuelProductKey, file: File) {
-    if (file.size > FUEL_ANALYSES_MAX_FILE_BYTES) {
-      setFormError(`${FUEL_PRODUCT_LABELS[key]}: a foto da nota fiscal deve ter no máximo 10 MB.`)
-      return
-    }
-    const previewUrl = URL.createObjectURL(file)
-    const named = new File([file], `nota-fiscal-${Date.now()}.jpg`, {
-      type: file.type || 'image/jpeg',
-      lastModified: file.lastModified || Date.now(),
-    })
-    updateRaq(key, {
-      invoiceFile: named,
-      invoicePreviewUrl: previewUrl,
-      invoiceAttachMode: 'camera',
-    })
-    setFormError(null)
-  }
-
-  function clearInvoiceAttachment(key: FuelProductKey) {
-    updateRaq(key, {
-      invoiceFile: null,
-      invoicePreviewUrl: null,
-    })
+    setRaqDrafts((current) => ({
+      ...current,
+      [key]: { ...(current[key] ?? emptyRaq()), ...patch },
+    }))
   }
 
   function updateAnalysis(key: FuelProductKey, patch: Partial<AnalysisDraft>) {
@@ -676,10 +611,6 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
       const transporterError = validateTransporterCnpj(raq.transporterCnpj)
       if (transporterError) return `${product.label}: ${transporterError}`
       if (!raq.invoiceNumber.trim()) return `${product.label}: informe o número da nota fiscal.`
-      if (!raq.invoiceFile) return `${product.label}: anexe a nota fiscal do produto.`
-      if (raq.invoiceFile && !isPdfOrImageFile(raq.invoiceFile)) {
-        return `${product.label}: a nota fiscal deve ser PDF ou imagem.`
-      }
       if (!raq.truckPlate.trim()) return `${product.label}: informe a placa do caminhão/reboque.`
       if (!raq.driverName.trim()) return `${product.label}: informe o nome do motorista.`
       if (!raq.distributorName.trim()) return `${product.label}: informe o distribuidor.`
@@ -747,7 +678,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
           transporterName: draft.transporterName,
           transporterCnpj: draft.transporterCnpj,
           invoiceNumber: draft.invoiceNumber,
-          invoiceFile: draft.invoiceFile,
+          invoiceFile: null,
           truckPlate: draft.truckPlate,
           driverName: draft.driverName,
           distributorName: draft.distributorName,
@@ -1198,73 +1129,6 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                               required
                             />
                           </label>
-                          <div className="reg-doc-form__field fuel-invoice-attach">
-                            <span>Anexo da Nota Fiscal *</span>
-                            <div className="fuel-invoice-attach__modes" role="group" aria-label="Forma de anexar a nota fiscal">
-                              <button
-                                type="button"
-                                className={`fuel-invoice-attach__mode${
-                                  draft.invoiceAttachMode === 'file'
-                                    ? ' fuel-invoice-attach__mode--active'
-                                    : ''
-                                }`}
-                                onClick={() => setInvoiceAttachMode(product.key, 'file')}
-                                disabled={busy}
-                              >
-                                Escolher arquivo
-                              </button>
-                              <button
-                                type="button"
-                                className={`fuel-invoice-attach__mode${
-                                  draft.invoiceAttachMode === 'camera'
-                                    ? ' fuel-invoice-attach__mode--active'
-                                    : ''
-                                }`}
-                                onClick={() => setInvoiceAttachMode(product.key, 'camera')}
-                                disabled={busy}
-                              >
-                                Tirar foto
-                              </button>
-                            </div>
-
-                            {draft.invoiceAttachMode === 'file' ? (
-                              <>
-                                <input
-                                  type="file"
-                                  accept="application/pdf,image/*"
-                                  onChange={(event) =>
-                                    handleInvoiceFileSelect(
-                                      product.key,
-                                      event.target.files?.[0] ?? null,
-                                    )
-                                  }
-                                  disabled={busy}
-                                />
-                                {draft.invoiceFile && (
-                                  <small className="fuel-invoice-attach__name">
-                                    {draft.invoiceFile.name}
-                                    <button
-                                      type="button"
-                                      className="fuel-invoice-attach__clear"
-                                      onClick={() => clearInvoiceAttachment(product.key)}
-                                      disabled={busy}
-                                    >
-                                      Remover
-                                    </button>
-                                  </small>
-                                )}
-                              </>
-                            ) : (
-                              <LiveCameraCapture
-                                disabled={busy}
-                                label="Foto da Nota Fiscal"
-                                hint="Use a câmera para fotografar a nota fiscal agora."
-                                previewUrl={draft.invoicePreviewUrl}
-                                onCapture={(file) => handleInvoicePhotoCapture(product.key, file)}
-                                onClear={() => clearInvoiceAttachment(product.key)}
-                              />
-                            )}
-                          </div>
                           <label className="reg-doc-form__field">
                             <span>Placa do caminhão/reboque *</span>
                             <input
