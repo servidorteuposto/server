@@ -152,11 +152,10 @@ export default function PublicPostoPage({ slug }: PublicPostoPageProps) {
             <p className="public-posto__eyebrow">Consulta pública</p>
             <h1>{board.posto.nome}</h1>
             <div className="public-posto__meta">
-              <span>CNPJ {formatCnpj(board.posto.cnpj)}</span>
-              <span className="public-posto__meta-dot" aria-hidden="true">
-                ·
+              <span className="public-posto__meta-cnpj">CNPJ {formatCnpj(board.posto.cnpj)}</span>
+              <span className="public-posto__meta-address">
+                {board.posto.endereco || 'Endereço não informado'}
               </span>
-              <span>{board.posto.endereco || 'Endereço não informado'}</span>
             </div>
             <p className="public-posto__live">
               Cada combustível exibe o último RAQ lançado daquele produto

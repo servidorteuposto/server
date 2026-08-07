@@ -215,6 +215,52 @@ export async function listFuelAnalysisReports(postoId: string): Promise<FuelAnal
   }))
 }
 
+/** Produtos cobertos por um lançamento (RAQ e/ou análise). */
+export function productKeysFromReport(report: FuelAnalysisReport): FuelProductKey[] {
+  const keys = new Set<FuelProductKey>()
+  for (const item of report.raq_items) keys.add(item.product_key)
+  for (const item of report.analysis_items) keys.add(item.product_key)
+  return [...keys]
+}
+
+/**
+ * Vigência por produto (igual à página pública): um lançamento fica vigente
+ * enquanto pelo menos um combustível dele ainda for o mais recente.
+ */
+export function partitionFuelReportsByVigencia(reports: FuelAnalysisReport[]) {
+  const latestReportIdByProduct = new Map<FuelProductKey, string>()
+
+  for (const report of reports) {
+    for (const key of productKeysFromReport(report)) {
+      if (!latestReportIdByProduct.has(key)) {
+        latestReportIdByProduct.set(key, report.id)
+      }
+    }
+  }
+
+  const currentReports: FuelAnalysisReport[] = []
+  const archivedReports: FuelAnalysisReport[] = []
+
+  for (const report of reports) {
+    const keys = productKeysFromReport(report)
+    const stillCurrent = keys.some((key) => latestReportIdByProduct.get(key) === report.id)
+    if (stillCurrent) currentReports.push(report)
+    else archivedReports.push(report)
+  }
+
+  return { currentReports, archivedReports, latestReportIdByProduct }
+}
+
+/** Produtos deste lançamento que ainda estão vigentes na página pública. */
+export function currentProductKeysForReport(
+  report: FuelAnalysisReport,
+  latestReportIdByProduct: Map<FuelProductKey, string>,
+): FuelProductKey[] {
+  return productKeysFromReport(report).filter(
+    (key) => latestReportIdByProduct.get(key) === report.id,
+  )
+}
+
 export async function getFuelFileUrl(path: string) {
   const { data, error } = await supabase.storage
     .from(FUEL_ANALYSES_STORAGE_BUCKET)

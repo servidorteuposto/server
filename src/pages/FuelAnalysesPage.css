@@ -56,6 +56,64 @@
   cursor: not-allowed;
 }
 
+.fuel-export {
+  position: relative;
+}
+
+.fuel-export__menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 30;
+  min-width: 15.5rem;
+  display: grid;
+  padding: 0.35rem;
+  border-radius: 12px;
+  border: 1px solid var(--gray-300);
+  background: #fff;
+  box-shadow: 0 14px 28px -18px rgba(8, 37, 82, 0.45);
+}
+
+.fuel-export__menu button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--blue-dark);
+  cursor: pointer;
+}
+
+.fuel-export__menu button:hover:not(:disabled) {
+  background: #f0f7ff;
+}
+
+.fuel-export__menu button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.fuel-period-modal {
+  width: min(420px, 100%);
+}
+
+.fuel-period-modal__hint {
+  margin: 0 0 0.85rem;
+  font-size: 0.86rem;
+  color: var(--gray-600);
+  line-height: 1.45;
+}
+
+.fuel-period-modal__fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
 .fuel-setup-hint {
   margin: 0;
   padding: 0.75rem 0.9rem;
@@ -335,6 +393,59 @@
   gap: 0.65rem;
 }
 
+.fuel-invoice-attach {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.fuel-invoice-attach__modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.fuel-invoice-attach__mode {
+  appearance: none;
+  border: 1px solid var(--gray-300);
+  background: #fff;
+  color: var(--gray-700);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fuel-invoice-attach__mode:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fuel-invoice-attach__mode--active {
+  border-color: rgba(61, 143, 212, 0.65);
+  background: #edf6ff;
+  color: var(--blue-dark);
+}
+
+.fuel-invoice-attach__name {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  color: var(--gray-600);
+}
+
+.fuel-invoice-attach__clear {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #b91c1c;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
 .fuel-camera {
   display: grid;
   gap: 0.55rem;
@@ -494,6 +605,11 @@
   background: rgba(61, 143, 212, 0.03);
 }
 
+.fuel-history__actions {
+  flex: 0 0 auto;
+  width: min(11.5rem, 100%);
+}
+
 .fuel-history__card--current {
   border-color: rgba(61, 143, 212, 0.45);
   background: #f0f7ff;
@@ -516,6 +632,11 @@
   margin: 1.1rem 0 0.65rem;
   font-size: 0.95rem;
   color: var(--blue-dark);
+}
+
+.fuel-history__address {
+  color: var(--gray-500) !important;
+  font-size: 0.8rem !important;
 }
 
 .fuel-qr-modal {
@@ -661,6 +782,18 @@
     width: auto;
     padding: 0.55rem 0.75rem;
     font-size: 0.8rem;
+  }
+
+  .fuel-export {
+    flex: 1 1 auto;
+  }
+
+  .fuel-export .reg-docs-page__add-btn {
+    width: 100%;
+  }
+
+  .fuel-period-modal__fields {
+    grid-template-columns: 1fr;
   }
 
   .fuel-panel__header,

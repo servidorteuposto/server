@@ -6,3 +6,5 @@ dist
 docs/
 scripts/generate_docs_pdf.py
 supabase/.temp/
+.vercel
+.env*

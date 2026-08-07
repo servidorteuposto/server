@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 type LiveCameraCaptureProps = {
   disabled?: boolean
   label?: string
+  hint?: string | null
   onCapture: (file: File) => void
   onClear?: () => void
   previewUrl?: string | null
@@ -11,6 +12,7 @@ type LiveCameraCaptureProps = {
 export default function LiveCameraCapture({
   disabled = false,
   label = 'Foto comprovando o local (opcional)',
+  hint = 'Opcional. Se capturar, a foto deve ser tirada agora com a câmera (não é permitido escolher arquivo da galeria).',
   onCapture,
   onClear,
   previewUrl = null,
@@ -124,10 +126,7 @@ export default function LiveCameraCapture({
   return (
     <div className="fuel-camera">
       <span className="fuel-camera__label">{label}</span>
-      <p className="fuel-camera__hint">
-        Opcional. Se capturar, a foto deve ser tirada agora com a câmera (não é permitido escolher
-        arquivo da galeria).
-      </p>
+      {hint ? <p className="fuel-camera__hint">{hint}</p> : null}
 
       {!previewUrl && (
         <div className="fuel-camera__viewport">

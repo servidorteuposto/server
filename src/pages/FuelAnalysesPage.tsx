@@ -36,6 +36,9 @@ import {
   getFuelFileUrl,
   getMyPostoProfile,
   listFuelAnalysisReports,
+  partitionFuelReportsByVigencia,
+  currentProductKeysForReport,
+  productKeysFromReport,
   saveFuelAnalysisReport,
   type AnalysisItemInput,
   type FuelAnalysisReport,
@@ -43,6 +46,15 @@ import {
   type RaqItemInput,
 } from '../lib/fuel-analyses'
 import { listPartners, type PostoPartner } from '../lib/partners'
+import {
+  buildRaqPdfFileName,
+  downloadRaqPdf,
+  fuelReportToPrintBoard,
+  generateRaqPrintPdf,
+  generateRaqPrintPdfFromPages,
+  openRaqPdfForPrint,
+  type RaqPdfPageSpec,
+} from '../lib/raq-print-report'
 import { buildPublicPostoUrl } from '../config/public-posto'
 import { formatDatePtBr } from '../config/regulatory-documents'
 import { fetchPublicPostoBoard } from '../lib/public-posto'
@@ -67,6 +79,8 @@ type RaqDraft = {
   transporterCnpj: string
   invoiceNumber: string
   invoiceFile: File | null
+  invoicePreviewUrl: string | null
+  invoiceAttachMode: 'file' | 'camera'
   truckPlate: string
   driverName: string
   distributorName: string
@@ -103,6 +117,8 @@ function emptyRaq(): RaqDraft {
     transporterCnpj: '',
     invoiceNumber: '',
     invoiceFile: null,
+    invoicePreviewUrl: null,
+    invoiceAttachMode: 'file',
     truckPlate: '',
     driverName: '',
     distributorName: '',
@@ -234,14 +250,164 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
   const [launchProductKeys, setLaunchProductKeys] = useState<FuelProductKey[]>([])
   const [transporters, setTransporters] = useState<PostoPartner[]>([])
   const [distributors, setDistributors] = useState<PostoPartner[]>([])
+  const [exportingId, setExportingId] = useState<string | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const [bulkExporting, setBulkExporting] = useState(false)
+  const [periodModalOpen, setPeriodModalOpen] = useState(false)
+  const [periodFrom, setPeriodFrom] = useState('')
+  const [periodTo, setPeriodTo] = useState('')
+  const [periodError, setPeriodError] = useState<string | null>(null)
+
+  const handleReportPdf = useCallback(
+    async (report: FuelAnalysisReport, mode: 'print' | 'download') => {
+      setExportingId(report.id)
+      setExportError(null)
+      try {
+        const board = fuelReportToPrintBoard(report)
+        const bytes = await generateRaqPrintPdf(board)
+        const fileName = buildRaqPdfFileName(board)
+        if (mode === 'print') {
+          openRaqPdfForPrint(bytes, fileName)
+        } else {
+          downloadRaqPdf(bytes, fileName)
+        }
+      } catch {
+        setExportError('Não foi possível gerar o PDF deste RAQ. Tente novamente.')
+      } finally {
+        setExportingId(null)
+      }
+    },
+    [],
+  )
 
   const launchProducts = useMemo(
     () => FUEL_PRODUCTS.filter((product) => launchProductKeys.includes(product.key)),
     [launchProductKeys],
   )
 
-  const latestReport = reports[0] ?? null
-  const archivedReports = reports.slice(1)
+  const { currentReports, archivedReports, latestReportIdByProduct } = useMemo(
+    () => partitionFuelReportsByVigencia(reports),
+    [reports],
+  )
+
+  const buildPagesFromReports = useCallback(
+    (
+      source: FuelAnalysisReport[],
+      productFilter?: (report: FuelAnalysisReport) => FuelProductKey[],
+    ): RaqPdfPageSpec[] => {
+      const pages: RaqPdfPageSpec[] = []
+      for (const report of source) {
+        const board = fuelReportToPrintBoard(report)
+        const keys = productFilter
+          ? productFilter(report)
+          : productKeysFromReport(report)
+        for (const productKey of keys) {
+          pages.push({ board, productKey })
+        }
+      }
+      return pages
+    },
+    [],
+  )
+
+  const runBulkExport = useCallback(
+    async (pages: RaqPdfPageSpec[], fileSuffix: string) => {
+      if (!pages.length) {
+        setExportError('Nenhum RAQ encontrado para exportar com esse filtro.')
+        return
+      }
+      setBulkExporting(true)
+      setExportError(null)
+      setExportMenuOpen(false)
+      try {
+        const bytes = await generateRaqPrintPdfFromPages(pages)
+        const slug = (posto?.nome || 'posto')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-zA-Z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')
+          .toLowerCase()
+          .slice(0, 40)
+        downloadRaqPdf(bytes, `RAQ-${slug || 'posto'}-${fileSuffix}.pdf`)
+      } catch {
+        setExportError('Não foi possível gerar o PDF. Tente novamente.')
+      } finally {
+        setBulkExporting(false)
+      }
+    },
+    [posto?.nome],
+  )
+
+  const handleBulkExport = useCallback(
+    async (mode: 'all' | 'current' | 'archived') => {
+      if (mode === 'all') {
+        await runBulkExport(buildPagesFromReports(reports), `todas-${new Date().toISOString().slice(0, 10)}`)
+        return
+      }
+      if (mode === 'current') {
+        await runBulkExport(
+          buildPagesFromReports(currentReports, (report) =>
+            currentProductKeysForReport(report, latestReportIdByProduct),
+          ),
+          `vigentes-${new Date().toISOString().slice(0, 10)}`,
+        )
+        return
+      }
+
+      const archivedPages = buildPagesFromReports(archivedReports)
+      const supersededFromCurrent = buildPagesFromReports(currentReports, (report) => {
+        const current = new Set(currentProductKeysForReport(report, latestReportIdByProduct))
+        return productKeysFromReport(report).filter((key) => !current.has(key))
+      })
+      await runBulkExport(
+        [...archivedPages, ...supersededFromCurrent],
+        `arquivo-${new Date().toISOString().slice(0, 10)}`,
+      )
+    },
+    [
+      archivedReports,
+      buildPagesFromReports,
+      currentReports,
+      latestReportIdByProduct,
+      reports,
+      runBulkExport,
+    ],
+  )
+
+  const handlePeriodExport = useCallback(async () => {
+    if (!periodFrom || !periodTo) {
+      setPeriodError('Informe a data inicial e a data final.')
+      return
+    }
+    if (periodFrom > periodTo) {
+      setPeriodError('A data inicial não pode ser maior que a final.')
+      return
+    }
+    setPeriodError(null)
+    const fromMs = new Date(`${periodFrom}T00:00:00`).getTime()
+    const toMs = new Date(`${periodTo}T23:59:59.999`).getTime()
+    const filtered = reports.filter((report) => {
+      const submitted = new Date(report.submitted_at).getTime()
+      return submitted >= fromMs && submitted <= toMs
+    })
+    await runBulkExport(
+      buildPagesFromReports(filtered),
+      `periodo-${periodFrom}_a_${periodTo}`,
+    )
+    setPeriodModalOpen(false)
+  }, [buildPagesFromReports, periodFrom, periodTo, reports, runBulkExport])
+
+  useEffect(() => {
+    if (!exportMenuOpen) return
+    function onPointerDown(event: MouseEvent) {
+      const target = event.target as HTMLElement | null
+      if (target?.closest('.fuel-export')) return
+      setExportMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [exportMenuOpen])
 
   const loadPage = useCallback(async () => {
     setLoading(true)
@@ -360,6 +526,8 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
 
     if (removing) {
       setRaqDrafts((drafts) => {
+        const previous = drafts[key]
+        if (previous?.invoicePreviewUrl) URL.revokeObjectURL(previous.invoicePreviewUrl)
         const copy = { ...drafts }
         delete copy[key]
         return copy
@@ -384,10 +552,66 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
   }
 
   function updateRaq(key: FuelProductKey, patch: Partial<RaqDraft>) {
-    setRaqDrafts((current) => ({
-      ...current,
-      [key]: { ...(current[key] ?? emptyRaq()), ...patch },
-    }))
+    setRaqDrafts((current) => {
+      const previous = current[key] ?? emptyRaq()
+      const nextPreview =
+        'invoicePreviewUrl' in patch ? (patch.invoicePreviewUrl ?? null) : previous.invoicePreviewUrl
+      if (previous.invoicePreviewUrl && previous.invoicePreviewUrl !== nextPreview) {
+        URL.revokeObjectURL(previous.invoicePreviewUrl)
+      }
+
+      return {
+        ...current,
+        [key]: { ...previous, ...patch },
+      }
+    })
+  }
+
+  function setInvoiceAttachMode(key: FuelProductKey, mode: 'file' | 'camera') {
+    const previous = raqDrafts[key] ?? emptyRaq()
+    if (previous.invoiceAttachMode === mode) return
+    updateRaq(key, {
+      invoiceAttachMode: mode,
+      invoiceFile: null,
+      invoicePreviewUrl: null,
+    })
+  }
+
+  function handleInvoiceFileSelect(key: FuelProductKey, file: File | null) {
+    if (!file) {
+      updateRaq(key, { invoiceFile: null, invoicePreviewUrl: null })
+      return
+    }
+    updateRaq(key, {
+      invoiceFile: file,
+      invoicePreviewUrl: null,
+      invoiceAttachMode: 'file',
+    })
+  }
+
+  function handleInvoicePhotoCapture(key: FuelProductKey, file: File) {
+    if (file.size > FUEL_ANALYSES_MAX_FILE_BYTES) {
+      setFormError(`${FUEL_PRODUCT_LABELS[key]}: a foto da nota fiscal deve ter no máximo 10 MB.`)
+      return
+    }
+    const previewUrl = URL.createObjectURL(file)
+    const named = new File([file], `nota-fiscal-${Date.now()}.jpg`, {
+      type: file.type || 'image/jpeg',
+      lastModified: file.lastModified || Date.now(),
+    })
+    updateRaq(key, {
+      invoiceFile: named,
+      invoicePreviewUrl: previewUrl,
+      invoiceAttachMode: 'camera',
+    })
+    setFormError(null)
+  }
+
+  function clearInvoiceAttachment(key: FuelProductKey) {
+    updateRaq(key, {
+      invoiceFile: null,
+      invoicePreviewUrl: null,
+    })
   }
 
   function updateAnalysis(key: FuelProductKey, patch: Partial<AnalysisDraft>) {
@@ -614,6 +838,57 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
         </div>
         {!formOpen && (
           <div className="fuel-header-actions">
+            <div className="fuel-export">
+              <button
+                type="button"
+                className={`reg-docs-page__add-btn fuel-header-actions__btn fuel-header-actions__btn--ghost${exportMenuOpen ? ' is-active' : ''}`}
+                onClick={() => setExportMenuOpen((open) => !open)}
+                disabled={bulkExporting || reports.length === 0}
+                title={reports.length === 0 ? 'Nenhum RAQ para exportar' : 'Exportar RAQs em PDF'}
+              >
+                {bulkExporting ? 'Exportando...' : 'Exportar'}
+              </button>
+              {exportMenuOpen && (
+                <div className="fuel-export__menu" role="menu">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void handleBulkExport('all')}
+                    disabled={bulkExporting}
+                  >
+                    Exportar todas
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void handleBulkExport('current')}
+                    disabled={bulkExporting}
+                  >
+                    Exportar somente as vigentes
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void handleBulkExport('archived')}
+                    disabled={bulkExporting}
+                  >
+                    Exportar somente as não vigentes
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setExportMenuOpen(false)
+                      setPeriodError(null)
+                      setPeriodModalOpen(true)
+                    }}
+                    disabled={bulkExporting}
+                  >
+                    Exportar por período de data
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               type="button"
               className={`reg-docs-page__add-btn fuel-header-actions__btn fuel-header-actions__btn--ghost${showQrPanel ? ' is-active' : ''}`}
@@ -642,6 +917,79 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
       </header>
 
       {pageError && <p className="reg-doc-form__error reg-docs-page__banner">{pageError}</p>}
+      {exportError && !formOpen && (
+        <p className="reg-doc-form__error reg-docs-page__banner">{exportError}</p>
+      )}
+
+      {periodModalOpen && (
+        <div
+          className="reg-doc-modal"
+          role="presentation"
+          onClick={() => setPeriodModalOpen(false)}
+        >
+          <div
+            className="reg-doc-modal__dialog fuel-period-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fuel-period-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="reg-doc-modal__header">
+              <h2 id="fuel-period-title">Exportar por período</h2>
+              <button
+                type="button"
+                className="reg-doc-modal__close"
+                onClick={() => setPeriodModalOpen(false)}
+                aria-label="Fechar"
+              >
+                ×
+              </button>
+            </header>
+            <p className="fuel-period-modal__hint">
+              Serão exportados todos os RAQs lançados entre as datas informadas (inclusive).
+            </p>
+            <div className="fuel-period-modal__fields">
+              <label className="reg-doc-form__field">
+                <span>Data inicial</span>
+                <input
+                  type="date"
+                  value={periodFrom}
+                  onChange={(event) => setPeriodFrom(event.target.value)}
+                  disabled={bulkExporting}
+                />
+              </label>
+              <label className="reg-doc-form__field">
+                <span>Data final</span>
+                <input
+                  type="date"
+                  value={periodTo}
+                  onChange={(event) => setPeriodTo(event.target.value)}
+                  disabled={bulkExporting}
+                />
+              </label>
+            </div>
+            {periodError && <p className="reg-doc-form__error">{periodError}</p>}
+            <div className="reg-doc-modal__actions">
+              <button
+                type="button"
+                className="btn btn--secondary"
+                onClick={() => setPeriodModalOpen(false)}
+                disabled={bulkExporting}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => void handlePeriodExport()}
+                disabled={bulkExporting}
+              >
+                {bulkExporting ? 'Exportando...' : 'Exportar PDF'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showQrPanel && (
         <div
@@ -883,20 +1231,73 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                               required
                             />
                           </label>
-                          <label className="reg-doc-form__field reg-doc-form__field--file">
+                          <div className="reg-doc-form__field fuel-invoice-attach">
                             <span>Anexo da Nota Fiscal *</span>
-                            <input
-                              type="file"
-                              accept="application/pdf,image/*"
-                              onChange={(event) =>
-                                updateRaq(product.key, {
-                                  invoiceFile: event.target.files?.[0] ?? null,
-                                })
-                              }
-                              disabled={busy}
-                            />
-                            {draft.invoiceFile && <small>{draft.invoiceFile.name}</small>}
-                          </label>
+                            <div className="fuel-invoice-attach__modes" role="group" aria-label="Forma de anexar a nota fiscal">
+                              <button
+                                type="button"
+                                className={`fuel-invoice-attach__mode${
+                                  draft.invoiceAttachMode === 'file'
+                                    ? ' fuel-invoice-attach__mode--active'
+                                    : ''
+                                }`}
+                                onClick={() => setInvoiceAttachMode(product.key, 'file')}
+                                disabled={busy}
+                              >
+                                Escolher arquivo
+                              </button>
+                              <button
+                                type="button"
+                                className={`fuel-invoice-attach__mode${
+                                  draft.invoiceAttachMode === 'camera'
+                                    ? ' fuel-invoice-attach__mode--active'
+                                    : ''
+                                }`}
+                                onClick={() => setInvoiceAttachMode(product.key, 'camera')}
+                                disabled={busy}
+                              >
+                                Tirar foto
+                              </button>
+                            </div>
+
+                            {draft.invoiceAttachMode === 'file' ? (
+                              <>
+                                <input
+                                  type="file"
+                                  accept="application/pdf,image/*"
+                                  onChange={(event) =>
+                                    handleInvoiceFileSelect(
+                                      product.key,
+                                      event.target.files?.[0] ?? null,
+                                    )
+                                  }
+                                  disabled={busy}
+                                />
+                                {draft.invoiceFile && (
+                                  <small className="fuel-invoice-attach__name">
+                                    {draft.invoiceFile.name}
+                                    <button
+                                      type="button"
+                                      className="fuel-invoice-attach__clear"
+                                      onClick={() => clearInvoiceAttachment(product.key)}
+                                      disabled={busy}
+                                    >
+                                      Remover
+                                    </button>
+                                  </small>
+                                )}
+                              </>
+                            ) : (
+                              <LiveCameraCapture
+                                disabled={busy}
+                                label="Foto da Nota Fiscal"
+                                hint="Use a câmera para fotografar a nota fiscal agora."
+                                previewUrl={draft.invoicePreviewUrl}
+                                onCapture={(file) => handleInvoicePhotoCapture(product.key, file)}
+                                onClear={() => clearInvoiceAttachment(product.key)}
+                              />
+                            )}
+                          </div>
                           <label className="reg-doc-form__field">
                             <span>Placa do caminhão/reboque *</span>
                             <input
@@ -1239,34 +1640,47 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
         <section className="fuel-panel">
           <h2>Últimos lançamentos</h2>
           <p className="fuel-panel__hint">
-            Não é possível editar nem apagar. Cada lançamento pode ter um ou vários produtos. Na
-            página pública, cada combustível mostra o RAQ mais recente daquele produto.
+            Não é possível editar nem apagar. Um lançamento fica vigente enquanto algum combustível
+            dele for o mais recente (igual à página pública). Só vai para o arquivo quando todos os
+            produtos forem substituídos por um lançamento novo do mesmo combustível.
           </p>
-          {!latestReport ? (
+          {currentReports.length === 0 ? (
             <p className="reg-doc-card__empty">Nenhum relatório lançado ainda.</p>
           ) : (
-            <article className="fuel-history__card fuel-history__card--current">
-              <div>
-                <span className="fuel-history__badge">Vigente</span>
-                <h3>{formatDateTimePtBr(latestReport.submitted_at)}</h3>
-                <p>
-                  {latestReport.author_full_name}
-                </p>
-                <p>
-                  {latestReport.raq_items.length} produto(s) · {latestReport.endereco}
-                </p>
-              </div>
-              <div className="reg-doc-card__actions">
-                <button
-                  type="button"
-                  className="btn btn--secondary"
-                  onClick={() => setViewReport(latestReport)}
-                >
-                  Ver detalhes
-                </button>
-              </div>
-            </article>
+            <div className="fuel-history">
+              {currentReports.map((report) => {
+                const currentKeys = currentProductKeysForReport(report, latestReportIdByProduct)
+                return (
+                  <article
+                    key={report.id}
+                    className="fuel-history__card fuel-history__card--current"
+                  >
+                    <div>
+                      <span className="fuel-history__badge">Vigente</span>
+                      <h3>{formatDateTimePtBr(report.submitted_at)}</h3>
+                      <p>{report.author_full_name}</p>
+                      <p>
+                        {currentKeys.map((key) => FUEL_PRODUCT_LABELS[key]).join(' · ')}
+                        {currentKeys.length < productKeysFromReport(report).length
+                          ? ` · ${productKeysFromReport(report).length - currentKeys.length} produto(s) já substituído(s)`
+                          : ''}
+                      </p>
+                      <p className="fuel-history__address">{report.endereco}</p>
+                    </div>
+                    <ReportCardActions
+                      report={report}
+                      exportingId={exportingId}
+                      onView={() => setViewReport(report)}
+                      onPrint={() => void handleReportPdf(report, 'print')}
+                      onExport={() => void handleReportPdf(report, 'download')}
+                    />
+                  </article>
+                )
+              })}
+            </div>
           )}
+
+          {exportError && <p className="reg-doc-form__error">{exportError}</p>}
 
           {archivedReports.length > 0 && (
             <>
@@ -1276,22 +1690,21 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                   <article key={report.id} className="fuel-history__card">
                     <div>
                       <h3>{formatDateTimePtBr(report.submitted_at)}</h3>
+                      <p>{report.author_full_name}</p>
                       <p>
-                        {report.author_full_name}
+                        {productKeysFromReport(report)
+                          .map((key) => FUEL_PRODUCT_LABELS[key])
+                          .join(' · ') || `${report.raq_items.length} produto(s)`}
                       </p>
-                      <p>
-                        {report.raq_items.length} produto(s) · {report.endereco}
-                      </p>
+                      <p className="fuel-history__address">{report.endereco}</p>
                     </div>
-                    <div className="reg-doc-card__actions">
-                      <button
-                        type="button"
-                        className="btn btn--secondary"
-                        onClick={() => setViewReport(report)}
-                      >
-                        Ver detalhes
-                      </button>
-                    </div>
+                    <ReportCardActions
+                      report={report}
+                      exportingId={exportingId}
+                      onView={() => setViewReport(report)}
+                      onPrint={() => void handleReportPdf(report, 'print')}
+                      onExport={() => void handleReportPdf(report, 'download')}
+                    />
                   </article>
                 ))}
               </div>
@@ -1301,20 +1714,62 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
       )}
 
       {viewReport && (
-        <ReportDetailsModal report={viewReport} onClose={() => setViewReport(null)} />
+        <ReportDetailsModal
+          report={viewReport}
+          exportingId={exportingId}
+          onClose={() => setViewReport(null)}
+          onPrint={() => void handleReportPdf(viewReport, 'print')}
+          onExport={() => void handleReportPdf(viewReport, 'download')}
+        />
       )}
+    </div>
+  )
+}
+
+function ReportCardActions({
+  report,
+  exportingId,
+  onView,
+  onPrint,
+  onExport,
+}: {
+  report: FuelAnalysisReport
+  exportingId: string | null
+  onView: () => void
+  onPrint: () => void
+  onExport: () => void
+}) {
+  const busy = exportingId === report.id
+  return (
+    <div className="reg-doc-card__actions fuel-history__actions">
+      <button type="button" className="btn btn--secondary" onClick={onView} disabled={busy}>
+        Ver detalhes
+      </button>
+      <button type="button" className="btn btn--secondary" onClick={onPrint} disabled={busy}>
+        {busy ? 'Gerando...' : 'Imprimir'}
+      </button>
+      <button type="button" className="btn btn--secondary" onClick={onExport} disabled={busy}>
+        {busy ? 'Gerando...' : 'Exportar PDF'}
+      </button>
     </div>
   )
 }
 
 function ReportDetailsModal({
   report,
+  exportingId,
   onClose,
+  onPrint,
+  onExport,
 }: {
   report: FuelAnalysisReport
+  exportingId: string | null
   onClose: () => void
+  onPrint: () => void
+  onExport: () => void
 }) {
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
+  const busy = exportingId === report.id
 
   useEffect(() => {
     let active = true
@@ -1435,7 +1890,13 @@ function ReportDetailsModal({
         )}
 
         <div className="reg-doc-modal__actions">
-          <button type="button" className="btn btn--secondary" onClick={onClose}>
+          <button type="button" className="btn btn--secondary" onClick={onPrint} disabled={busy}>
+            {busy ? 'Gerando...' : 'Imprimir'}
+          </button>
+          <button type="button" className="btn btn--secondary" onClick={onExport} disabled={busy}>
+            {busy ? 'Gerando...' : 'Exportar PDF'}
+          </button>
+          <button type="button" className="btn btn--secondary" onClick={onClose} disabled={busy}>
             Fechar
           </button>
         </div>

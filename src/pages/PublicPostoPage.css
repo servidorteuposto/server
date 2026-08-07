@@ -1,10 +1,9 @@
 .public-posto {
   position: relative;
-  min-height: 100%;
+  min-height: 100dvh;
   overflow-x: hidden;
   color: var(--blue-dark);
-  background:
-    linear-gradient(180deg, #082552 0%, #0c3b7a 42%, #e8f1fa 42%, #f4f8fc 100%);
+  background: linear-gradient(180deg, #082552 0%, #0a3268 45%, #0c3b7a 100%);
 }
 
 .public-posto__glow {
@@ -100,9 +99,9 @@
 .public-posto__posto {
   width: 100%;
   display: grid;
-  gap: 0.45rem;
+  gap: 0.55rem;
   justify-items: center;
-  padding: 1.15rem 1.2rem 1.2rem;
+  padding: 1.15rem 1.15rem 1.25rem;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.7);
@@ -118,32 +117,48 @@
 }
 
 .public-posto__hero h1 {
-  font-size: clamp(1.35rem, 4vw, 1.85rem);
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0 0.15rem;
+  font-size: clamp(1.02rem, 3.2vw, 1.28rem);
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
   color: var(--blue-dark);
-  max-width: 18ch;
+  text-wrap: balance;
+  overflow-wrap: break-word;
 }
 
 .public-posto__meta {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.35rem 0.45rem;
-  font-size: 0.88rem;
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  width: 100%;
+  font-size: 0.84rem;
   color: var(--gray-600);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
-.public-posto__meta-dot {
-  opacity: 0.5;
+.public-posto__meta-cnpj {
+  font-weight: 600;
+  color: var(--gray-700);
+}
+
+.public-posto__meta-address {
+  max-width: 38rem;
+  text-wrap: pretty;
+  overflow-wrap: break-word;
 }
 
 .public-posto__live {
-  margin-top: 0.25rem;
-  font-size: 0.8rem;
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
   font-weight: 600;
+  line-height: 1.4;
   color: var(--blue-medium);
+  max-width: 28rem;
+  text-wrap: balance;
 }
 
 .public-posto__section {
