@@ -1,15 +1,20 @@
 .app-shell {
-  /* fixed + inset cobre a viewport real (PWA/iOS); 100dvh deixa faixa no rodapé */
+  /* fixed + inset; box-shadow cobre gap do home indicator no iOS/PWA */
   position: fixed;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   width: 100%;
   height: auto;
+  min-height: 100%;
+  min-height: -webkit-fill-available;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: var(--gray-100);
   font-family: var(--font-family);
-  /* Safe-area inferior fica no .app-content — evita “rodapé” cinza fixo */
+  box-shadow: 0 120px 0 0 var(--gray-100);
   padding:
     env(safe-area-inset-top, 0)
     env(safe-area-inset-right, 0)
@@ -148,6 +153,7 @@
   overflow: hidden;
   padding-top: env(safe-area-inset-top, 0);
   padding-bottom: env(safe-area-inset-bottom, 0);
+  box-sizing: border-box;
 }
 
 .app-sidebar__brand {
@@ -596,12 +602,21 @@
     position: fixed;
     top: 0;
     left: 0;
+    right: auto;
     bottom: 0;
     z-index: 30;
     width: min(300px, 88vw);
+    height: auto;
+    max-height: none;
+    min-height: 100%;
+    min-height: -webkit-fill-available;
     transform: translateX(-105%);
     transition: transform 0.22s ease;
-    box-shadow: 8px 0 28px rgba(12, 59, 122, 0.28);
+    /* Sombra lateral + extensão inferior azul (fecha faixa branca no iOS) */
+    box-shadow:
+      8px 0 28px rgba(12, 59, 122, 0.28),
+      0 120px 0 0 var(--blue-dark);
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
   }
 
   .app-sidebar[data-open='true'] {
