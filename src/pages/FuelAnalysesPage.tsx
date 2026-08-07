@@ -58,11 +58,6 @@ import {
 import { buildPublicPostoUrl } from '../config/public-posto'
 import { formatDatePtBr } from '../config/regulatory-documents'
 import { fetchPublicPostoBoard } from '../lib/public-posto'
-import {
-  buildRaqPdfFileName,
-  downloadRaqPdf,
-  generateRaqPrintPdf,
-} from '../lib/raq-print-report'
 import QRCode from 'qrcode'
 import '../pages/RegulatoryDocumentsPage.css'
 import './FuelAnalysesPage.css'
