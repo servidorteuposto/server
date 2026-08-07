@@ -244,6 +244,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
   const [transporters, setTransporters] = useState<PostoPartner[]>([])
   const [distributors, setDistributors] = useState<PostoPartner[]>([])
   const [exportingId, setExportingId] = useState<string | null>(null)
+  const [exportingMode, setExportingMode] = useState<'print' | 'download' | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const [bulkExporting, setBulkExporting] = useState(false)
@@ -255,20 +256,26 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
   const handleReportPdf = useCallback(
     async (report: FuelAnalysisReport, mode: 'print' | 'download') => {
       setExportingId(report.id)
+      setExportingMode(mode)
       setExportError(null)
       try {
         const board = fuelReportToPrintBoard(report)
         const bytes = await generateRaqPrintPdf(board)
         const fileName = buildRaqPdfFileName(board)
         if (mode === 'print') {
-          openRaqPdfForPrint(bytes, fileName)
+          await openRaqPdfForPrint(bytes, fileName)
         } else {
           downloadRaqPdf(bytes, fileName)
         }
       } catch {
-        setExportError('Não foi possível gerar o PDF deste RAQ. Tente novamente.')
+        setExportError(
+          mode === 'print'
+            ? 'Não foi possível abrir a impressão deste RAQ. Tente novamente.'
+            : 'Não foi possível gerar o PDF deste RAQ. Tente novamente.',
+        )
       } finally {
         setExportingId(null)
+        setExportingMode(null)
       }
     },
     [],
@@ -1630,6 +1637,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                     <ReportCardActions
                       report={report}
                       exportingId={exportingId}
+                      exportingMode={exportingMode}
                       onView={() => setViewReport(report)}
                       onPrint={() => void handleReportPdf(report, 'print')}
                       onExport={() => void handleReportPdf(report, 'download')}
@@ -1661,6 +1669,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                     <ReportCardActions
                       report={report}
                       exportingId={exportingId}
+                      exportingMode={exportingMode}
                       onView={() => setViewReport(report)}
                       onPrint={() => void handleReportPdf(report, 'print')}
                       onExport={() => void handleReportPdf(report, 'download')}
@@ -1677,6 +1686,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
         <ReportDetailsModal
           report={viewReport}
           exportingId={exportingId}
+          exportingMode={exportingMode}
           onClose={() => setViewReport(null)}
           onPrint={() => void handleReportPdf(viewReport, 'print')}
           onExport={() => void handleReportPdf(viewReport, 'download')}
@@ -1689,27 +1699,31 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
 function ReportCardActions({
   report,
   exportingId,
+  exportingMode,
   onView,
   onPrint,
   onExport,
 }: {
   report: FuelAnalysisReport
   exportingId: string | null
+  exportingMode: 'print' | 'download' | null
   onView: () => void
   onPrint: () => void
   onExport: () => void
 }) {
   const busy = exportingId === report.id
+  const printing = busy && exportingMode === 'print'
+  const downloading = busy && exportingMode === 'download'
   return (
     <div className="reg-doc-card__actions fuel-history__actions">
       <button type="button" className="btn btn--secondary" onClick={onView} disabled={busy}>
         Ver detalhes
       </button>
       <button type="button" className="btn btn--secondary" onClick={onPrint} disabled={busy}>
-        {busy ? 'Gerando...' : 'Imprimir'}
+        {printing ? 'Abrindo...' : 'Imprimir'}
       </button>
       <button type="button" className="btn btn--secondary" onClick={onExport} disabled={busy}>
-        {busy ? 'Gerando...' : 'Exportar PDF'}
+        {downloading ? 'Gerando...' : 'Exportar PDF'}
       </button>
     </div>
   )
@@ -1718,18 +1732,22 @@ function ReportCardActions({
 function ReportDetailsModal({
   report,
   exportingId,
+  exportingMode,
   onClose,
   onPrint,
   onExport,
 }: {
   report: FuelAnalysisReport
   exportingId: string | null
+  exportingMode: 'print' | 'download' | null
   onClose: () => void
   onPrint: () => void
   onExport: () => void
 }) {
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
   const busy = exportingId === report.id
+  const printing = busy && exportingMode === 'print'
+  const downloading = busy && exportingMode === 'download'
 
   useEffect(() => {
     let active = true
@@ -1851,10 +1869,10 @@ function ReportDetailsModal({
 
         <div className="reg-doc-modal__actions">
           <button type="button" className="btn btn--secondary" onClick={onPrint} disabled={busy}>
-            {busy ? 'Gerando...' : 'Imprimir'}
+            {printing ? 'Abrindo...' : 'Imprimir'}
           </button>
           <button type="button" className="btn btn--secondary" onClick={onExport} disabled={busy}>
-            {busy ? 'Gerando...' : 'Exportar PDF'}
+            {downloading ? 'Gerando...' : 'Exportar PDF'}
           </button>
           <button type="button" className="btn btn--secondary" onClick={onClose} disabled={busy}>
             Fechar

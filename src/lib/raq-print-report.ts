@@ -666,58 +666,63 @@ export function downloadRaqPdf(bytes: Uint8Array, fileName: string) {
 }
 
 /** Abre só o diálogo de impressão — sem baixar o PDF. */
-export function openRaqPdfForPrint(bytes: Uint8Array, _fileName = 'RAQ.pdf') {
-  const pdfBlob = new Blob(
-    [bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer],
-    { type: 'application/pdf' },
-  )
-  const pdfUrl = URL.createObjectURL(pdfBlob)
+export function openRaqPdfForPrint(bytes: Uint8Array, _fileName = 'RAQ.pdf'): Promise<void> {
+  return new Promise((resolve) => {
+    const blob = new Blob(
+      [bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer],
+      { type: 'application/pdf' },
+    )
+    const url = URL.createObjectURL(blob)
 
-  // HTML intermediário: evitar window.open/navegação direta no PDF (Chrome baixa o arquivo).
-  const html = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Imprimir RAQ</title>
-    <style>
-      html, body { margin: 0; height: 100%; background: #fff; }
-      embed { width: 100%; height: 100%; border: 0; }
-    </style>
-  </head>
-  <body>
-    <embed src="${pdfUrl}" type="application/pdf" />
-    <script>
-      function runPrint() {
-        try { window.focus(); window.print(); } catch (e) {}
+    // PDF direto no iframe (tamanho real). HTML+embed em blob quebra a carga do PDF.
+    const iframe = document.createElement('iframe')
+    iframe.setAttribute('title', 'Imprimir RAQ')
+    iframe.setAttribute('aria-hidden', 'true')
+    iframe.style.position = 'fixed'
+    iframe.style.top = '0'
+    iframe.style.left = '0'
+    iframe.style.width = '100vw'
+    iframe.style.height = '100vh'
+    iframe.style.border = '0'
+    iframe.style.margin = '0'
+    iframe.style.padding = '0'
+    iframe.style.opacity = '0.01'
+    iframe.style.zIndex = '2147483646'
+    iframe.style.pointerEvents = 'none'
+    iframe.src = url
+    document.body.appendChild(iframe)
+
+    let finished = false
+    const finish = () => {
+      if (finished) return
+      finished = true
+      resolve()
+      window.setTimeout(() => {
+        iframe.remove()
+        URL.revokeObjectURL(url)
+      }, 90_000)
+    }
+
+    const triggerPrint = () => {
+      if (finished) return
+      try {
+        const frameWindow = iframe.contentWindow
+        if (!frameWindow) return
+        frameWindow.focus()
+        frameWindow.print()
+        finish()
+      } catch {
+        /* tenta de novo no fallback */
       }
-      window.addEventListener('load', function () { setTimeout(runPrint, 400); });
-      setTimeout(runPrint, 1000);
-    </script>
-  </body>
-</html>`
+    }
 
-  const htmlBlob = new Blob([html], { type: 'text/html' })
-  const htmlUrl = URL.createObjectURL(htmlBlob)
-
-  const iframe = document.createElement('iframe')
-  iframe.setAttribute('title', 'Imprimir RAQ')
-  iframe.setAttribute('aria-hidden', 'true')
-  iframe.style.position = 'fixed'
-  iframe.style.right = '0'
-  iframe.style.bottom = '0'
-  iframe.style.width = '1px'
-  iframe.style.height = '1px'
-  iframe.style.opacity = '0'
-  iframe.style.border = '0'
-  iframe.style.pointerEvents = 'none'
-  iframe.src = htmlUrl
-  document.body.appendChild(iframe)
-
-  window.setTimeout(() => {
-    iframe.remove()
-    URL.revokeObjectURL(htmlUrl)
-    URL.revokeObjectURL(pdfUrl)
-  }, 180_000)
+    iframe.addEventListener('load', () => {
+      window.setTimeout(triggerPrint, 600)
+    })
+    // Fallback: plugin de PDF às vezes atrasa o load
+    window.setTimeout(triggerPrint, 1500)
+    window.setTimeout(finish, 8000)
+  })
 }
 
 export function buildRaqPdfFileName(board: PrintBoard) {
