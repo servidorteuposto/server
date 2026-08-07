@@ -665,68 +665,59 @@ export function downloadRaqPdf(bytes: Uint8Array, fileName: string) {
   URL.revokeObjectURL(url)
 }
 
-/** Abre o diálogo de impressão do PDF (sem baixar o arquivo). */
-export function openRaqPdfForPrint(bytes: Uint8Array, fileName = 'RAQ.pdf') {
-  const blob = new Blob(
+/** Abre só o diálogo de impressão — sem baixar o PDF. */
+export function openRaqPdfForPrint(bytes: Uint8Array, _fileName = 'RAQ.pdf') {
+  const pdfBlob = new Blob(
     [bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer],
     { type: 'application/pdf' },
   )
-  const url = URL.createObjectURL(blob)
+  const pdfUrl = URL.createObjectURL(pdfBlob)
 
-  const printWindow = window.open(url, '_blank', 'noopener,noreferrer')
-  if (printWindow) {
-    const tryPrint = () => {
-      try {
-        printWindow.focus()
-        printWindow.print()
-      } catch {
-        /* navegador bloqueou; usuário ainda vê o PDF na aba */
+  // HTML intermediário: evitar window.open/navegação direta no PDF (Chrome baixa o arquivo).
+  const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Imprimir RAQ</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #fff; }
+      embed { width: 100%; height: 100%; border: 0; }
+    </style>
+  </head>
+  <body>
+    <embed src="${pdfUrl}" type="application/pdf" />
+    <script>
+      function runPrint() {
+        try { window.focus(); window.print(); } catch (e) {}
       }
-    }
+      window.addEventListener('load', function () { setTimeout(runPrint, 400); });
+      setTimeout(runPrint, 1000);
+    </script>
+  </body>
+</html>`
 
-    printWindow.addEventListener('load', () => {
-      window.setTimeout(tryPrint, 300)
-    })
-    // Alguns browsers não disparam load em blob PDF
-    window.setTimeout(tryPrint, 1200)
-    window.setTimeout(() => URL.revokeObjectURL(url), 120_000)
-    return
-  }
+  const htmlBlob = new Blob([html], { type: 'text/html' })
+  const htmlUrl = URL.createObjectURL(htmlBlob)
 
-  // Popup bloqueado: iframe oculto só para print, sem download
   const iframe = document.createElement('iframe')
-  iframe.setAttribute('title', fileName)
+  iframe.setAttribute('title', 'Imprimir RAQ')
   iframe.setAttribute('aria-hidden', 'true')
   iframe.style.position = 'fixed'
-  iframe.style.inset = '0'
-  iframe.style.width = '100%'
-  iframe.style.height = '100%'
-  iframe.style.border = '0'
+  iframe.style.right = '0'
+  iframe.style.bottom = '0'
+  iframe.style.width = '1px'
+  iframe.style.height = '1px'
   iframe.style.opacity = '0'
+  iframe.style.border = '0'
   iframe.style.pointerEvents = 'none'
-  iframe.style.zIndex = '-1'
-  iframe.src = url
+  iframe.src = htmlUrl
   document.body.appendChild(iframe)
 
-  const cleanup = () => {
+  window.setTimeout(() => {
     iframe.remove()
-    URL.revokeObjectURL(url)
-  }
-
-  const tryPrintIframe = () => {
-    try {
-      iframe.contentWindow?.focus()
-      iframe.contentWindow?.print()
-    } catch {
-      /* sem fallback de download */
-    }
-  }
-
-  iframe.onload = () => {
-    window.setTimeout(tryPrintIframe, 300)
-  }
-  window.setTimeout(tryPrintIframe, 1200)
-  window.setTimeout(cleanup, 120_000)
+    URL.revokeObjectURL(htmlUrl)
+    URL.revokeObjectURL(pdfUrl)
+  }, 180_000)
 }
 
 export function buildRaqPdfFileName(board: PrintBoard) {
