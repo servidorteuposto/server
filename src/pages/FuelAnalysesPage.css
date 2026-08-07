@@ -748,6 +748,42 @@
   line-height: 1.4;
 }
 
+.fuel-details__media {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.65rem 0 0.35rem;
+}
+
+.fuel-details__media span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+}
+
+.fuel-details__media a {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--blue-medium);
+}
+
+.fuel-details__photo {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  border: 1px solid var(--gray-300);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.fuel-details__photo-loading {
+  margin: 0.5rem 0 0 !important;
+  font-style: italic;
+}
+
 .fuel-details__signature img {
   width: min(100%, 320px);
   border: 1px solid var(--gray-300);

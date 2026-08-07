@@ -1745,6 +1745,8 @@ function ReportDetailsModal({
   onExport: () => void
 }) {
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
+  const [invoiceUrls, setInvoiceUrls] = useState<Record<string, string>>({})
   const busy = exportingId === report.id
   const printing = busy && exportingMode === 'print'
   const downloading = busy && exportingMode === 'download'
@@ -1762,6 +1764,51 @@ function ReportDetailsModal({
       active = false
     }
   }, [report.signature_storage_path])
+
+  useEffect(() => {
+    let active = true
+    const photoItems = report.analysis_items.filter((item) => item.photo_storage_path)
+    const invoiceItems = report.raq_items.filter((item) => item.invoice_storage_path)
+
+    void Promise.all([
+      Promise.all(
+        photoItems.map(async (item) => {
+          try {
+            const url = await getFuelFileUrl(item.photo_storage_path!)
+            return [item.id, url] as const
+          } catch {
+            return null
+          }
+        }),
+      ),
+      Promise.all(
+        invoiceItems.map(async (item) => {
+          try {
+            const url = await getFuelFileUrl(item.invoice_storage_path!)
+            return [item.id, url] as const
+          } catch {
+            return null
+          }
+        }),
+      ),
+    ]).then(([photos, invoices]) => {
+      if (!active) return
+      const nextPhotos: Record<string, string> = {}
+      for (const row of photos) {
+        if (row) nextPhotos[row[0]] = row[1]
+      }
+      const nextInvoices: Record<string, string> = {}
+      for (const row of invoices) {
+        if (row) nextInvoices[row[0]] = row[1]
+      }
+      setPhotoUrls(nextPhotos)
+      setInvoiceUrls(nextInvoices)
+    })
+
+    return () => {
+      active = false
+    }
+  }, [report.analysis_items, report.raq_items])
 
   return (
     <div className="reg-doc-modal" role="dialog" aria-modal="true">
@@ -1799,66 +1846,104 @@ function ReportDetailsModal({
         </dl>
 
         <h3>RAQ</h3>
-        {report.raq_items.map((item) => (
-          <div key={item.id} className="fuel-details__block">
-            <strong>{FUEL_PRODUCT_LABELS[item.product_key]}</strong>
-            <p>Volume: {item.volume_received_liters ?? '—'} L</p>
-            <p>
-              Coleta:{' '}
-              {item.collection_date ? formatDatePtBr(item.collection_date) : '—'}
-            </p>
-            <p>
-              Transportador: {item.transporter_name} ({formatCnpj(item.transporter_cnpj ?? '')})
-            </p>
-            <p>
-              NF: {item.invoice_number}
-              {item.invoice_file_name ? ` · ${item.invoice_file_name}` : ''}
-            </p>
-            <p>
-              Placa: {item.truck_plate} · Motorista: {item.driver_name}
-            </p>
-            <p>
-              Distribuidor: {item.distributor_name} ({formatCnpj(item.distributor_cnpj ?? '')})
-            </p>
-          </div>
-        ))}
+        {report.raq_items.map((item) => {
+          const invoiceUrl = invoiceUrls[item.id]
+          const invoiceIsImage = Boolean(
+            item.invoice_file_name &&
+              /\.(jpe?g|png|webp|gif)$/i.test(item.invoice_file_name),
+          )
+          return (
+            <div key={item.id} className="fuel-details__block">
+              <strong>{FUEL_PRODUCT_LABELS[item.product_key]}</strong>
+              <p>Volume: {item.volume_received_liters ?? '—'} L</p>
+              <p>
+                Coleta:{' '}
+                {item.collection_date ? formatDatePtBr(item.collection_date) : '—'}
+              </p>
+              <p>
+                Transportador: {item.transporter_name} ({formatCnpj(item.transporter_cnpj ?? '')})
+              </p>
+              <p>
+                NF: {item.invoice_number}
+                {item.invoice_file_name ? ` · ${item.invoice_file_name}` : ''}
+              </p>
+              {invoiceUrl && (
+                <div className="fuel-details__media">
+                  <span>Anexo da Nota Fiscal</span>
+                  {invoiceIsImage ? (
+                    <img
+                      src={invoiceUrl}
+                      alt={`Nota fiscal ${item.invoice_number ?? ''}`.trim()}
+                      className="fuel-details__photo"
+                    />
+                  ) : (
+                    <a href={invoiceUrl} target="_blank" rel="noopener noreferrer">
+                      Abrir anexo da NF
+                    </a>
+                  )}
+                </div>
+              )}
+              <p>
+                Placa: {item.truck_plate} · Motorista: {item.driver_name}
+              </p>
+              <p>
+                Distribuidor: {item.distributor_name} ({formatCnpj(item.distributor_cnpj ?? '')})
+              </p>
+            </div>
+          )
+        })}
 
         <h3>Análises</h3>
-        {report.analysis_items.map((item) => (
-          <div key={item.id} className="fuel-details__block">
-            <strong>{FUEL_PRODUCT_LABELS[item.product_key]}</strong>
-            <p>Aspecto: {item.aspecto}</p>
-            <p>Cor: {item.cor}</p>
-            <p>Temperatura: {item.temperatura_observada}</p>
-            <p>ME observada: {item.massa_especifica_observada}</p>
-            <p>ME convertida 20 °C: {item.massa_especifica_convertida}</p>
-            {item.densidade_status && (
+        {report.analysis_items.map((item) => {
+          const photoUrl = photoUrls[item.id]
+          return (
+            <div key={item.id} className="fuel-details__block">
+              <strong>{FUEL_PRODUCT_LABELS[item.product_key]}</strong>
+              <p>Aspecto: {item.aspecto}</p>
+              <p>Cor: {item.cor}</p>
+              <p>Temperatura: {item.temperatura_observada}</p>
+              <p>ME observada: {item.massa_especifica_observada}</p>
+              <p>ME convertida 20 °C: {item.massa_especifica_convertida}</p>
+              {item.densidade_status && (
+                <p>
+                  Conformidade ANP:{' '}
+                  <strong className={`fuel-density__badge fuel-density__badge--${item.densidade_status}`}>
+                    {DENSITY_CONFORMITY_LABELS[item.densidade_status]}
+                  </strong>
+                </p>
+              )}
+              {item.teor_alcool_gasolina && (
+                <p>
+                  {item.product_key.startsWith('etanol-')
+                    ? `Teor alcoólico: ${item.teor_alcool_gasolina} °INPM`
+                    : `Teor de álcool: ${item.teor_alcool_gasolina}%`}
+                </p>
+              )}
               <p>
-                Conformidade ANP:{' '}
-                <strong className={`fuel-density__badge fuel-density__badge--${item.densidade_status}`}>
-                  {DENSITY_CONFORMITY_LABELS[item.densidade_status]}
-                </strong>
+                Foto em:{' '}
+                {item.photo_captured_at ? formatDateTimePtBr(item.photo_captured_at) : '—'}
               </p>
-            )}
-            {item.teor_alcool_gasolina && (
               <p>
-                {item.product_key.startsWith('etanol-')
-                  ? `Teor alcoólico: ${item.teor_alcool_gasolina} °INPM`
-                  : `Teor de álcool: ${item.teor_alcool_gasolina}%`}
+                Coordenadas:{' '}
+                {item.photo_latitude != null && item.photo_longitude != null
+                  ? formatCoords(item.photo_latitude, item.photo_longitude)
+                  : '—'}
               </p>
-            )}
-            <p>
-              Foto em:{' '}
-              {item.photo_captured_at ? formatDateTimePtBr(item.photo_captured_at) : '—'}
-            </p>
-            <p>
-              Coordenadas:{' '}
-              {item.photo_latitude != null && item.photo_longitude != null
-                ? formatCoords(item.photo_latitude, item.photo_longitude)
-                : '—'}
-            </p>
-          </div>
-        ))}
+              {photoUrl ? (
+                <div className="fuel-details__media">
+                  <span>Foto do local</span>
+                  <img
+                    src={photoUrl}
+                    alt={`Foto ${FUEL_PRODUCT_LABELS[item.product_key]}`}
+                    className="fuel-details__photo"
+                  />
+                </div>
+              ) : item.photo_storage_path ? (
+                <p className="fuel-details__photo-loading">Carregando foto...</p>
+              ) : null}
+            </div>
+          )
+        })}
 
         {signatureUrl && (
           <div className="fuel-details__signature">
