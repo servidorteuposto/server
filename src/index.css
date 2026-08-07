@@ -75,10 +75,13 @@ html.teuposto-lock-active #root {
   background-color: #000821 !important;
 }
 
-/* App autenticado: fundo alinhado ao shell (sem faixa de asfalto no rodapé) */
+/* App autenticado: fundo alinhado ao shell; overflow travado (shell é position:fixed) */
 html.teuposto-app-active,
 html.teuposto-app-active body,
 html.teuposto-app-active #root {
+  height: 100%;
+  overflow: hidden !important;
+  overscroll-behavior: none;
   background-color: var(--gray-100) !important;
 }
 

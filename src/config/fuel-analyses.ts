@@ -57,7 +57,7 @@ export const FUEL_ANALYSES_MAX_FILE_BYTES = 10 * 1024 * 1024
 
 /** Volumes padrão do RAQ (litros). */
 export const RAQ_VOLUME_PRESETS = [
-  1000, 2000, 2500, 5000, 7500, 10000, 12500, 15000, 20000,
+  1000, 2000, 2500, 4000, 5000, 6000, 7500, 10000, 12500, 15000, 20000,
 ] as const
 
 export const RAQ_VOLUME_CUSTOM_OPTION = 'custom'
