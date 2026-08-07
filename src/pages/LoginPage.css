@@ -435,6 +435,7 @@
   width: min(420px, 100%);
   margin: 0.65rem auto 0;
   padding: 0;
+  flex-shrink: 0;
 }
 
 .login-legal-links a {
@@ -702,8 +703,22 @@
     padding-bottom: 0;
   }
 
+  /* 2x2 pra Segurança não cair fora da tela no Android */
   .login-legal-links {
-    padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+    width: min(360px, 100%);
+    margin-top: 0.5rem;
+    padding: 0 0.15rem max(0.5rem, env(safe-area-inset-bottom, 0px));
+    flex-shrink: 0;
+  }
+
+  .login-legal-links a {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.4rem 0.45rem;
+    font-size: 0.68rem;
   }
 
   .login-branding {
@@ -757,6 +772,8 @@
     max-width: 100%;
     margin: 0 auto;
     padding: 1.35rem 1.15rem;
+    flex-shrink: 1;
+    min-height: 0;
   }
 
   .login-card--register {
