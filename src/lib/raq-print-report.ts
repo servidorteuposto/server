@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib'
 import {
+  FUEL_ANALYSES_STORAGE_BUCKET,
   FUEL_PRODUCT_LABELS,
   formatCnpj,
   formatCoords,
@@ -8,8 +9,10 @@ import {
 } from '../config/fuel-analyses'
 import { DENSITY_CONFORMITY_LABELS } from '../config/fuel-density'
 import { formatDatePtBr } from '../config/regulatory-documents'
+import { getSignedObjectBytes } from './object-storage'
+import { embedRasterImage } from './pdf-embed-image'
 import { drawCenteredBrandLogo, embedTeuPostoLogo } from './pdf-brand'
-import { getPublicFuelFileUrl, type PublicPostoBoard } from './public-posto'
+import type { PublicPostoBoard } from './public-posto'
 import type { FuelAnalysisReport } from './fuel-analyses'
 
 const PAGE_WIDTH = 595.28
@@ -120,38 +123,19 @@ function drawPageChrome(ctx: PdfContext) {
   })
 }
 
-async function fetchImageBytes(path: string | null | undefined) {
+async function fetchImageBytes(path: string | null | undefined, publicSlug?: string) {
   if (!path) return null
   try {
-    const url = await getPublicFuelFileUrl(path)
-    const response = await fetch(url)
-    if (!response.ok) return null
-    const buffer = await response.arrayBuffer()
-    return {
-      bytes: new Uint8Array(buffer),
-      contentType: response.headers.get('content-type') ?? '',
+    const slug = publicSlug?.trim() || undefined
+    const { bytes, contentType } = await getSignedObjectBytes(
+      FUEL_ANALYSES_STORAGE_BUCKET,
       path,
-    }
+      60 * 30,
+      slug ? { publicSlug: slug } : undefined,
+    )
+    return { bytes, contentType, path }
   } catch {
     return null
-  }
-}
-
-async function embedImage(
-  doc: PDFDocument,
-  image: Awaited<ReturnType<typeof fetchImageBytes>>,
-): Promise<PDFImage | null> {
-  if (!image) return null
-  const lowerPath = image.path.toLowerCase()
-  const isPng = image.contentType.includes('png') || lowerPath.endsWith('.png')
-  try {
-    return isPng ? await doc.embedPng(image.bytes) : await doc.embedJpg(image.bytes)
-  } catch {
-    try {
-      return isPng ? await doc.embedJpg(image.bytes) : await doc.embedPng(image.bytes)
-    } catch {
-      return null
-    }
   }
 }
 
@@ -378,10 +362,11 @@ async function drawProductCardPage(
     board.report?.signature_storage_path ||
     null
 
+  const publicSlug = board.posto.public_slug || undefined
   const photo = analysis
-    ? await embedImage(doc, await fetchImageBytes(analysis.photo_storage_path))
+    ? await embedRasterImage(doc, await fetchImageBytes(analysis.photo_storage_path, publicSlug))
     : null
-  const signature = await embedImage(doc, await fetchImageBytes(signaturePath))
+  const signature = await embedRasterImage(doc, await fetchImageBytes(signaturePath, publicSlug))
 
   const cardTop = ctx.y + 8
   const cardBottom = MARGIN_BOTTOM + 10

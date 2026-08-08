@@ -1,10 +1,9 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib'
 import { formatCnpj, formatCoords, formatDateTimePtBr } from '../config/fuel-analyses'
-import {
-  getDrainagePhotoUrl,
-  getDrainageSignatureUrl,
-  type DieselDrainageReport,
-} from './diesel-drainages'
+import { DIESEL_DRAINAGES_STORAGE_BUCKET } from '../config/diesel-drainages'
+import { type DieselDrainageReport } from './diesel-drainages'
+import { getSignedObjectBytes } from './object-storage'
+import { embedRasterImage } from './pdf-embed-image'
 import { drawCenteredBrandLogo, embedTeuPostoLogo } from './pdf-brand'
 
 const PAGE_WIDTH = 595.28
@@ -169,38 +168,17 @@ function drawHeading(ctx: PdfContext, title: string) {
   ctx.y -= 14
 }
 
-async function fetchImageBytes(path: string | null | undefined, kind: 'photo' | 'signature') {
+async function fetchImageBytes(path: string | null | undefined) {
   if (!path) return null
   try {
-    const url = kind === 'photo' ? await getDrainagePhotoUrl(path) : await getDrainageSignatureUrl(path)
-    const response = await fetch(url)
-    if (!response.ok) return null
-    const buffer = await response.arrayBuffer()
-    return {
-      bytes: new Uint8Array(buffer),
-      contentType: response.headers.get('content-type') ?? '',
+    const { bytes, contentType } = await getSignedObjectBytes(
+      DIESEL_DRAINAGES_STORAGE_BUCKET,
       path,
-    }
+      60 * 60,
+    )
+    return { bytes, contentType, path }
   } catch {
     return null
-  }
-}
-
-async function embedImage(
-  doc: PDFDocument,
-  image: Awaited<ReturnType<typeof fetchImageBytes>>,
-): Promise<PDFImage | null> {
-  if (!image) return null
-  const lowerPath = image.path.toLowerCase()
-  const isPng = image.contentType.includes('png') || lowerPath.endsWith('.png')
-  try {
-    return isPng ? await doc.embedPng(image.bytes) : await doc.embedJpg(image.bytes)
-  } catch {
-    try {
-      return isPng ? await doc.embedJpg(image.bytes) : await doc.embedPng(image.bytes)
-    } catch {
-      return null
-    }
   }
 }
 
@@ -438,7 +416,7 @@ export async function generateDrainagePrintPdf(
         : '-',
     )
 
-    const photo = await embedImage(doc, await fetchImageBytes(report.photo_storage_path, 'photo'))
+    const photo = await embedRasterImage(doc, await fetchImageBytes(report.photo_storage_path))
     if (photo) {
       ctx.y -= 2
       drawEmbeddedImage(ctx, photo, CONTENT_WIDTH, 220)
@@ -446,9 +424,9 @@ export async function generateDrainagePrintPdf(
       drawKeyValue(ctx, 'Foto', 'Nao disponivel')
     }
 
-    const signature = await embedImage(
+    const signature = await embedRasterImage(
       doc,
-      await fetchImageBytes(report.signature_storage_path, 'signature'),
+      await fetchImageBytes(report.signature_storage_path),
     )
     if (signature) {
       drawHeading(ctx, '3. Assinatura')

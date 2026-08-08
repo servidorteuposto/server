@@ -45,7 +45,7 @@ export async function uploadObject(
   }
 }
 
-export async function getSignedObjectUrl(
+export async function getSignedObjectBytes(
   bucket: string,
   path: string,
   expiresIn = 3600,
@@ -60,12 +60,27 @@ export async function getSignedObjectUrl(
   })
   if (!url) throw new Error('presign_download_failed')
 
-  // Converte para blob: — CSP/PWA podem bloquear <img src> direto no host do R2.
   const response = await fetch(url)
   if (!response.ok) {
     throw new Error(`r2_download_failed:${response.status}`)
   }
-  const blob = await response.blob()
+  const buffer = await response.arrayBuffer()
+  return {
+    bytes: new Uint8Array(buffer),
+    contentType: response.headers.get('content-type') ?? '',
+    url,
+  }
+}
+
+export async function getSignedObjectUrl(
+  bucket: string,
+  path: string,
+  expiresIn = 3600,
+  options?: { publicSlug?: string },
+) {
+  // blob: — CSP/PWA podem bloquear <img src> direto no host do R2.
+  const { bytes, contentType } = await getSignedObjectBytes(bucket, path, expiresIn, options)
+  const blob = new Blob([bytes], { type: contentType || 'application/octet-stream' })
   return URL.createObjectURL(blob)
 }
 
