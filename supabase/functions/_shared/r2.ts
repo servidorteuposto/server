@@ -91,6 +91,20 @@ export async function presignR2Url(
   return signed.url
 }
 
+export async function getR2Object(key: string) {
+  const cfg = getR2Config()
+  const client = createAwsClient(cfg)
+  const url = `${cfg.endpoint}/${cfg.bucket}/${key.split('/').map(encodeURIComponent).join('/')}`
+  const response = await client.fetch(url, { method: 'GET' })
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    throw new Error(`r2_get_failed:${response.status}:${text.slice(0, 200)}`)
+  }
+  const contentType = response.headers.get('content-type') || 'application/octet-stream'
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  return { bytes, contentType }
+}
+
 export async function putR2Object(key: string, body: BodyInit, contentType: string) {
   const cfg = getR2Config()
   const client = createAwsClient(cfg)

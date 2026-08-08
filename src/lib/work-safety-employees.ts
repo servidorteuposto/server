@@ -453,13 +453,7 @@ export async function getEmployeeFileUrl(storagePath: string) {
 }
 
 export async function downloadEmployeeFile(fileName: string, storagePath: string) {
-  const url = await getEmployeeFileUrl(storagePath)
-  const response = await fetch(url)
-
-  if (!response.ok) throw new Error('download_failed')
-
-  const blob = await response.blob()
-  const blobUrl = URL.createObjectURL(blob)
+  const blobUrl = await getEmployeeFileUrl(storagePath)
   const anchor = window.document.createElement('a')
   anchor.href = blobUrl
   anchor.download = fileName

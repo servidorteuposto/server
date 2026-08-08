@@ -1,5 +1,8 @@
 import { supabase } from './supabase'
 
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+
 type PresignResponse = {
   ok: boolean
   url?: string
@@ -7,7 +10,7 @@ type PresignResponse = {
   contentType?: string
 }
 
-async function invokeR2<T extends PresignResponse>(body: Record<string, unknown>): Promise<T> {
+async function invokeR2Json<T extends PresignResponse>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke('r2-storage', { body })
   if (error) throw error
   const payload = data as T
@@ -17,6 +20,51 @@ async function invokeR2<T extends PresignResponse>(body: Record<string, unknown>
   return payload
 }
 
+async function authHeaders() {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  return {
+    apikey: supabaseAnonKey,
+    Authorization: `Bearer ${token || supabaseAnonKey}`,
+    'Content-Type': 'application/json',
+  }
+}
+
+/** Download via Edge Function (proxy) — o browser não precisa falar com o host do R2. */
+async function downloadViaProxy(
+  bucket: string,
+  path: string,
+  options?: { publicSlug?: string },
+) {
+  const response = await fetch(`${supabaseUrl}/functions/v1/r2-storage`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({
+      action: 'download',
+      bucket,
+      path,
+      publicSlug: options?.publicSlug,
+    }),
+  })
+
+  if (!response.ok) {
+    let message = `r2_download_failed:${response.status}`
+    try {
+      const payload = (await response.json()) as { message?: string }
+      if (payload?.message) message = payload.message
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message)
+  }
+
+  const buffer = await response.arrayBuffer()
+  return {
+    bytes: new Uint8Array(buffer),
+    contentType: response.headers.get('content-type') ?? 'application/octet-stream',
+  }
+}
+
 export async function uploadObject(
   bucket: string,
   path: string,
@@ -24,7 +72,7 @@ export async function uploadObject(
   contentType?: string,
 ) {
   const type = contentType || file.type || 'application/octet-stream'
-  const { url } = await invokeR2({
+  const { url } = await invokeR2Json({
     action: 'presign-upload',
     bucket,
     path,
@@ -48,28 +96,10 @@ export async function uploadObject(
 export async function getSignedObjectBytes(
   bucket: string,
   path: string,
-  expiresIn = 3600,
+  _expiresIn = 3600,
   options?: { publicSlug?: string },
 ) {
-  const { url } = await invokeR2({
-    action: 'presign-download',
-    bucket,
-    path,
-    expiresIn,
-    publicSlug: options?.publicSlug,
-  })
-  if (!url) throw new Error('presign_download_failed')
-
-  const response = await fetch(url)
-  if (!response.ok) {
-    throw new Error(`r2_download_failed:${response.status}`)
-  }
-  const buffer = await response.arrayBuffer()
-  return {
-    bytes: new Uint8Array(buffer),
-    contentType: response.headers.get('content-type') ?? '',
-    url,
-  }
+  return downloadViaProxy(bucket, path, options)
 }
 
 export async function getSignedObjectUrl(
@@ -78,7 +108,6 @@ export async function getSignedObjectUrl(
   expiresIn = 3600,
   options?: { publicSlug?: string },
 ) {
-  // blob: — CSP/PWA podem bloquear <img src> direto no host do R2.
   const { bytes, contentType } = await getSignedObjectBytes(bucket, path, expiresIn, options)
   const blob = new Blob([bytes], { type: contentType || 'application/octet-stream' })
   return URL.createObjectURL(blob)
@@ -88,7 +117,7 @@ export async function removeObjects(bucket: string, paths: Array<string | null |
   const unique = [...new Set(paths.filter((item): item is string => Boolean(item)))]
   if (!unique.length) return
 
-  await invokeR2({
+  await invokeR2Json({
     action: 'delete',
     bucket,
     paths: unique,

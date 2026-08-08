@@ -155,13 +155,7 @@ export async function getWorkSafetyDocumentUrl(storagePath: string) {
 }
 
 export async function downloadWorkSafetyDocument(document: WorkSafetyDocument) {
-  const url = await getWorkSafetyDocumentUrl(getWorkSafetyDocumentOriginalPath(document))
-  const response = await fetch(url)
-
-  if (!response.ok) throw new Error('download_failed')
-
-  const blob = await response.blob()
-  const blobUrl = URL.createObjectURL(blob)
+  const blobUrl = await getWorkSafetyDocumentUrl(getWorkSafetyDocumentOriginalPath(document))
   const anchor = window.document.createElement('a')
   anchor.href = blobUrl
   anchor.download = document.file_name

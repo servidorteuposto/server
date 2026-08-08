@@ -1,4 +1,4 @@
-/** Baixa o PDF da URL assinada e gera blob: local — iframes não renderizam PDFs cross-origin do Storage. */
+/** Garante um blob: PDF local para iframe/preview (aceita URL http(s) ou blob: já baixado). */
 export async function createPdfPreviewObjectUrl(signedUrl: string): Promise<string> {
   const response = await fetch(signedUrl)
   if (!response.ok) {
@@ -11,7 +11,12 @@ export async function createPdfPreviewObjectUrl(signedUrl: string): Promise<stri
       ? raw
       : new Blob([raw], { type: 'application/pdf' })
 
-  return URL.createObjectURL(pdfBlob)
+  const objectUrl = URL.createObjectURL(pdfBlob)
+  // Libera o blob intermediário do storage (evita vazamento de memória).
+  if (signedUrl.startsWith('blob:') && signedUrl !== objectUrl) {
+    URL.revokeObjectURL(signedUrl)
+  }
+  return objectUrl
 }
 
 export function revokePdfPreviewObjectUrl(url: string | null | undefined) {

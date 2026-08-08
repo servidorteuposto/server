@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import {
   deleteR2Object,
+  getR2Object,
   isLogicalBucket,
   objectKey,
   presignR2Url,
@@ -140,6 +141,8 @@ async function authorize(
   user: Awaited<ReturnType<typeof resolveUser>>,
   publicSlug?: string,
 ) {
+  const isDownload = action === 'presign-download' || action === 'download'
+
   if (bucket === 'admin-secure-files') {
     return Boolean(user && isAdminUser(user))
   }
@@ -150,7 +153,7 @@ async function authorize(
   }
 
   if (!user) {
-    if (action === 'presign-download' && bucket === 'fuel-analyses') {
+    if (isDownload && bucket === 'fuel-analyses') {
       return canPublicFuelDownload(path, publicSlug)
     }
     return false
@@ -206,6 +209,27 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, url, key, bucket, path })
     }
 
+    // Proxy binário: o browser só fala com a Edge Function (já liberada no CSP).
+    if (action === 'download') {
+      const path = typeof body.path === 'string' ? cleanPath(body.path) : ''
+      if (!path) return jsonResponse({ ok: false, message: 'Path inválido.' }, 400)
+
+      const allowed = await authorize(action, bucket, path, user, body.publicSlug)
+      if (!allowed) return jsonResponse({ ok: false, message: 'Não autorizado.' }, 403)
+
+      const key = objectKey(bucket, path)
+      const { bytes, contentType } = await getR2Object(key)
+      return new Response(bytes, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': contentType,
+          'Cache-Control': 'private, max-age=60',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      })
+    }
+
     if (action === 'delete') {
       const paths = Array.isArray(body.paths)
         ? body.paths.filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
@@ -231,6 +255,9 @@ Deno.serve(async (req) => {
     const message = error instanceof Error ? error.message : 'Erro interno'
     if (message === 'r2_not_configured') {
       return jsonResponse({ ok: false, message: 'R2 não configurado nas secrets.' }, 503)
+    }
+    if (message.startsWith('r2_get_failed:404')) {
+      return jsonResponse({ ok: false, message: 'Arquivo não encontrado no storage.' }, 404)
     }
     console.error('r2-storage error', error)
     return jsonResponse({ ok: false, message: 'Erro interno do storage.' }, 500)
