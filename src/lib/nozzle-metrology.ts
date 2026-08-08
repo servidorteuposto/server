@@ -3,6 +3,8 @@ import {
   type MetrologyStatus,
   type NozzleFuelKey,
 } from '../config/nozzle-metrology'
+import { prepareImageUpload } from './image-webp'
+import { getSignedObjectUrl, removeObjects, uploadObject } from './object-storage'
 import { getMyPostoId } from './regulatory-documents'
 import { supabase } from './supabase'
 
@@ -88,21 +90,11 @@ export async function listNozzleMetrologyVerifications(postoId: string) {
 }
 
 export async function getNozzleMetrologySignatureUrl(path: string) {
-  const { data, error } = await supabase.storage
-    .from(NOZZLE_METROLOGY_STORAGE_BUCKET)
-    .createSignedUrl(path, 60 * 60)
-
-  if (error) throw error
-  return data.signedUrl
+  return getSignedObjectUrl(NOZZLE_METROLOGY_STORAGE_BUCKET, path, 60 * 60)
 }
 
 export async function getNozzleMetrologyPhotoUrl(path: string) {
-  const { data, error } = await supabase.storage
-    .from(NOZZLE_METROLOGY_STORAGE_BUCKET)
-    .createSignedUrl(path, 60 * 60)
-
-  if (error) throw error
-  return data.signedUrl
+  return getSignedObjectUrl(NOZZLE_METROLOGY_STORAGE_BUCKET, path, 60 * 60)
 }
 
 export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrologyInput) {
@@ -111,36 +103,26 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
   }
 
   const verificationId = crypto.randomUUID()
-  const signaturePath = `${input.postoId}/${verificationId}/signature.png`
-  const photoExt = input.photoFile.name.includes('.')
-    ? input.photoFile.name.split('.').pop()!.toLowerCase()
-    : 'jpg'
-  const safeExt = ['jpg', 'jpeg', 'png', 'webp'].includes(photoExt)
-    ? photoExt === 'jpeg'
-      ? 'jpg'
-      : photoExt
-    : 'jpg'
-  const photoPath = `${input.postoId}/${verificationId}/photo.${safeExt}`
+  const signaturePrepared = await prepareImageUpload(input.signatureBlob, 'signature.png')
+  const photoPrepared = await prepareImageUpload(input.photoFile, input.photoFile.name || 'photo.jpg')
+  const signaturePath = `${input.postoId}/${verificationId}/signature.${signaturePrepared.extension}`
+  const photoPath = `${input.postoId}/${verificationId}/photo.${photoPrepared.extension}`
   const uploadedPaths = [signaturePath]
 
   try {
-    const { error: signatureUploadError } = await supabase.storage
-      .from(NOZZLE_METROLOGY_STORAGE_BUCKET)
-      .upload(signaturePath, input.signatureBlob, {
-        upsert: true,
-        contentType: input.signatureBlob.type || 'image/png',
-      })
+    await uploadObject(
+      NOZZLE_METROLOGY_STORAGE_BUCKET,
+      signaturePath,
+      signaturePrepared.file,
+      signaturePrepared.contentType,
+    )
 
-    if (signatureUploadError) throw signatureUploadError
-
-    const { error: photoUploadError } = await supabase.storage
-      .from(NOZZLE_METROLOGY_STORAGE_BUCKET)
-      .upload(photoPath, input.photoFile, {
-        upsert: true,
-        contentType: input.photoFile.type || `image/${safeExt === 'jpg' ? 'jpeg' : safeExt}`,
-      })
-
-    if (photoUploadError) throw photoUploadError
+    await uploadObject(
+      NOZZLE_METROLOGY_STORAGE_BUCKET,
+      photoPath,
+      photoPrepared.file,
+      photoPrepared.contentType,
+    )
     uploadedPaths.push(photoPath)
 
     const { error: headerError } = await supabase.from('nozzle_metrology_verifications').insert({
@@ -152,7 +134,7 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
       overall_status: input.overallStatus,
       signature_storage_path: signaturePath,
       photo_storage_path: photoPath,
-      photo_file_name: input.photoFile.name || `photo.${safeExt}`,
+      photo_file_name: photoPrepared.file.name,
       photo_latitude: input.photoLatitude,
       photo_longitude: input.photoLongitude,
       photo_captured_at: input.photoCapturedAt,
@@ -187,7 +169,7 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
     if (!saved) throw new Error('verification_not_found')
     return saved
   } catch (error) {
-    await supabase.storage.from(NOZZLE_METROLOGY_STORAGE_BUCKET).remove(uploadedPaths)
+    await removeObjects(NOZZLE_METROLOGY_STORAGE_BUCKET, uploadedPaths)
     await supabase.from('nozzle_metrology_verifications').delete().eq('id', verificationId)
     throw error
   }

@@ -1,3 +1,4 @@
+import { deleteR2Object, objectKey } from '../_shared/r2.ts'
 import { sendResendEmail, SUPPORT_EMAIL } from './resend.ts'
 
 const corsHeaders = {
@@ -151,7 +152,13 @@ Deno.serve(async (req) => {
         : []
 
       if (paths.length > 0) {
-        await admin.storage.from('support-attachments').remove(paths)
+        for (const path of paths) {
+          try {
+            await deleteR2Object(objectKey('support-attachments', path))
+          } catch (error) {
+            console.error('r2 delete support attachment failed', path, error)
+          }
+        }
       }
 
       const { error: deleteError } = await admin.from('support_tickets').delete().eq('id', ticketId)

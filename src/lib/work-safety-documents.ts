@@ -2,6 +2,7 @@ import {
   WORK_SAFETY_STORAGE_BUCKET,
   type WorkSafetyTemplateKey,
 } from '../config/work-safety'
+import { getSignedObjectUrl, removeObjects, uploadObject } from './object-storage'
 import { supabase } from './supabase'
 
 export type WorkSafetyDocument = {
@@ -57,8 +58,7 @@ async function removeStorageObjects(paths: Array<string | null | undefined>) {
   const uniquePaths = [...new Set(paths.filter(Boolean))] as string[]
   if (!uniquePaths.length) return
 
-  const { error } = await supabase.storage.from(WORK_SAFETY_STORAGE_BUCKET).remove(uniquePaths)
-  if (error) throw error
+  await removeObjects(WORK_SAFETY_STORAGE_BUCKET, uniquePaths)
 }
 
 export function getWorkSafetyDocumentPreviewPath(document: WorkSafetyDocument) {
@@ -90,24 +90,17 @@ export async function saveWorkSafetyDocument(input: SaveWorkSafetyDocumentInput)
   pathsToRemove.delete(previewPath)
   await removeStorageObjects([...pathsToRemove])
 
-  const { error: originalUploadError } = await supabase.storage
-    .from(WORK_SAFETY_STORAGE_BUCKET)
-    .upload(originalPath, prepared.originalFile, {
-      upsert: true,
-      contentType: 'application/pdf',
-    })
-
-  if (originalUploadError) throw originalUploadError
+  await uploadObject(WORK_SAFETY_STORAGE_BUCKET, originalPath, prepared.originalFile, 'application/pdf')
 
   if (shouldStoreSeparatePreview) {
-    const { error: previewUploadError } = await supabase.storage
-      .from(WORK_SAFETY_STORAGE_BUCKET)
-      .upload(previewPath, prepared.previewFile, {
-        upsert: true,
-        contentType: 'application/pdf',
-      })
-
-    if (previewUploadError) {
+    try {
+      await uploadObject(
+        WORK_SAFETY_STORAGE_BUCKET,
+        previewPath,
+        prepared.previewFile,
+        'application/pdf',
+      )
+    } catch (previewUploadError) {
       await removeStorageObjects([originalPath])
       throw previewUploadError
     }
@@ -158,14 +151,7 @@ export async function saveWorkSafetyDocument(input: SaveWorkSafetyDocumentInput)
 }
 
 export async function getWorkSafetyDocumentUrl(storagePath: string) {
-  const { data, error } = await supabase.storage
-    .from(WORK_SAFETY_STORAGE_BUCKET)
-    .createSignedUrl(storagePath, 3600)
-
-  if (error) throw error
-  if (!data?.signedUrl) throw new Error('signed_url_failed')
-
-  return data.signedUrl
+  return getSignedObjectUrl(WORK_SAFETY_STORAGE_BUCKET, storagePath, 3600)
 }
 
 export async function downloadWorkSafetyDocument(document: WorkSafetyDocument) {

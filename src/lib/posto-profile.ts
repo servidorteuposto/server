@@ -5,6 +5,8 @@ import {
   isImageFile,
   stripCep,
 } from '../config/posto-settings'
+import { prepareImageUpload } from './image-webp'
+import { getSignedObjectUrl, removeObjects, uploadObject } from './object-storage'
 import { supabase } from './supabase'
 
 export type PostoSettingsProfile = {
@@ -66,29 +68,13 @@ export async function getMyPostoSettings(): Promise<PostoSettingsProfile> {
   return data as PostoSettingsProfile
 }
 
-function extensionFromImage(file: File) {
-  if (file.type === 'image/png') return 'png'
-  if (file.type === 'image/webp') return 'webp'
-  if (file.name.includes('.')) {
-    const ext = file.name.split('.').pop()!.toLowerCase()
-    if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return ext === 'jpeg' ? 'jpg' : ext
-  }
-  return 'jpg'
-}
-
 async function removePhoto(path: string | null | undefined) {
   if (!path) return
-  const { error } = await supabase.storage.from(POSTO_ASSETS_STORAGE_BUCKET).remove([path])
-  if (error) throw error
+  await removeObjects(POSTO_ASSETS_STORAGE_BUCKET, [path])
 }
 
 export async function getPostoPhotoUrl(path: string) {
-  const { data, error } = await supabase.storage
-    .from(POSTO_ASSETS_STORAGE_BUCKET)
-    .createSignedUrl(path, 60 * 60)
-
-  if (error) throw error
-  return data.signedUrl
+  return getSignedObjectUrl(POSTO_ASSETS_STORAGE_BUCKET, path, 60 * 60)
 }
 
 export async function updatePostoSettings(input: UpdatePostoSettingsInput) {
@@ -119,21 +105,14 @@ export async function updatePostoSettings(input: UpdatePostoSettingsInput) {
       throw new Error('photo_too_large')
     }
 
-    const ext = extensionFromImage(input.photoFile)
-    const nextPath = `${input.postoId}/profile/photo.${ext}`
+    const prepared = await prepareImageUpload(input.photoFile, input.photoFile.name || 'photo.jpg')
+    const nextPath = `${input.postoId}/profile/photo.${prepared.extension}`
 
     if (fotoPath && fotoPath !== nextPath) {
       await removePhoto(fotoPath)
     }
 
-    const { error: uploadError } = await supabase.storage
-      .from(POSTO_ASSETS_STORAGE_BUCKET)
-      .upload(nextPath, input.photoFile, {
-        upsert: true,
-        contentType: input.photoFile.type || `image/${ext}`,
-      })
-
-    if (uploadError) throw uploadError
+    await uploadObject(POSTO_ASSETS_STORAGE_BUCKET, nextPath, prepared.file, prepared.contentType)
     fotoPath = nextPath
   }
 

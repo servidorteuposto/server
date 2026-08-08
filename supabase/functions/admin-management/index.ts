@@ -17,6 +17,14 @@ import {
   usagePercent,
   type ManagementSettings,
 } from '../_shared/admin-management.ts'
+import {
+  deleteR2Object,
+  isR2Configured,
+  listR2UsageByPrefix,
+  objectKey,
+  presignR2Url,
+  putR2Object,
+} from '../_shared/r2.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -249,7 +257,21 @@ Deno.serve(async (req) => {
 
       const quotas = settings.quotas
       const dbBytes = Number(metrics?.db_bytes ?? 0)
-      const storageBytes = Number(metrics?.storage_bytes ?? 0)
+      let storageBytes = Number(metrics?.storage_bytes ?? 0)
+      let storageBuckets = (metrics?.buckets ?? []) as Array<{
+        bucket: string
+        bytes: number
+        objects: number
+      }>
+      if (isR2Configured()) {
+        try {
+          const r2Usage = await listR2UsageByPrefix()
+          storageBytes = r2Usage.storage_bytes
+          storageBuckets = r2Usage.buckets
+        } catch (error) {
+          console.error('r2 usage list failed', error)
+        }
+      }
       const dailyUsed = resend.daily_used ?? resend.emails_today
       const monthlyUsed = resend.monthly_used
 
@@ -270,7 +292,7 @@ Deno.serve(async (req) => {
           near_limit: isNearLimit(storageBytes, quotas.storage_bytes),
           used_label: formatBytes(storageBytes),
           quota_label: formatBytes(quotas.storage_bytes),
-          buckets: metrics?.buckets ?? [],
+          buckets: storageBuckets,
         },
         tables: metrics?.tables ?? [],
         flow_today: metrics?.flow_today ?? {},
@@ -516,15 +538,11 @@ Deno.serve(async (req) => {
       const storagePath = `${user.id}/${fileId}.${ext}`
       const passwordHash = await hashPassword(password)
 
-      const { error: uploadError } = await admin.storage
-        .from(SECURE_BUCKET)
-        .upload(storagePath, bytes, {
-          contentType: mime,
-          upsert: false,
-        })
-
-      if (uploadError) {
-        return jsonResponse({ ok: false, message: uploadError.message }, 500)
+      try {
+        await putR2Object(objectKey(SECURE_BUCKET, storagePath), bytes, mime)
+      } catch (uploadError) {
+        const message = uploadError instanceof Error ? uploadError.message : 'Falha no upload R2.'
+        return jsonResponse({ ok: false, message }, 500)
       }
 
       const { data: row, error: insertError } = await admin
@@ -543,7 +561,7 @@ Deno.serve(async (req) => {
         .single()
 
       if (insertError) {
-        await admin.storage.from(SECURE_BUCKET).remove([storagePath])
+        await deleteR2Object(objectKey(SECURE_BUCKET, storagePath))
         return jsonResponse({ ok: false, message: insertError.message }, 500)
       }
 
@@ -596,22 +614,24 @@ Deno.serve(async (req) => {
         .update({ failed_attempts: 0, locked_until: null })
         .eq('id', fileId)
 
-      const { data: signed, error: signedError } = await admin.storage
-        .from(SECURE_BUCKET)
-        .createSignedUrl(file.storage_path, UNLOCK_URL_SECONDS, {
-          download: mode === 'download' ? file.original_filename : undefined,
-        })
-
-      if (signedError || !signed?.signedUrl) {
-        return jsonResponse(
-          { ok: false, message: signedError?.message ?? 'Não foi possível liberar o arquivo.' },
-          500,
+      let signedUrl: string
+      try {
+        signedUrl = await presignR2Url(
+          'GET',
+          objectKey(SECURE_BUCKET, file.storage_path),
+          UNLOCK_URL_SECONDS,
         )
+      } catch (signedError) {
+        const message =
+          signedError instanceof Error
+            ? signedError.message
+            : 'Não foi possível liberar o arquivo.'
+        return jsonResponse({ ok: false, message }, 500)
       }
 
       return jsonResponse({
         ok: true,
-        url: signed.signedUrl,
+        url: signedUrl,
         mode,
         mime_type: file.mime_type,
         filename: file.original_filename,
@@ -662,7 +682,7 @@ Deno.serve(async (req) => {
         return jsonResponse({ ok: false, message: 'Senha incorreta.' }, 401)
       }
 
-      await admin.storage.from(SECURE_BUCKET).remove([file.storage_path])
+      await deleteR2Object(objectKey(SECURE_BUCKET, file.storage_path))
       const { error: deleteError } = await admin.from('admin_secure_files').delete().eq('id', fileId)
       if (deleteError) {
         return jsonResponse({ ok: false, message: deleteError.message }, 500)

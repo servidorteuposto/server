@@ -3,6 +3,8 @@ import {
   type FuelProductKey,
 } from '../config/fuel-analyses'
 import { cnpjDigits } from './cnpj'
+import { prepareImageUpload } from './image-webp'
+import { getSignedObjectUrl, removeObjects, uploadObject } from './object-storage'
 import { supabase } from './supabase'
 
 export type PostoProfile = {
@@ -129,18 +131,11 @@ function extensionFromFile(file: File | Blob, fallback: string) {
 }
 
 async function uploadFile(path: string, file: Blob, contentType: string) {
-  const { error } = await supabase.storage.from(FUEL_ANALYSES_STORAGE_BUCKET).upload(path, file, {
-    upsert: true,
-    contentType,
-  })
-  if (error) throw error
+  await uploadObject(FUEL_ANALYSES_STORAGE_BUCKET, path, file, contentType)
 }
 
 async function removeStorageObjects(paths: string[]) {
-  const unique = [...new Set(paths.filter(Boolean))]
-  if (!unique.length) return
-  const { error } = await supabase.storage.from(FUEL_ANALYSES_STORAGE_BUCKET).remove(unique)
-  if (error) throw error
+  await removeObjects(FUEL_ANALYSES_STORAGE_BUCKET, paths)
 }
 
 export async function getMyPostoProfile(): Promise<PostoProfile> {
@@ -262,12 +257,7 @@ export function currentProductKeysForReport(
 }
 
 export async function getFuelFileUrl(path: string) {
-  const { data, error } = await supabase.storage
-    .from(FUEL_ANALYSES_STORAGE_BUCKET)
-    .createSignedUrl(path, 60 * 60)
-
-  if (error) throw error
-  return data.signedUrl
+  return getSignedObjectUrl(FUEL_ANALYSES_STORAGE_BUCKET, path, 60 * 60)
 }
 
 export async function saveFuelAnalysisReport(input: SaveFuelAnalysisReportInput) {
@@ -275,9 +265,9 @@ export async function saveFuelAnalysisReport(input: SaveFuelAnalysisReportInput)
   const uploadedPaths: string[] = []
 
   try {
-    const signatureExt = extensionFromFile(input.signatureBlob, 'png')
-    const signaturePath = `${input.postoId}/${reportId}/signature.${signatureExt}`
-    await uploadFile(signaturePath, input.signatureBlob, input.signatureBlob.type || 'image/png')
+    const signaturePrepared = await prepareImageUpload(input.signatureBlob, 'signature.png')
+    const signaturePath = `${input.postoId}/${reportId}/signature.${signaturePrepared.extension}`
+    await uploadFile(signaturePath, signaturePrepared.file, signaturePrepared.contentType)
     uploadedPaths.push(signaturePath)
 
     const raqRows = []
@@ -322,11 +312,11 @@ export async function saveFuelAnalysisReport(input: SaveFuelAnalysisReportInput)
       let photoFileName: string | null = null
 
       if (item.photoFile) {
-        const ext = extensionFromFile(item.photoFile, 'jpg')
-        photoPath = `${input.postoId}/${reportId}/analysis/${item.productKey}/photo.${ext}`
-        await uploadFile(photoPath, item.photoFile, item.photoFile.type || 'image/jpeg')
+        const prepared = await prepareImageUpload(item.photoFile, item.photoFile.name || 'photo.jpg')
+        photoPath = `${input.postoId}/${reportId}/analysis/${item.productKey}/photo.${prepared.extension}`
+        await uploadFile(photoPath, prepared.file, prepared.contentType)
         uploadedPaths.push(photoPath)
-        photoFileName = item.photoFile.name
+        photoFileName = prepared.file.name
       }
 
       analysisRows.push({

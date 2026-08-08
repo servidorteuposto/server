@@ -430,7 +430,7 @@ export default function AdminManagementPage() {
               nearLimit={dashboard.supabase.db.near_limit}
             />
             <UsageMeter
-              label="Storage (buckets)"
+              label="Storage (Cloudflare R2)"
               percent={dashboard.supabase.storage.percent}
               usedLabel={dashboard.supabase.storage.used_label}
               quotaLabel={dashboard.supabase.storage.quota_label}

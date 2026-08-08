@@ -356,7 +356,7 @@ export function resourceAlertMessage(
   const quotaLabel = isEmail ? `${quota} e-mails` : formatBytes(quota)
   const labels = {
     supabase_db: 'Banco de dados (Supabase)',
-    supabase_storage: 'Storage / buckets (Supabase)',
+    supabase_storage: 'Storage / buckets (Cloudflare R2)',
     resend_daily: 'Cota diária de e-mail (Resend)',
     resend_monthly: 'Cota mensal de e-mail (Resend)',
   } as const
@@ -540,7 +540,7 @@ const DEFAULT_REPLY_TO = 'Teu Posto Suporte <suporte@appteuposto.com.br>'
 
 export const ALERT_REASON_LABELS: Record<string, string> = {
   supabase_db: 'Banco de dados perto do limite (≤10% restante)',
-  supabase_storage: 'Storage perto do limite (≤10% restante)',
+  supabase_storage: 'Storage R2 perto do limite (≤10% restante)',
   resend_daily: 'Cota diária Resend: restam ≤10 e-mails no dia',
   resend_monthly: 'Cota mensal de e-mail perto do limite',
   domain_7d: 'Domínio vence em 7 dias',
@@ -731,6 +731,7 @@ export async function collectAttentionReasons(admin: ManagementAlertClient): Pro
   zapi: Awaited<ReturnType<typeof fetchZApiStatus>>
   settings: Awaited<ReturnType<typeof loadManagementSettingsRow>>
 }> {
+  const { isR2Configured, listR2UsageByPrefix } = await import('./r2.ts')
   const settings = await loadManagementSettingsRow(admin)
   const [{ data: metrics, error: metricsError }, resend, zapi] = await Promise.all([
     admin.rpc('admin_management_metrics'),
@@ -740,7 +741,15 @@ export async function collectAttentionReasons(admin: ManagementAlertClient): Pro
   if (metricsError) throw metricsError
 
   const dbBytes = Number(metrics?.db_bytes ?? 0)
-  const storageBytes = Number(metrics?.storage_bytes ?? 0)
+  let storageBytes = Number(metrics?.storage_bytes ?? 0)
+  if (isR2Configured()) {
+    try {
+      const r2Usage = await listR2UsageByPrefix()
+      storageBytes = r2Usage.storage_bytes
+    } catch (error) {
+      console.error('r2 usage list failed in alerts', error)
+    }
+  }
   const dailyUsed = resend.daily_used ?? resend.emails_today
   const monthlyUsed = resend.monthly_used
   const daysLeft = daysUntilDate(settings.domain_expires_on)

@@ -1,4 +1,6 @@
 import { isImageFile } from '../config/posto-settings'
+import { prepareImageUpload } from './image-webp'
+import { getSignedObjectUrl, removeObjects, uploadObject } from './object-storage'
 import { supabase } from './supabase'
 
 export const SUPPORT_ATTACHMENTS_BUCKET = 'support-attachments'
@@ -57,16 +59,6 @@ export type SubmitSupportTicketResult = {
   message: string
 }
 
-function extensionForFile(file: File) {
-  const fromName = file.name.split('.').pop()?.toLowerCase()
-  if (fromName && ['jpg', 'jpeg', 'png', 'webp'].includes(fromName)) {
-    return fromName === 'jpeg' ? 'jpg' : fromName
-  }
-  if (file.type === 'image/png') return 'png'
-  if (file.type === 'image/webp') return 'webp'
-  return 'jpg'
-}
-
 export function validateSupportPhotos(files: File[]) {
   if (files.length > SUPPORT_MAX_PHOTOS) {
     return `Envie no máximo ${SUPPORT_MAX_PHOTOS} prints.`
@@ -89,16 +81,13 @@ async function uploadSupportPhotos(ticketId: string, photos: File[]) {
 
   for (let index = 0; index < photos.length; index += 1) {
     const file = photos[index]
-    const path = `${ticketId}/${index + 1}.${extensionForFile(file)}`
-    const { error } = await supabase.storage.from(SUPPORT_ATTACHMENTS_BUCKET).upload(path, file, {
-      upsert: false,
-      contentType: file.type || 'image/jpeg',
-    })
-
-    if (error) {
-      throw new Error(error.message || 'Falha ao enviar anexo.')
+    const prepared = await prepareImageUpload(file, file.name || `photo-${index + 1}.jpg`)
+    const path = `${ticketId}/${index + 1}.${prepared.extension}`
+    try {
+      await uploadObject(SUPPORT_ATTACHMENTS_BUCKET, path, prepared.file, prepared.contentType)
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Falha ao enviar anexo.')
     }
-
     paths.push(path)
   }
 
@@ -162,7 +151,7 @@ export async function submitSupportTicket(
 
     if (error) {
       if (attachmentPaths.length > 0) {
-        await supabase.storage.from(SUPPORT_ATTACHMENTS_BUCKET).remove(attachmentPaths)
+        await removeObjects(SUPPORT_ATTACHMENTS_BUCKET, attachmentPaths)
       }
       return {
         ok: false,
@@ -208,15 +197,11 @@ export async function listSupportTickets(audience: SupportAudience): Promise<Sup
 }
 
 export async function getSupportAttachmentUrl(path: string) {
-  const { data, error } = await supabase.storage
-    .from(SUPPORT_ATTACHMENTS_BUCKET)
-    .createSignedUrl(path, 60 * 60)
-
-  if (error || !data?.signedUrl) {
+  try {
+    return await getSignedObjectUrl(SUPPORT_ATTACHMENTS_BUCKET, path, 60 * 60)
+  } catch {
     return null
   }
-
-  return data.signedUrl
 }
 
 async function parsePayload<T>(data: T | null, error: unknown): Promise<T | null> {
@@ -300,7 +285,7 @@ export async function deleteSupportTicket(ticketId: string): Promise<void> {
     : []
 
   if (paths.length > 0) {
-    await supabase.storage.from(SUPPORT_ATTACHMENTS_BUCKET).remove(paths)
+    await removeObjects(SUPPORT_ATTACHMENTS_BUCKET, paths)
   }
 
   const { error } = await supabase.from('support_tickets').delete().eq('id', ticketId)

@@ -205,6 +205,7 @@ export default function PublicPostoPage({ slug }: PublicPostoPageProps) {
                   <FuelPublicCard
                     key={productKey}
                     productKey={productKey}
+                    publicSlug={board.posto.public_slug}
                     raq={board.raq_items.find((item) => item.product_key === productKey)}
                     analysis={board.analysis_items.find((item) => item.product_key === productKey)}
                     fallbackAuthor={board.report?.author_full_name}
@@ -222,12 +223,14 @@ export default function PublicPostoPage({ slug }: PublicPostoPageProps) {
 
 function FuelPublicCard({
   productKey,
+  publicSlug,
   raq,
   analysis,
   fallbackAuthor,
   fallbackSignaturePath,
 }: {
   productKey: FuelProductKey
+  publicSlug: string
   raq?: PublicPostoBoard['raq_items'][number]
   analysis?: PublicPostoBoard['analysis_items'][number]
   fallbackAuthor?: string | null
@@ -252,7 +255,7 @@ function FuelPublicCard({
       setPhotoUrl(null)
       return
     }
-    getPublicFuelFileUrl(analysis.photo_storage_path)
+    getPublicFuelFileUrl(analysis.photo_storage_path, publicSlug)
       .then((url) => {
         if (active) setPhotoUrl(url)
       })
@@ -262,7 +265,7 @@ function FuelPublicCard({
     return () => {
       active = false
     }
-  }, [analysis?.photo_storage_path])
+  }, [analysis?.photo_storage_path, publicSlug])
 
   useEffect(() => {
     let active = true
@@ -270,7 +273,7 @@ function FuelPublicCard({
       setSignatureUrl(null)
       return
     }
-    getPublicFuelFileUrl(signaturePath)
+    getPublicFuelFileUrl(signaturePath, publicSlug)
       .then((url) => {
         if (active) setSignatureUrl(url)
       })
@@ -280,7 +283,7 @@ function FuelPublicCard({
     return () => {
       active = false
     }
-  }, [signaturePath])
+  }, [signaturePath, publicSlug])
 
   return (
     <article className="public-posto__fuel-card">

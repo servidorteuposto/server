@@ -1,4 +1,5 @@
 import { FUEL_ANALYSES_STORAGE_BUCKET, type FuelProductKey } from '../config/fuel-analyses'
+import { getSignedObjectUrl } from './object-storage'
 import { supabase } from './supabase'
 import type {
   FuelAnalysisItem,
@@ -35,13 +36,8 @@ export async function fetchPublicPostoBoard(slug: string): Promise<PublicPostoBo
   return data as PublicPostoBoard
 }
 
-export async function getPublicFuelFileUrl(path: string) {
-  const { data, error } = await supabase.storage
-    .from(FUEL_ANALYSES_STORAGE_BUCKET)
-    .createSignedUrl(path, 60 * 30)
-
-  if (error) throw error
-  return data.signedUrl
+export async function getPublicFuelFileUrl(path: string, publicSlug?: string) {
+  return getSignedObjectUrl(FUEL_ANALYSES_STORAGE_BUCKET, path, 60 * 30, { publicSlug })
 }
 
 export function uniqueProductsFromBoard(board: PublicPostoBoard): FuelProductKey[] {

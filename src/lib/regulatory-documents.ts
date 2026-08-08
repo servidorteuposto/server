@@ -2,6 +2,7 @@ import {
   REGULATORY_STORAGE_BUCKET,
   type RegulatoryTemplateKey,
 } from '../config/regulatory-documents'
+import { getSignedObjectUrl, removeObjects, uploadObject } from './object-storage'
 import { supabase } from './supabase'
 
 export type RegulatoryDocument = {
@@ -67,8 +68,7 @@ async function removeStorageObjects(paths: Array<string | null | undefined>) {
   const uniquePaths = [...new Set(paths.filter(Boolean))] as string[]
   if (!uniquePaths.length) return
 
-  const { error } = await supabase.storage.from(REGULATORY_STORAGE_BUCKET).remove(uniquePaths)
-  if (error) throw error
+  await removeObjects(REGULATORY_STORAGE_BUCKET, uniquePaths)
 }
 
 export function getDocumentPreviewPath(document: RegulatoryDocument) {
@@ -100,24 +100,21 @@ export async function saveRegulatoryDocument(input: SaveRegulatoryDocumentInput)
   pathsToRemove.delete(previewPath)
   await removeStorageObjects([...pathsToRemove])
 
-  const { error: originalUploadError } = await supabase.storage
-    .from(REGULATORY_STORAGE_BUCKET)
-    .upload(originalPath, prepared.originalFile, {
-      upsert: true,
-      contentType: 'application/pdf',
-    })
-
-  if (originalUploadError) throw originalUploadError
+  try {
+    await uploadObject(REGULATORY_STORAGE_BUCKET, originalPath, prepared.originalFile, 'application/pdf')
+  } catch (originalUploadError) {
+    throw originalUploadError
+  }
 
   if (shouldStoreSeparatePreview) {
-    const { error: previewUploadError } = await supabase.storage
-      .from(REGULATORY_STORAGE_BUCKET)
-      .upload(previewPath, prepared.previewFile, {
-        upsert: true,
-        contentType: 'application/pdf',
-      })
-
-    if (previewUploadError) {
+    try {
+      await uploadObject(
+        REGULATORY_STORAGE_BUCKET,
+        previewPath,
+        prepared.previewFile,
+        'application/pdf',
+      )
+    } catch (previewUploadError) {
       await removeStorageObjects([originalPath])
       throw previewUploadError
     }
@@ -176,14 +173,7 @@ export async function deleteCustomRegulatoryDocument(document: RegulatoryDocumen
 }
 
 export async function getRegulatoryDocumentUrl(storagePath: string) {
-  const { data, error } = await supabase.storage
-    .from(REGULATORY_STORAGE_BUCKET)
-    .createSignedUrl(storagePath, 3600)
-
-  if (error) throw error
-  if (!data?.signedUrl) throw new Error('signed_url_failed')
-
-  return data.signedUrl
+  return getSignedObjectUrl(REGULATORY_STORAGE_BUCKET, storagePath, 3600)
 }
 
 export async function downloadRegulatoryDocument(document: RegulatoryDocument) {

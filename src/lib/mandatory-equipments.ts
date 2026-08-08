@@ -5,6 +5,8 @@ import {
   type EquipmentPhotoMeta,
   type MandatoryEquipmentKey,
 } from '../config/mandatory-equipments'
+import { prepareImageUpload } from './image-webp'
+import { getSignedObjectUrl, removeObjects, uploadObject } from './object-storage'
 import { getMyPostoId } from './regulatory-documents'
 import { supabase } from './supabase'
 
@@ -83,19 +85,16 @@ function collectExistingPaths(row: MandatoryEquipment | null | undefined) {
 }
 
 async function removeStoragePaths(paths: string[]) {
-  const unique = [...new Set(paths.filter(Boolean))]
-  if (unique.length === 0) return
-  await supabase.storage.from(MANDATORY_EQUIPMENTS_STORAGE_BUCKET).remove(unique)
+  await removeObjects(MANDATORY_EQUIPMENTS_STORAGE_BUCKET, paths)
 }
 
-async function uploadFile(path: string, file: File) {
-  const { error } = await supabase.storage
-    .from(MANDATORY_EQUIPMENTS_STORAGE_BUCKET)
-    .upload(path, file, {
-      upsert: true,
-      contentType: file.type || undefined,
-    })
-  if (error) throw error
+async function uploadFile(path: string, file: File, contentType?: string) {
+  await uploadObject(
+    MANDATORY_EQUIPMENTS_STORAGE_BUCKET,
+    path,
+    file,
+    contentType || file.type || undefined,
+  )
 }
 
 export function evaluateEquipmentCompliance(
@@ -150,12 +149,7 @@ export async function listMandatoryEquipments(postoId: string) {
 }
 
 export async function getMandatoryEquipmentFileUrl(path: string) {
-  const { data, error } = await supabase.storage
-    .from(MANDATORY_EQUIPMENTS_STORAGE_BUCKET)
-    .createSignedUrl(path, 60 * 60)
-
-  if (error) throw error
-  return data.signedUrl
+  return getSignedObjectUrl(MANDATORY_EQUIPMENTS_STORAGE_BUCKET, path, 60 * 60)
 }
 
 export async function saveMandatoryEquipment(input: SaveMandatoryEquipmentInput) {
@@ -185,11 +179,14 @@ export async function saveMandatoryEquipment(input: SaveMandatoryEquipmentInput)
       : null
 
     if (input.equipmentPhoto) {
-      const ext = fileExt(input.equipmentPhoto.file, 'jpg')
-      equipmentPhotoPath = `${basePath}/equipment.${ext}`
-      await uploadFile(equipmentPhotoPath, input.equipmentPhoto.file)
+      const prepared = await prepareImageUpload(
+        input.equipmentPhoto.file,
+        input.equipmentPhoto.file.name || 'equipment.jpg',
+      )
+      equipmentPhotoPath = `${basePath}/equipment.${prepared.extension}`
+      await uploadFile(equipmentPhotoPath, prepared.file, prepared.contentType)
       uploadedPaths.push(equipmentPhotoPath)
-      equipmentPhotoName = input.equipmentPhoto.file.name
+      equipmentPhotoName = prepared.file.name
       equipmentPhotoLat = input.equipmentPhoto.latitude
       equipmentPhotoLng = input.equipmentPhoto.longitude
       equipmentPhotoCapturedAt = input.equipmentPhoto.capturedAt
@@ -231,11 +228,14 @@ export async function saveMandatoryEquipment(input: SaveMandatoryEquipmentInput)
       : null
 
     if (input.serialPhoto) {
-      const ext = fileExt(input.serialPhoto.file, 'jpg')
-      serialPhotoPath = `${basePath}/serial.${ext}`
-      await uploadFile(serialPhotoPath, input.serialPhoto.file)
+      const prepared = await prepareImageUpload(
+        input.serialPhoto.file,
+        input.serialPhoto.file.name || 'serial.jpg',
+      )
+      serialPhotoPath = `${basePath}/serial.${prepared.extension}`
+      await uploadFile(serialPhotoPath, prepared.file, prepared.contentType)
       uploadedPaths.push(serialPhotoPath)
-      serialPhotoName = input.serialPhoto.file.name
+      serialPhotoName = prepared.file.name
       serialPhotoLat = input.serialPhoto.latitude
       serialPhotoLng = input.serialPhoto.longitude
       serialPhotoCapturedAt = input.serialPhoto.capturedAt
@@ -248,13 +248,16 @@ export async function saveMandatoryEquipment(input: SaveMandatoryEquipmentInput)
         const keep = input.keepExistingBucketPhotos?.[index]
         const capture = input.bucketPhotos?.[index]
         if (capture) {
-          const ext = fileExt(capture.file, 'jpg')
-          const path = `${basePath}/bucket-${index + 1}.${ext}`
-          await uploadFile(path, capture.file)
+          const prepared = await prepareImageUpload(
+            capture.file,
+            capture.file.name || `bucket-${index + 1}.jpg`,
+          )
+          const path = `${basePath}/bucket-${index + 1}.${prepared.extension}`
+          await uploadFile(path, prepared.file, prepared.contentType)
           uploadedPaths.push(path)
           extraPhotos.push({
             path,
-            file_name: capture.file.name,
+            file_name: prepared.file.name,
             latitude: capture.latitude,
             longitude: capture.longitude,
             captured_at: capture.capturedAt,
