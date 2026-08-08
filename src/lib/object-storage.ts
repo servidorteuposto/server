@@ -59,7 +59,14 @@ export async function getSignedObjectUrl(
     publicSlug: options?.publicSlug,
   })
   if (!url) throw new Error('presign_download_failed')
-  return url
+
+  // Converte para blob: — CSP/PWA podem bloquear <img src> direto no host do R2.
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`r2_download_failed:${response.status}`)
+  }
+  const blob = await response.blob()
+  return URL.createObjectURL(blob)
 }
 
 export async function removeObjects(bucket: string, paths: Array<string | null | undefined>) {
