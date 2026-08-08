@@ -62,9 +62,7 @@ export default function PdfPreviewModal({
           {loading && <p className="reg-doc-preview__status">Carregando documento...</p>}
           {error && <p className="reg-doc-form__error">{error}</p>}
           {!loading && !error && viewerSrc && (
-            <object className="reg-doc-preview__frame" data={viewerSrc} type="application/pdf">
-              <iframe className="reg-doc-preview__frame" src={viewerSrc} title={title} />
-            </object>
+            <iframe className="reg-doc-preview__frame" src={viewerSrc} title={title} />
           )}
         </div>
       </div>

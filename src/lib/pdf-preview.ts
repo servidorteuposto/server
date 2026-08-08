@@ -1,22 +1,41 @@
-/** Garante um blob: PDF local para iframe/preview (aceita URL http(s) ou blob: já baixado). */
+/** Cria blob: PDF a partir dos bytes já baixados (sem re-fetch). */
+export function createPdfPreviewFromBytes(bytes: Uint8Array, contentType?: string): string {
+  if (!bytes?.length) {
+    throw new Error('preview_empty')
+  }
+
+  const type =
+    contentType && (contentType.includes('pdf') || contentType === 'application/octet-stream')
+      ? contentType.includes('pdf')
+        ? contentType
+        : 'application/pdf'
+      : 'application/pdf'
+
+  // Cópia explícita — evita issues com views de ArrayBuffer.
+  const copy = new Uint8Array(bytes)
+  const blob = new Blob([copy], { type })
+  return URL.createObjectURL(blob)
+}
+
+/**
+ * Garante um blob: PDF local para iframe/preview.
+ * Se a URL já for blob:, reutiliza (sem fetch — CSP pode bloquear connect-src blob:).
+ */
 export async function createPdfPreviewObjectUrl(signedUrl: string): Promise<string> {
+  if (signedUrl.startsWith('blob:')) {
+    return signedUrl
+  }
+
   const response = await fetch(signedUrl)
   if (!response.ok) {
     throw new Error('preview_fetch_failed')
   }
 
-  const raw = await response.blob()
-  const pdfBlob =
-    raw.type === 'application/pdf' || raw.type === 'application/x-pdf'
-      ? raw
-      : new Blob([raw], { type: 'application/pdf' })
-
-  const objectUrl = URL.createObjectURL(pdfBlob)
-  // Libera o blob intermediário do storage (evita vazamento de memória).
-  if (signedUrl.startsWith('blob:') && signedUrl !== objectUrl) {
-    URL.revokeObjectURL(signedUrl)
-  }
-  return objectUrl
+  const buffer = await response.arrayBuffer()
+  return createPdfPreviewFromBytes(
+    new Uint8Array(buffer),
+    response.headers.get('content-type') ?? undefined,
+  )
 }
 
 export function revokePdfPreviewObjectUrl(url: string | null | undefined) {

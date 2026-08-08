@@ -14,7 +14,7 @@ import {
   saveRegulatoryDocument,
   type RegulatoryDocument,
 } from '../lib/regulatory-documents'
-import { createPdfPreviewObjectUrl, revokePdfPreviewObjectUrl } from '../lib/pdf-preview'
+import { revokePdfPreviewObjectUrl } from '../lib/pdf-preview'
 import './RegulatoryDocumentsPage.css'
 
 type RegulatoryDocumentsPageProps = {
@@ -183,8 +183,8 @@ export default function RegulatoryDocumentsPage({ isReadOnly }: RegulatoryDocume
     setActionBusyId(document.id)
 
     try {
-      const signedUrl = await getRegulatoryDocumentUrl(getDocumentPreviewPath(document))
-      const objectUrl = await createPdfPreviewObjectUrl(signedUrl)
+      // getSignedObjectUrl já devolve blob: — não re-fetch (CSP connect-src).
+      const objectUrl = await getRegulatoryDocumentUrl(getDocumentPreviewPath(document))
       setPreviewUrl(objectUrl)
     } catch {
       setPreviewError('Não foi possível carregar a visualização do documento.')

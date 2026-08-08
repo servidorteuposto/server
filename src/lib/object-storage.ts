@@ -109,7 +109,15 @@ export async function getSignedObjectUrl(
   options?: { publicSlug?: string },
 ) {
   const { bytes, contentType } = await getSignedObjectBytes(bucket, path, expiresIn, options)
-  const blob = new Blob([bytes], { type: contentType || 'application/octet-stream' })
+  const lower = path.toLowerCase()
+  const type =
+    contentType && contentType !== 'application/octet-stream'
+      ? contentType
+      : lower.endsWith('.pdf')
+        ? 'application/pdf'
+        : contentType || 'application/octet-stream'
+  const copy = new Uint8Array(bytes)
+  const blob = new Blob([copy], { type })
   return URL.createObjectURL(blob)
 }
 

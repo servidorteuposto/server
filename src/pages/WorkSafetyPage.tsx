@@ -26,7 +26,7 @@ import {
   type WorkSafetyDocument,
 } from '../lib/work-safety-documents'
 import type { RegulatoryDocument } from '../lib/regulatory-documents'
-import { createPdfPreviewObjectUrl, revokePdfPreviewObjectUrl } from '../lib/pdf-preview'
+import { revokePdfPreviewObjectUrl } from '../lib/pdf-preview'
 import '../pages/RegulatoryDocumentsPage.css'
 import './WorkSafetyPage.css'
 
@@ -175,8 +175,7 @@ export default function WorkSafetyPage({ isReadOnly }: WorkSafetyPageProps) {
     setActionBusyId(document.id)
 
     try {
-      const signedUrl = await getWorkSafetyDocumentUrl(getWorkSafetyDocumentPreviewPath(document))
-      const objectUrl = await createPdfPreviewObjectUrl(signedUrl)
+      const objectUrl = await getWorkSafetyDocumentUrl(getWorkSafetyDocumentPreviewPath(document))
       setPreviewUrl(objectUrl)
     } catch {
       setPreviewError('Não foi possível carregar a visualização do documento.')
@@ -206,8 +205,7 @@ export default function WorkSafetyPage({ isReadOnly }: WorkSafetyPageProps) {
     setPreviewLoading(true)
 
     try {
-      const signedUrl = await urlPromise
-      const objectUrl = await createPdfPreviewObjectUrl(signedUrl)
+      const objectUrl = await urlPromise
       setPreviewUrl(objectUrl)
     } catch {
       setPreviewError('Não foi possível carregar a visualização do documento.')
