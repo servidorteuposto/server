@@ -332,15 +332,32 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
       })
 
       fillFromProfile(saved)
+      setSuccessMessage('Configurações salvas com sucesso.')
+
+      // Recarregar preview da foto não pode invalidar um save já concluído.
       if (saved.foto_storage_path) {
-        const url = await getPostoPhotoUrl(saved.foto_storage_path)
-        setPhotoPreview(url)
+        try {
+          const url = await getPostoPhotoUrl(saved.foto_storage_path)
+          setPhotoPreview(url)
+        } catch {
+          setPhotoPreview(null)
+        }
       } else {
         setPhotoPreview(null)
       }
-      setSuccessMessage('Configurações salvas com sucesso.')
-    } catch {
-      setFormError('Não foi possível salvar as configurações. Tente novamente.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      if (message === 'invalid_photo_type') {
+        setFormError('A foto do posto deve ser JPG, PNG ou WebP.')
+      } else if (message === 'photo_too_large') {
+        setFormError('A foto do posto deve ter no máximo 5 MB.')
+      } else if (message.startsWith('r2_upload_failed') || message === 'presign_upload_failed') {
+        setFormError('Não foi possível enviar a foto do posto. Tente novamente.')
+      } else if (message === 'posto_update_forbidden') {
+        setFormError('Sem permissão para alterar estas configurações.')
+      } else {
+        setFormError('Não foi possível salvar as configurações. Tente novamente.')
+      }
     } finally {
       setBusy(false)
     }

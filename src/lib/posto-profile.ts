@@ -70,7 +70,16 @@ export async function getMyPostoSettings(): Promise<PostoSettingsProfile> {
 
 async function removePhoto(path: string | null | undefined) {
   if (!path) return
-  await removeObjects(POSTO_ASSETS_STORAGE_BUCKET, [path])
+  try {
+    await removeObjects(POSTO_ASSETS_STORAGE_BUCKET, [path])
+  } catch {
+    // Arquivo já ausente no R2 não deve impedir salvar o restante do perfil.
+  }
+}
+
+function digitsOrNull(value: string) {
+  const digits = value.replace(/\D/g, '')
+  return digits || null
 }
 
 export async function getPostoPhotoUrl(path: string) {
@@ -131,16 +140,17 @@ export async function updatePostoSettings(input: UpdatePostoSettingsInput) {
       latitude: input.latitude,
       longitude: input.longitude,
       foto_storage_path: fotoPath,
-      aviso_whatsapp_1: input.avisoWhatsapp1.trim() || null,
-      aviso_whatsapp_2: input.avisoWhatsapp2.trim() || null,
-      aviso_whatsapp_3: input.avisoWhatsapp3.trim() || null,
-      aviso_whatsapp_4: input.avisoWhatsapp4.trim() || null,
-      aviso_whatsapp_5: input.avisoWhatsapp5.trim() || null,
+      aviso_whatsapp_1: digitsOrNull(input.avisoWhatsapp1),
+      aviso_whatsapp_2: digitsOrNull(input.avisoWhatsapp2),
+      aviso_whatsapp_3: digitsOrNull(input.avisoWhatsapp3),
+      aviso_whatsapp_4: digitsOrNull(input.avisoWhatsapp4),
+      aviso_whatsapp_5: digitsOrNull(input.avisoWhatsapp5),
     })
     .eq('id', input.postoId)
     .select(PROFILE_SELECT)
-    .single()
+    .maybeSingle()
 
   if (error) throw error
+  if (!data) throw new Error('posto_update_forbidden')
   return data as PostoSettingsProfile
 }
