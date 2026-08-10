@@ -66,10 +66,10 @@ export function parseVolumetryInput(raw: string): number | null {
   return parsed
 }
 
-/** Sugere valores da grade ao digitar (ex.: "-2" → -200, -20). */
-export function suggestVolumetryOptions(raw: string, limit = 8): number[] {
+/** Sugere valores da grade ao digitar (ex.: "-2" → -200, -20). Campo vazio: lista completa −200…+200. */
+export function suggestVolumetryOptions(raw: string, limit = 40): number[] {
   const query = raw.trim().replace(/\s/g, '')
-  if (!query) return []
+  if (!query) return [...VOLUMETRY_OPTIONS]
 
   const normalizedQuery = query.replace(',', '.')
   const scored = VOLUMETRY_OPTIONS.map((value) => {
@@ -83,7 +83,7 @@ export function suggestVolumetryOptions(raw: string, limit = 8): number[] {
     return { value, score }
   }).filter((row): row is { value: number; score: number } => row != null)
 
-  scored.sort((a, b) => b.score - a.score || Math.abs(a.value) - Math.abs(b.value))
+  scored.sort((a, b) => b.score - a.score || a.value - b.value)
   return scored.slice(0, limit).map((row) => row.value)
 }
 

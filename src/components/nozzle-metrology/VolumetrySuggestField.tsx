@@ -67,7 +67,7 @@ export default function VolumetrySuggestField({
         }}
         disabled={disabled}
         autoComplete="off"
-        placeholder="Ex.: -80"
+        placeholder="Ex.: -200 a +200"
       />
       {open && suggestions.length > 0 && (
         <ul className="partner-suggest__list" role="listbox">
