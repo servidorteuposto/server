@@ -17,7 +17,7 @@
   right: 0;
   z-index: 20;
   display: grid;
-  min-width: 11.5rem;
+  min-width: 14rem;
   padding: 0.35rem;
   border-radius: 12px;
   border: 1px solid var(--gray-300);
@@ -315,10 +315,16 @@
 
 .diesel-history__card .btn {
   width: 100%;
-  margin-top: auto;
+  margin-top: 0;
   padding: 0.28rem 0.45rem;
   font-size: 0.72rem;
   border-radius: 6px;
+}
+
+.diesel-history__actions {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: auto;
 }
 
 .diesel-details {

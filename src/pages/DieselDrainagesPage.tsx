@@ -15,12 +15,14 @@ import {
 } from '../config/fuel-analyses'
 import {
   buildDrainagePdfFileName,
+  buildDrainageSinglePdfFileName,
   buildDrainageSpreadsheetFileName,
   downloadBlob,
   generateDrainagePrintPdf,
   generateDrainageSpreadsheetCsv,
   type DrainageExportPosto,
 } from '../lib/diesel-drainage-export'
+import { openRaqPdfForPrint } from '../lib/raq-print-report'
 import {
   ensureStandardDieselTanks,
   getDrainagePhotoUrl,
@@ -60,8 +62,14 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
   const [reports, setReports] = useState<DieselDrainageReport[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [exporting, setExporting] = useState<'pdf' | 'sheet' | null>(null)
-  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [bulkExporting, setBulkExporting] = useState(false)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const [periodModalOpen, setPeriodModalOpen] = useState(false)
+  const [periodFrom, setPeriodFrom] = useState('')
+  const [periodTo, setPeriodTo] = useState('')
+  const [periodError, setPeriodError] = useState<string | null>(null)
+  const [exportingId, setExportingId] = useState<string | null>(null)
+  const [exportingMode, setExportingMode] = useState<'print' | 'download' | null>(null)
   const [pageError, setPageError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -166,31 +174,105 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
     setDrainedAtPreview(new Date().toISOString())
   }
 
-  async function handleExport(kind: 'pdf' | 'sheet') {
-    if (!postoInfo || !reports.length || exporting) return
+  useEffect(() => {
+    if (!exportMenuOpen) return
+    function onPointerDown(event: MouseEvent) {
+      const target = event.target as HTMLElement | null
+      if (target?.closest('.diesel-export')) return
+      setExportMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [exportMenuOpen])
 
-    setExporting(kind)
-    setPageError(null)
-    setShowExportMenu(false)
-
-    try {
-      if (kind === 'sheet') {
-        const csv = generateDrainageSpreadsheetCsv(postoInfo, reports)
-        downloadBlob(csv, buildDrainageSpreadsheetFileName(postoInfo), 'text/csv;charset=utf-8')
-      } else {
-        const bytes = await generateDrainagePrintPdf(postoInfo, reports)
-        downloadBlob(bytes, buildDrainagePdfFileName(postoInfo), 'application/pdf')
+  const runBulkPdfExport = useCallback(
+    async (source: DieselDrainageReport[], fileSuffix: string) => {
+      if (!postoInfo) return
+      if (!source.length) {
+        setPageError('Nenhuma drenagem encontrada para exportar com esse filtro.')
+        return
       }
+      setBulkExporting(true)
+      setPageError(null)
+      setExportMenuOpen(false)
+      try {
+        const bytes = await generateDrainagePrintPdf(postoInfo, source)
+        downloadBlob(bytes, buildDrainagePdfFileName(postoInfo, fileSuffix), 'application/pdf')
+      } catch {
+        setPageError('Não foi possível gerar o PDF. Tente novamente.')
+      } finally {
+        setBulkExporting(false)
+      }
+    },
+    [postoInfo],
+  )
+
+  const handleBulkExportAll = useCallback(async () => {
+    await runBulkPdfExport(reports, `todas-${new Date().toISOString().slice(0, 10)}`)
+  }, [reports, runBulkPdfExport])
+
+  const handlePeriodExport = useCallback(async () => {
+    if (!periodFrom || !periodTo) {
+      setPeriodError('Informe a data inicial e a data final.')
+      return
+    }
+    if (periodFrom > periodTo) {
+      setPeriodError('A data inicial não pode ser maior que a final.')
+      return
+    }
+    setPeriodError(null)
+    const fromMs = new Date(`${periodFrom}T00:00:00`).getTime()
+    const toMs = new Date(`${periodTo}T23:59:59.999`).getTime()
+    const filtered = reports.filter((report) => {
+      const drained = new Date(report.drained_at).getTime()
+      return drained >= fromMs && drained <= toMs
+    })
+    await runBulkPdfExport(filtered, `periodo-${periodFrom}_a_${periodTo}`)
+    setPeriodModalOpen(false)
+  }, [periodFrom, periodTo, reports, runBulkPdfExport])
+
+  async function handleSheetExport() {
+    if (!postoInfo || !reports.length || bulkExporting) return
+    setBulkExporting(true)
+    setPageError(null)
+    setExportMenuOpen(false)
+    try {
+      const csv = generateDrainageSpreadsheetCsv(postoInfo, reports)
+      downloadBlob(csv, buildDrainageSpreadsheetFileName(postoInfo), 'text/csv;charset=utf-8')
     } catch {
-      setPageError(
-        kind === 'sheet'
-          ? 'Não foi possível gerar a planilha. Tente novamente.'
-          : 'Não foi possível gerar o PDF. Tente novamente.',
-      )
+      setPageError('Não foi possível gerar a planilha. Tente novamente.')
     } finally {
-      setExporting(null)
+      setBulkExporting(false)
     }
   }
+
+  const handleReportPdf = useCallback(
+    async (report: DieselDrainageReport, mode: 'print' | 'download') => {
+      if (!postoInfo) return
+      setExportingId(report.id)
+      setExportingMode(mode)
+      setPageError(null)
+      try {
+        const bytes = await generateDrainagePrintPdf(postoInfo, [report])
+        const fileName = buildDrainageSinglePdfFileName(postoInfo, report)
+        if (mode === 'print') {
+          await openRaqPdfForPrint(bytes, fileName)
+        } else {
+          downloadBlob(bytes, fileName, 'application/pdf')
+        }
+      } catch {
+        setPageError(
+          mode === 'print'
+            ? 'Não foi possível abrir a impressão desta drenagem. Tente novamente.'
+            : 'Não foi possível gerar o PDF desta drenagem. Tente novamente.',
+        )
+      } finally {
+        setExportingId(null)
+        setExportingMode(null)
+      }
+    },
+    [postoInfo],
+  )
 
   async function handleLivePhotoCapture(file: File) {
     if (file.size > FUEL_ANALYSES_MAX_FILE_BYTES) {
@@ -314,35 +396,44 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
           <div className="fuel-header-actions diesel-export">
             <button
               type="button"
-              className={`reg-docs-page__add-btn fuel-header-actions__btn fuel-header-actions__btn--ghost${showExportMenu ? ' is-active' : ''}`}
-              onClick={() => setShowExportMenu((open) => !open)}
-              disabled={!!exporting}
-              aria-expanded={showExportMenu}
+              className={`reg-docs-page__add-btn fuel-header-actions__btn fuel-header-actions__btn--ghost${exportMenuOpen ? ' is-active' : ''}`}
+              onClick={() => setExportMenuOpen((open) => !open)}
+              disabled={bulkExporting}
+              aria-expanded={exportMenuOpen}
               aria-haspopup="menu"
+              title="Exportar drenagens em PDF"
             >
-              {exporting === 'pdf'
-                ? 'Gerando PDF...'
-                : exporting === 'sheet'
-                  ? 'Gerando planilha...'
-                  : 'Imprimir'}
+              {bulkExporting ? 'Exportando...' : 'Exportar'}
             </button>
-            {showExportMenu && (
+            {exportMenuOpen && (
               <div className="diesel-export__menu" role="menu">
                 <button
                   type="button"
                   role="menuitem"
-                  onClick={() => void handleExport('sheet')}
-                  disabled={!!exporting}
+                  onClick={() => void handleBulkExportAll()}
+                  disabled={bulkExporting}
                 >
-                  Planilha (Excel)
+                  Exportar todas
                 </button>
                 <button
                   type="button"
                   role="menuitem"
-                  onClick={() => void handleExport('pdf')}
-                  disabled={!!exporting}
+                  onClick={() => {
+                    setExportMenuOpen(false)
+                    setPeriodError(null)
+                    setPeriodModalOpen(true)
+                  }}
+                  disabled={bulkExporting}
                 >
-                  PDF A4 completo
+                  Exportar por período de data
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => void handleSheetExport()}
+                  disabled={bulkExporting}
+                >
+                  Planilha (Excel)
                 </button>
               </div>
             )}
@@ -351,6 +442,76 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
       </header>
 
       {pageError && <p className="reg-doc-form__error reg-docs-page__banner">{pageError}</p>}
+
+      {periodModalOpen && (
+        <div
+          className="reg-doc-modal"
+          role="presentation"
+          onClick={() => setPeriodModalOpen(false)}
+        >
+          <div
+            className="reg-doc-modal__dialog fuel-period-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="diesel-period-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="reg-doc-modal__header">
+              <h2 id="diesel-period-title">Exportar por período</h2>
+              <button
+                type="button"
+                className="reg-doc-modal__close"
+                onClick={() => setPeriodModalOpen(false)}
+                aria-label="Fechar"
+              >
+                ×
+              </button>
+            </header>
+            <p className="fuel-period-modal__hint">
+              Serão exportadas todas as drenagens lançadas entre as datas informadas (inclusive).
+            </p>
+            <div className="fuel-period-modal__fields">
+              <label className="reg-doc-form__field">
+                <span>Data inicial</span>
+                <input
+                  type="date"
+                  value={periodFrom}
+                  onChange={(event) => setPeriodFrom(event.target.value)}
+                  disabled={bulkExporting}
+                />
+              </label>
+              <label className="reg-doc-form__field">
+                <span>Data final</span>
+                <input
+                  type="date"
+                  value={periodTo}
+                  onChange={(event) => setPeriodTo(event.target.value)}
+                  disabled={bulkExporting}
+                />
+              </label>
+            </div>
+            {periodError && <p className="reg-doc-form__error">{periodError}</p>}
+            <div className="reg-doc-modal__actions">
+              <button
+                type="button"
+                className="btn btn--secondary"
+                onClick={() => setPeriodModalOpen(false)}
+                disabled={bulkExporting}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => void handlePeriodExport()}
+                disabled={bulkExporting}
+              >
+                {bulkExporting ? 'Exportando...' : 'Exportar PDF'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {alertSchedules.length > 0 && (
         <div className="diesel-alerts" role="status">
@@ -583,13 +744,36 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
                     )}
                     {report.observations && <p>{report.observations}</p>}
                   </div>
-                  <button
-                    type="button"
-                    className="btn btn--secondary"
-                    onClick={() => setViewReport(report)}
-                  >
-                    Ver detalhes
-                  </button>
+                  <div className="diesel-history__actions">
+                    <button
+                      type="button"
+                      className="btn btn--secondary"
+                      onClick={() => setViewReport(report)}
+                      disabled={exportingId === report.id || bulkExporting}
+                    >
+                      Ver detalhes
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--secondary"
+                      onClick={() => void handleReportPdf(report, 'print')}
+                      disabled={exportingId === report.id || bulkExporting}
+                    >
+                      {exportingId === report.id && exportingMode === 'print'
+                        ? 'Abrindo...'
+                        : 'Imprimir'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--secondary"
+                      onClick={() => void handleReportPdf(report, 'download')}
+                      disabled={exportingId === report.id || bulkExporting}
+                    >
+                      {exportingId === report.id && exportingMode === 'download'
+                        ? 'Gerando...'
+                        : 'Exportar PDF'}
+                    </button>
+                  </div>
                 </article>
               )
             })}
@@ -598,7 +782,14 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
       </section>
 
       {viewReport && (
-        <DrainageDetailsModal report={viewReport} onClose={() => setViewReport(null)} />
+        <DrainageDetailsModal
+          report={viewReport}
+          exportingId={exportingId}
+          exportingMode={exportingMode}
+          onClose={() => setViewReport(null)}
+          onPrint={() => void handleReportPdf(viewReport, 'print')}
+          onExport={() => void handleReportPdf(viewReport, 'download')}
+        />
       )}
     </div>
   )
@@ -635,13 +826,24 @@ function DrainageAlertBanner({ schedule }: { schedule: DrainageSchedule }) {
 
 function DrainageDetailsModal({
   report,
+  exportingId,
+  exportingMode,
   onClose,
+  onPrint,
+  onExport,
 }: {
   report: DieselDrainageReport
+  exportingId: string | null
+  exportingMode: 'print' | 'download' | null
   onClose: () => void
+  onPrint: () => void
+  onExport: () => void
 }) {
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const busy = exportingId === report.id
+  const printing = busy && exportingMode === 'print'
+  const downloading = busy && exportingMode === 'download'
 
   useEffect(() => {
     let active = true
@@ -759,7 +961,13 @@ function DrainageDetailsModal({
         )}
 
         <div className="reg-doc-modal__actions">
-          <button type="button" className="btn btn--secondary" onClick={onClose}>
+          <button type="button" className="btn btn--secondary" onClick={onPrint} disabled={busy}>
+            {printing ? 'Abrindo...' : 'Imprimir'}
+          </button>
+          <button type="button" className="btn btn--secondary" onClick={onExport} disabled={busy}>
+            {downloading ? 'Gerando...' : 'Exportar PDF'}
+          </button>
+          <button type="button" className="btn btn--secondary" onClick={onClose} disabled={busy}>
             Fechar
           </button>
         </div>

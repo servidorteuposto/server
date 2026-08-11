@@ -182,16 +182,24 @@ async function fetchImageBytes(path: string | null | undefined) {
   }
 }
 
+function fitImageSize(image: PDFImage, maxWidth: number, maxHeight: number) {
+  const scale = Math.min(maxWidth / image.width, maxHeight / image.height, 1)
+  return {
+    width: image.width * scale,
+    height: image.height * scale,
+  }
+}
+
+/** Desenha a imagem encolhendo para caber — sem criar nova página (1 drenagem = 1 A4). */
 function drawEmbeddedImage(
   ctx: PdfContext,
   image: PDFImage,
   maxWidth: number,
   maxHeight: number,
 ) {
-  const scale = Math.min(maxWidth / image.width, maxHeight / image.height, 1)
-  const width = image.width * scale
-  const height = image.height * scale
-  ensureSpace(ctx, height + 10)
+  const available = Math.max(36, ctx.y - MARGIN_BOTTOM - 6)
+  const cappedHeight = Math.min(maxHeight, available)
+  const { width, height } = fitImageSize(image, maxWidth, cappedHeight)
   ctx.y -= height
   ctx.page.drawImage(image, {
     x: MARGIN_X,
@@ -199,7 +207,26 @@ function drawEmbeddedImage(
     width,
     height,
   })
-  ctx.y -= 10
+  ctx.y -= 8
+}
+
+function drawHeadingCompact(ctx: PdfContext, title: string) {
+  ctx.y -= 2
+  ctx.page.drawText(sanitize(title), {
+    x: MARGIN_X,
+    y: ctx.y,
+    size: 11,
+    font: ctx.fontBold,
+    color: COLOR.accent,
+  })
+  ctx.y -= 5
+  ctx.page.drawLine({
+    start: { x: MARGIN_X, y: ctx.y },
+    end: { x: PAGE_WIDTH - MARGIN_X, y: ctx.y },
+    thickness: 1,
+    color: COLOR.line,
+  })
+  ctx.y -= 12
 }
 
 function slugify(value: string) {
@@ -231,9 +258,19 @@ export function downloadBlob(bytes: Uint8Array | Blob, fileName: string, mimeTyp
   URL.revokeObjectURL(url)
 }
 
-export function buildDrainagePdfFileName(posto: DrainageExportPosto) {
+export function buildDrainagePdfFileName(posto: DrainageExportPosto, suffix?: string) {
   const date = new Date().toISOString().slice(0, 10)
-  return `Drenagens-${slugify(posto.nome) || 'posto'}-${date}.pdf`
+  const tail = suffix ? `-${suffix}` : `-${date}`
+  return `Drenagens-${slugify(posto.nome) || 'posto'}${tail}.pdf`
+}
+
+export function buildDrainageSinglePdfFileName(
+  posto: DrainageExportPosto,
+  report: DieselDrainageReport,
+) {
+  const tank = slugify(report.tank?.name ?? 'tanque') || 'tanque'
+  const date = report.drained_at.slice(0, 10)
+  return `Drenagem-${slugify(posto.nome) || 'posto'}-${tank}-${date}.pdf`
 }
 
 export function buildDrainageSpreadsheetFileName(posto: DrainageExportPosto) {
@@ -416,26 +453,48 @@ export async function generateDrainagePrintPdf(
         : '-',
     )
 
-    const photo = await embedRasterImage(doc, await fetchImageBytes(report.photo_storage_path))
+    const [photo, signature] = await Promise.all([
+      embedRasterImage(doc, await fetchImageBytes(report.photo_storage_path)),
+      embedRasterImage(doc, await fetchImageBytes(report.signature_storage_path)),
+    ])
+
+    // Reserva espaço para assinatura + rodapé "Gerado em" na mesma página A4.
+    const generatedLineH = 22
+    const signatureBlockH = signature ? 118 : 0
+    const reservedAfterPhoto = signatureBlockH + generatedLineH
+    const availableForPhoto = ctx.y - MARGIN_BOTTOM - reservedAfterPhoto
+
     if (photo) {
       ctx.y -= 2
-      drawEmbeddedImage(ctx, photo, CONTENT_WIDTH, 220)
+      const maxPhotoH = Math.max(56, Math.min(168, availableForPhoto))
+      drawEmbeddedImage(ctx, photo, CONTENT_WIDTH, maxPhotoH)
     } else {
       drawKeyValue(ctx, 'Foto', 'Nao disponivel')
     }
 
-    const signature = await embedRasterImage(
-      doc,
-      await fetchImageBytes(report.signature_storage_path),
-    )
     if (signature) {
-      drawHeading(ctx, '3. Assinatura')
-      drawKeyValue(ctx, 'Assinado por', report.operator_full_name)
-      drawEmbeddedImage(ctx, signature, Math.min(CONTENT_WIDTH, 260), 90)
+      drawHeadingCompact(ctx, '3. Assinatura')
+      ctx.page.drawText(sanitize('Assinado por'), {
+        x: MARGIN_X,
+        y: ctx.y,
+        size: 8.5,
+        font: ctx.fontBold,
+        color: COLOR.muted,
+      })
+      ctx.page.drawText(sanitize(report.operator_full_name), {
+        x: MARGIN_X + 148,
+        y: ctx.y,
+        size: 9.5,
+        font: ctx.font,
+        color: COLOR.ink,
+      })
+      ctx.y -= 14
+      const maxSigH = Math.max(40, Math.min(72, ctx.y - MARGIN_BOTTOM - generatedLineH))
+      drawEmbeddedImage(ctx, signature, Math.min(CONTENT_WIDTH, 240), maxSigH)
     }
 
-    ctx.y -= 6
-    ensureSpace(ctx, 24)
+    ctx.y -= 4
+    if (ctx.y < MARGIN_BOTTOM) ctx.y = MARGIN_BOTTOM
     ctx.page.drawText(
       sanitize(`Gerado em ${formatDateTimePtBr(new Date())} pelo Teu Posto.`),
       {
