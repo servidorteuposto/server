@@ -92,7 +92,7 @@ export default function AdminManagementPage() {
   const [whatsapp2, setWhatsapp2] = useState('')
   const [domainExpires, setDomainExpires] = useState('')
   const [dbGb, setDbGb] = useState('0.5')
-  const [storageGb, setStorageGb] = useState('1')
+  const [storageGb, setStorageGb] = useState('10')
   const [resendDaily, setResendDaily] = useState('100')
   const [resendMonthly, setResendMonthly] = useState('3000')
 
@@ -171,7 +171,7 @@ export default function AdminManagementPage() {
         domain_expires_on: domainExpires,
         quotas_gb: {
           db_gb: Number(dbGb) || 0.5,
-          storage_gb: Number(storageGb) || 1,
+          storage_gb: Number(storageGb) || 10,
           resend_daily: Number(resendDaily) || 100,
           resend_monthly: Number(resendMonthly) || 3000,
         },

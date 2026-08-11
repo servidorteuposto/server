@@ -153,19 +153,20 @@ export async function listR2UsageByPrefix() {
     }
 
     const xml = await response.text()
-    const keys = [...xml.matchAll(/<Key>([^<]+)<\/Key>/g)].map((match) =>
-      match[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'),
-    )
-    const sizes = [...xml.matchAll(/<Size>([^<]+)<\/Size>/g)].map((match) => Number(match[1]) || 0)
+    const contents = [...xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)]
 
-    for (let i = 0; i < keys.length; i += 1) {
-      const key = keys[i]
+    for (const match of contents) {
+      const block = match[1]
+      const rawKey = block.match(/<Key>([^<]+)<\/Key>/)?.[1]
+      if (!rawKey) continue
+      const key = rawKey.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      const size = Number(block.match(/<Size>([^<]+)<\/Size>/)?.[1] || 0)
       const slash = key.indexOf('/')
       const logical = slash >= 0 ? key.slice(0, slash) : key
       const row = byBucket.get(logical)
       if (!row) continue
       row.objects += 1
-      row.bytes += sizes[i] ?? 0
+      row.bytes += Number.isFinite(size) ? size : 0
     }
 
     const truncated = /<IsTruncated>true<\/IsTruncated>/i.test(xml)

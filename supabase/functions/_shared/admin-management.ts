@@ -27,8 +27,8 @@ export type ManagementSettings = {
 }
 
 export const DEFAULT_QUOTAS: ManagementQuotas = {
-  db_bytes: 512 * 1024 ** 2, // 0.5 GB free
-  storage_bytes: 1 * 1024 ** 3, // 1 GB free
+  db_bytes: 512 * 1024 ** 2, // 0.5 GB free (Supabase)
+  storage_bytes: 10 * 1024 ** 3, // 10 GB free tier Cloudflare R2
   resend_daily: 100,
   resend_monthly: 3000,
 }
