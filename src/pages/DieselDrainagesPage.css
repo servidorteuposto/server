@@ -323,6 +323,11 @@
 
 .diesel-details {
   width: min(560px, 100%);
+  max-height: min(90vh, 900px);
+  max-height: min(90dvh, 900px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .diesel-details__meta {
@@ -344,6 +349,10 @@
   color: var(--gray-600);
 }
 
+.diesel-details__signature {
+  margin-bottom: 0.85rem;
+}
+
 .diesel-details__signature h3 {
   font-size: 0.95rem;
   margin-bottom: 0.5rem;
@@ -351,7 +360,10 @@
 }
 
 .diesel-details__signature img {
+  display: block;
   width: min(100%, 320px);
+  max-height: min(42vh, 360px);
+  object-fit: contain;
   border: 1px solid var(--gray-300);
   border-radius: 8px;
   background: var(--white);

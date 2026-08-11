@@ -446,9 +446,12 @@
   width: min(480px, 100%);
   max-width: 100%;
   min-width: 0;
+  max-height: min(90vh, 900px);
+  max-height: min(90dvh, 900px);
   box-sizing: border-box;
   overflow-x: hidden;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--white);
   border-radius: 16px;
   box-shadow: var(--shadow-card);
