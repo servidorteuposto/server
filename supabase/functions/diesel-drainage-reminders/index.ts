@@ -17,43 +17,6 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
-function onlyDigits(value: string) {
-  return value.replace(/\D/g, '')
-}
-
-function toZApiPhone(phone: string) {
-  let digits = onlyDigits(phone)
-  if (!digits) return ''
-  if (digits.startsWith('55') && digits.length >= 12) return digits
-  if (digits.length === 10 || digits.length === 11) return `55${digits}`
-  return digits
-}
-
-function collectAvisoPhones(posto: {
-  aviso_whatsapp_1?: string | null
-  aviso_whatsapp_2?: string | null
-  aviso_whatsapp_3?: string | null
-  aviso_whatsapp_4?: string | null
-  aviso_whatsapp_5?: string | null
-  telefone?: string | null
-}) {
-  const avisos = [
-    posto.aviso_whatsapp_1,
-    posto.aviso_whatsapp_2,
-    posto.aviso_whatsapp_3,
-    posto.aviso_whatsapp_4,
-    posto.aviso_whatsapp_5,
-  ]
-  const candidates = avisos.some(Boolean) ? avisos : [posto.telefone]
-  const unique = new Set<string>()
-  for (const candidate of candidates) {
-    if (!candidate) continue
-    const normalized = toZApiPhone(candidate)
-    if (normalized.length >= 12 && normalized.length <= 15) unique.add(normalized)
-  }
-  return [...unique]
-}
-
 function pad2(value: number) {
   return String(value).padStart(2, '0')
 }
@@ -96,38 +59,6 @@ async function sendEmail(to: string, subject: string, html: string) {
       Deno.env.get('SECURITY_EMAIL_FROM') ??
       'Teu Posto Avisos <noreply@appteuposto.com.br>',
   })
-}
-
-async function sendWhatsApp(phone: string, message: string) {
-  const webhookUrl = Deno.env.get('WHATSAPP_WEBHOOK_URL')
-  const apiKey = Deno.env.get('WHATSAPP_API_KEY')
-  if (!webhookUrl) {
-    console.warn('WHATSAPP_WEBHOOK_URL not configured, skipping WhatsApp')
-    return false
-  }
-
-  const response = await fetch(webhookUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(apiKey
-        ? {
-            'Client-Token': apiKey,
-            Authorization: `Bearer ${apiKey}`,
-          }
-        : {}),
-    },
-    body: JSON.stringify({
-      phone: toZApiPhone(phone),
-      message,
-    }),
-  })
-
-  if (!response.ok) {
-    console.error('Failed to send drainage WhatsApp', await response.text())
-    return false
-  }
-  return true
 }
 
 Deno.serve(async (req) => {

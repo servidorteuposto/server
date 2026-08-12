@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
     })
 
     const result = await processManagementAlerts(admin)
-    // Tenta descarregar avisos de usuários que ficaram na fila (no-op se Z-API offline).
+    // Descarrega também a fila de lembretes dos postos (Meta templates).
     await triggerOperationalRemindersFlush()
 
     return jsonResponse({

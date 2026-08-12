@@ -358,7 +358,7 @@ export default function AppShell({
             <strong>Alerta de infraestrutura.</strong>{' '}
             {adminAttention.reasons[0]?.label
               ? `${adminAttention.reasons[0].label}.`
-              : 'Verifique Z-API, cotas ou domínio.'}
+              : 'Verifique cotas, domínio ou Resend.'}
             {adminAttention.reasons.length > 1
               ? ` (+${adminAttention.reasons.length - 1})`
               : ''}

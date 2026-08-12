@@ -5,7 +5,7 @@ name: Operational reminders
 
 on:
   schedule:
-    # A cada hora (UTC). Fila Z-API + marcos do dia.
+    # A cada hora (UTC). Fila Meta templates + marcos do dia.
     - cron: '5 * * * *'
   workflow_dispatch:
 

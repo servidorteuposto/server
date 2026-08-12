@@ -45,20 +45,9 @@ export type ManagementDashboard = {
     tables: Array<{ schema: string; name: string; bytes: number }>
     flow_today: Record<string, number>
   }
-  zapi: {
+  whatsapp?: {
     configured: boolean
-    connected: boolean
-    smartphone_connected: boolean | null
-    message: string
-    detail: string | null
-    checked_at: string
-    due_on: string | null
-    days_left: number | null
-    payment_status: string | null
-    instance_name: string | null
-    warn_7d: boolean
-    warn_2d: boolean
-    expired: boolean
+    provider: string
   }
   resend: {
     configured: boolean
@@ -330,10 +319,9 @@ export async function runManagementAlertCheck() {
 export type ManagementAttention = {
   needs_attention: boolean
   reasons: Array<{ code: string; label: string }>
-  zapi?: {
+  whatsapp?: {
     configured: boolean
-    connected: boolean
-    message: string
+    provider: string
   }
 }
 
@@ -349,7 +337,7 @@ export async function getManagementAttention(): Promise<ManagementAttention> {
   return {
     needs_attention: Boolean(payload.needs_attention),
     reasons: payload.reasons ?? [],
-    zapi: payload.zapi,
+    whatsapp: payload.whatsapp,
   }
 }
 

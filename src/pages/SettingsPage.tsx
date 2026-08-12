@@ -505,8 +505,8 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
           <p className="settings-section__hint">
             Cadastre até 5 números de WhatsApp para receber avisos automáticos: renovação do plano
             (7 e 2 dias antes), documentos e laudos (30/15/7/1 dia e no vencimento), metrologia
-            (a cada 15 dias), drenagem (semanal) e RAQ (a cada 2 dias). A instância Z-API precisa
-            estar conectada.
+            (a cada 15 dias), drenagem (semanal) e RAQ (a cada 2 dias). Os avisos saem pela API oficial
+            da Meta (modelos aprovados).
           </p>
           <div className="settings-grid settings-grid--whatsapp">
             <label className="reg-doc-form__field">

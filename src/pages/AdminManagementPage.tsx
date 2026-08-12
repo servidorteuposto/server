@@ -30,22 +30,6 @@ function formatDateBr(value: string | null | undefined) {
   return `${d}/${m}/${y}`
 }
 
-function formatZApiPaymentStatus(status: string | null | undefined) {
-  if (!status) return null
-  const key = status.trim().toUpperCase()
-  const map: Record<string, string> = {
-    ACTIVE: 'Ativo',
-    CANCELED: 'Cancelado',
-    CANCELLED: 'Cancelado',
-    CANCELLATION_PROC: 'Cancelamento em andamento',
-    CANCELLATION_PROCESS: 'Cancelamento em andamento',
-    PENDING: 'Pendente',
-    OVERDUE: 'Em atraso',
-    EXPIRED: 'Expirado',
-  }
-  return map[key] ?? status.replace(/_/g, ' ').toLowerCase()
-}
-
 function UsageMeter({
   label,
   percent,
@@ -304,18 +288,6 @@ export default function AdminManagementPage() {
     return `${d} dia(s) restantes`
   })()
 
-  const zapiDueLabel = (() => {
-    if (!dashboard?.zapi.configured) return 'Z-API não configurada'
-    if (!dashboard.zapi.due_on) return 'Indisponível na API'
-    const d = dashboard.zapi.days_left
-    if (d == null) return formatDateBr(dashboard.zapi.due_on)
-    if (d < 0) return `Expirada há ${Math.abs(d)} dia(s)`
-    if (d === 0) return 'Expira hoje'
-    return `${d} dia(s) restantes`
-  })()
-
-  const zapiPaymentLabel = formatZApiPaymentStatus(dashboard?.zapi.payment_status)
-
   return (
     <section className="reg-docs-page admin-mgmt-page">
       <header className="reg-docs-page__header">
@@ -374,46 +346,29 @@ export default function AdminManagementPage() {
           </section>
 
           <section className="admin-mgmt-section">
-            <h2>WhatsApp (Z-API)</h2>
+            <h2>WhatsApp (Meta)</h2>
             <div
               className={`admin-mgmt-zapi${
-                !dashboard.zapi.configured
-                  ? ''
-                  : dashboard.zapi.connected
-                    ? ' admin-mgmt-zapi--ok'
-                    : ' admin-mgmt-zapi--down'
+                dashboard.whatsapp?.configured ? ' admin-mgmt-zapi--ok' : ''
               }`}
             >
               <div>
-                <span className="admin-mgmt-stat__label">Status</span>
+                <span className="admin-mgmt-stat__label">Cloud API</span>
                 <strong>
-                  {!dashboard.zapi.configured
-                    ? 'Não configurada'
-                    : dashboard.zapi.connected
-                      ? 'Conectada'
-                      : 'Desconectada'}
-                </strong>
-              </div>
-              <div>
-                <span className="admin-mgmt-stat__label">Celular</span>
-                <strong>
-                  {dashboard.zapi.smartphone_connected == null
-                    ? '—'
-                    : dashboard.zapi.smartphone_connected
-                      ? 'Online'
-                      : 'Offline'}
+                  {dashboard.whatsapp?.configured ? 'Secrets configurados' : 'Não configurada'}
                 </strong>
               </div>
               <div className="admin-mgmt-zapi__msg">
-                <span className="admin-mgmt-stat__label">Detalhe</span>
-                <p>{dashboard.zapi.message}</p>
-                {dashboard.zapi.detail && (
-                  <p className="admin-mgmt-muted">{dashboard.zapi.detail}</p>
-                )}
+                <span className="admin-mgmt-stat__label">Provedor</span>
+                <p>
+                  {dashboard.whatsapp?.configured
+                    ? 'Envio por modelos (templates) da Meta WhatsApp Cloud API.'
+                    : 'Configure META_WHATSAPP_TOKEN e META_WHATSAPP_PHONE_NUMBER_ID nos secrets do Supabase.'}
+                </p>
               </div>
             </div>
             <p className="admin-mgmt-hint">
-              Status da conexão. Vencimento e pagamento da assinatura ficam em Vencimentos, abaixo.
+              Avisos usam modelos Utilidade aprovados na WABA do número de produção.
             </p>
           </section>
 
@@ -616,36 +571,9 @@ export default function AdminManagementPage() {
                   </div>
                 </dl>
               </article>
-              <article
-                className={`admin-mgmt-expiry-card${
-                  dashboard.zapi.expired || dashboard.zapi.warn_2d
-                    ? ' admin-mgmt-expiry-card--danger'
-                    : dashboard.zapi.warn_7d
-                      ? ' admin-mgmt-expiry-card--warn'
-                      : ''
-                }`}
-              >
-                <h3>Z-API</h3>
-                <dl className="admin-mgmt-expiry-rows">
-                  <div>
-                    <dt>Expiração</dt>
-                    <dd>{formatDateBr(dashboard.zapi.due_on)}</dd>
-                  </div>
-                  <div>
-                    <dt>Situação</dt>
-                    <dd>{zapiDueLabel}</dd>
-                  </div>
-                  {zapiPaymentLabel && (
-                    <div>
-                      <dt>Pagamento</dt>
-                      <dd>{zapiPaymentLabel}</dd>
-                    </div>
-                  )}
-                </dl>
-              </article>
             </div>
             <p className="admin-mgmt-hint">
-              Domínio: data manual nas configurações. Z-API: automática. Avisos 7 e ≤2 dias antes.
+              Domínio: data manual nas configurações. Avisos WhatsApp/e-mail em 7 e ≤2 dias antes.
             </p>
           </section>
 

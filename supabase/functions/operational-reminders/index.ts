@@ -1,5 +1,17 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
-import { fetchZApiStatus } from '../_shared/admin-management.ts'
+import {
+  isMetaWhatsAppConfigured,
+  normalizeWaPhone,
+  sendWhatsAppTemplate,
+} from '../_shared/meta-whatsapp.ts'
+import {
+  assinaturaTemplate,
+  docTemplate,
+  drenagemTemplate,
+  metrologiaTemplate,
+  raqTemplate,
+  type TemplatePayload,
+} from '../_shared/whatsapp-templates.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,7 +25,7 @@ const SUBSCRIPTION_MILESTONES = [7, 2] as const
 const METROLOGY_INTERVAL_DAYS = 15
 const DRAINAGE_INTERVAL_DAYS = 7
 const RAQ_INTERVAL_DAYS = 2
-/** ~6 msgs/min — dentro da faixa 5–10/min pedida */
+/** ~6 msgs/min */
 const SEND_DELAY_MS = 10_000
 const MAX_SENDS_PER_RUN = Number(Deno.env.get('OPERATIONAL_MAX_SENDS') ?? '40')
 
@@ -21,6 +33,7 @@ type PostoRow = {
   id: string
   nome: string
   cnpj: string | null
+  endereco: string | null
   telefone: string | null
   aviso_whatsapp_1: string | null
   aviso_whatsapp_2: string | null
@@ -39,8 +52,9 @@ type ReminderJob = {
   milestone: string
   phones: string[]
   message: string
+  template_name: string
+  template_params: string[]
   due_on: string
-  meta?: Record<string, unknown>
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -48,28 +62,6 @@ function jsonResponse(body: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
-}
-
-function onlyDigits(value: string) {
-  return value.replace(/\D/g, '')
-}
-
-function formatCnpj(value: string | null | undefined) {
-  const digits = onlyDigits(value ?? '')
-  if (digits.length !== 14) return value?.trim() || 'não informado'
-  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`
-}
-
-function postoHeader(nome: string, cnpj: string | null | undefined) {
-  return [`🏪 *Posto:* ${nome}`, `🧾 *CNPJ:* ${formatCnpj(cnpj)}`].join('\n')
-}
-
-function toZApiPhone(phone: string) {
-  let digits = onlyDigits(phone)
-  if (!digits) return ''
-  if (digits.startsWith('55') && digits.length >= 12) return digits
-  if (digits.length === 10 || digits.length === 11) return `55${digits}`
-  return digits
 }
 
 function collectAvisoPhones(posto: PostoRow) {
@@ -84,7 +76,7 @@ function collectAvisoPhones(posto: PostoRow) {
   const unique = new Set<string>()
   for (const candidate of candidates) {
     if (!candidate) continue
-    const normalized = toZApiPhone(candidate)
+    const normalized = normalizeWaPhone(candidate)
     if (normalized.length >= 12 && normalized.length <= 15) unique.add(normalized)
   }
   return [...unique]
@@ -125,58 +117,20 @@ function daysBetweenKeys(fromKey: string, toKey: string) {
   return Math.round((b - a) / 86_400_000)
 }
 
-function formatDateKeyPtBr(dateKey: string) {
-  const [year, month, day] = dateKey.split('-')
-  return `${day}/${month}/${year}`
-}
-
-function pickVariantIndex(seed: string, count = 10) {
-  let hash = 2166136261
-  for (let i = 0; i < seed.length; i++) {
-    hash ^= seed.charCodeAt(i)
-    hash = Math.imul(hash, 16777619)
-  }
-  return Math.abs(hash) % count
-}
-
-function pick<T>(variants: T[], seed: string): T {
-  return variants[pickVariantIndex(seed, variants.length)]
-}
-
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function sendWhatsApp(phone: string, message: string) {
-  const webhookUrl = Deno.env.get('WHATSAPP_WEBHOOK_URL')
-  const apiKey = Deno.env.get('WHATSAPP_API_KEY')
-  if (!webhookUrl) {
-    console.warn('WHATSAPP_WEBHOOK_URL not configured, skipping WhatsApp')
-    return false
+function jobFromTemplate(
+  base: Omit<ReminderJob, 'message' | 'template_name' | 'template_params'>,
+  tpl: TemplatePayload,
+): ReminderJob {
+  return {
+    ...base,
+    message: tpl.summary,
+    template_name: tpl.name,
+    template_params: tpl.bodyParams,
   }
-
-  const response = await fetch(webhookUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(apiKey
-        ? {
-            'Client-Token': apiKey,
-            Authorization: `Bearer ${apiKey}`,
-          }
-        : {}),
-    },
-    body: JSON.stringify({
-      phone: toZApiPhone(phone),
-      message,
-    }),
-  })
-
-  if (!response.ok) {
-    console.error('Failed to send WhatsApp', phone, await response.text())
-    return false
-  }
-  return true
 }
 
 async function alreadySent(
@@ -237,6 +191,8 @@ async function enqueueReminder(
       reference_id: job.reference_id,
       milestone: job.milestone,
       message: job.message,
+      template_name: job.template_name,
+      template_params: job.template_params,
       phones: job.phones,
       due_on: job.due_on,
       updated_at: now,
@@ -265,15 +221,15 @@ async function hasPendingRaq(
   return Boolean(data?.id)
 }
 
-/** Envia pendências da fila; só marca como enviado após sucesso na Z-API. */
+/** Envia pendências da fila via Meta templates; só marca enviado após sucesso. */
 async function flushReminderQueue(admin: ReturnType<typeof createClient>, todayKey: string) {
-  const zapi = await fetchZApiStatus()
   const details: Array<Record<string, unknown>> = []
   let apiCalls = 0
   let jobsSent = 0
   let deferred = 0
+  const metaConfigured = isMetaWhatsAppConfigured()
 
-  if (!zapi.configured || !zapi.connected) {
+  if (!metaConfigured) {
     const { count } = await admin
       .from('whatsapp_reminder_queue')
       .select('id', { count: 'exact', head: true })
@@ -281,16 +237,14 @@ async function flushReminderQueue(admin: ReturnType<typeof createClient>, todayK
     return {
       details: [
         {
-          skipped: 'zapi_disconnected',
+          skipped: 'meta_not_configured',
           pending: count ?? 0,
-          zapi_message: zapi.message,
         },
       ],
       apiCalls: 0,
       jobsSent: 0,
       deferred: count ?? 0,
-      zapi_connected: false,
-      zapi_message: zapi.message,
+      meta_configured: false,
       pending_left: count ?? 0,
     }
   }
@@ -298,7 +252,7 @@ async function flushReminderQueue(admin: ReturnType<typeof createClient>, todayK
   const { data: pending, error: pendingError } = await admin
     .from('whatsapp_reminder_queue')
     .select(
-      'id, posto_id, category, reference_id, milestone, message, phones, due_on, attempts',
+      'id, posto_id, category, reference_id, milestone, message, template_name, template_params, phones, due_on, attempts',
     )
     .order('due_on', { ascending: true })
     .order('created_at', { ascending: true })
@@ -335,6 +289,26 @@ async function flushReminderQueue(admin: ReturnType<typeof createClient>, todayK
       continue
     }
 
+    const templateName =
+      typeof row.template_name === 'string' ? row.template_name.trim() : ''
+    if (!templateName) {
+      await admin
+        .from('whatsapp_reminder_queue')
+        .update({
+          attempts: Number(row.attempts ?? 0) + 1,
+          last_error: 'missing_template_name',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', row.id)
+      details.push({
+        id: row.id,
+        category: row.category,
+        sent: false,
+        error: 'missing_template_name',
+      })
+      continue
+    }
+
     const phones = Array.isArray(row.phones) ? row.phones.filter(Boolean) : []
     if (!phones.length) {
       await admin
@@ -349,12 +323,20 @@ async function flushReminderQueue(admin: ReturnType<typeof createClient>, todayK
       continue
     }
 
+    const bodyParams = Array.isArray(row.template_params)
+      ? row.template_params.map((value: unknown) => String(value ?? ''))
+      : []
+
     let ok = false
     let lastError: string | null = null
     for (const phone of phones) {
       if (apiCalls >= MAX_SENDS_PER_RUN) break
       if (apiCalls > 0) await sleep(SEND_DELAY_MS)
-      const delivered = await sendWhatsApp(String(phone), row.message)
+      const delivered = await sendWhatsAppTemplate({
+        to: String(phone),
+        name: templateName,
+        bodyParams,
+      })
       apiCalls += 1
       if (delivered) ok = true
       else lastError = 'whatsapp_send_failed'
@@ -376,6 +358,7 @@ async function flushReminderQueue(admin: ReturnType<typeof createClient>, todayK
         category: row.category,
         reference_id: row.reference_id,
         milestone: row.milestone,
+        template_name: templateName,
         due_on: row.due_on,
         sent: true,
         catch_up: row.due_on !== todayKey,
@@ -397,9 +380,6 @@ async function flushReminderQueue(admin: ReturnType<typeof createClient>, todayK
         deferred: true,
         error: lastError,
       })
-      // Se a Z-API caiu no meio do lote, para e deixa o resto na fila.
-      const statusAgain = await fetchZApiStatus()
-      if (!statusAgain.connected) break
     }
   }
 
@@ -412,732 +392,9 @@ async function flushReminderQueue(admin: ReturnType<typeof createClient>, todayK
     apiCalls,
     jobsSent,
     deferred,
-    zapi_connected: true,
-    zapi_message: zapi.message,
+    meta_configured: true,
     pending_left: pendingLeft ?? 0,
   }
-}
-
-function docMessage(
-  posto: PostoRow,
-  title: string,
-  daysLeft: number,
-  expiresKey: string,
-  seed: string,
-) {
-  const when = formatDateKeyPtBr(expiresKey)
-  const header = postoHeader(posto.nome, posto.cnpj)
-  const dayLabel = daysLeft === 1 ? '1 dia' : `${daysLeft} dias`
-
-  if (daysLeft === 0) {
-    return pick(
-      [
-        [
-          '🚨 *VALIDADE EXPIRADA — Teu Posto*',
-          '',
-          header,
-          '',
-          `O documento *_${title}_* *venceu hoje* (${when}).`,
-          '',
-          'A validade está expirada. Renove e atualize o anexo no Teu Posto o quanto antes.',
-        ].join('\n'),
-        [
-          '⚠️ *Documento vencido*',
-          '',
-          header,
-          '',
-          `Atenção: *_${title}_* expirou em *${when}*.`,
-          '',
-          'Regularize a renovação e registre o novo arquivo no sistema.',
-        ].join('\n'),
-        [
-          '🛑 *Prazo estourado — Teu Posto*',
-          '',
-          header,
-          '',
-          `*_${title}_* está com validade *expirada* (hoje, ${when}).`,
-          '',
-          'Não deixe pendência regulatória aberta — renove já.',
-        ].join('\n'),
-        [
-          '📢 *Aviso urgente de validade*',
-          '',
-          header,
-          '',
-          `O item *_${title}_* venceu nesta data (${when}).`,
-          '',
-          'Atualize o documento no Teu Posto após a renovação.',
-        ].join('\n'),
-        [
-          '🔴 *Conformidade em risco*',
-          '',
-          header,
-          '',
-          `*_${title}_* perdeu a validade hoje (${when}).`,
-          '',
-          'Faça a renovação e anexe o comprovante no app.',
-        ].join('\n'),
-        [
-          '⏳ *Vencimento do dia*',
-          '',
-          header,
-          '',
-          `Hoje (${when}) o documento *_${title}_* chegou ao fim da validade.`,
-          '',
-          'Priorize a renovação para manter a operação em dia.',
-        ].join('\n'),
-        [
-          '📋 *Checklist Teu Posto*',
-          '',
-          header,
-          '',
-          `Pendente crítico: *_${title}_* vencido em ${when}.`,
-          '',
-          'Renove e lance o novo anexo no sistema.',
-        ].join('\n'),
-        [
-          '🚨 *Alerta regulatório*',
-          '',
-          header,
-          '',
-          `*_${title}_* está vencido (data: ${when}).`,
-          '',
-          'Ação imediata: renovar e atualizar no Teu Posto.',
-        ].join('\n'),
-        [
-          '❗ *Documento fora da validade*',
-          '',
-          header,
-          '',
-          `Confirmamos o vencimento de *_${title}_* em ${when}.`,
-          '',
-          'Evite autuação: regularize e registre no app.',
-        ].join('\n'),
-        [
-          '📌 *Lembrete Teu Posto — vencido*',
-          '',
-          header,
-          '',
-          `*_${title}_* expirou hoje (${when}).`,
-          '',
-          'Assim que renovar, atualize o arquivo no Teu Posto.',
-        ].join('\n'),
-      ],
-      seed,
-    )
-  }
-
-  const urgency =
-    daysLeft === 1
-      ? 'ÚLTIMO DIA'
-      : daysLeft <= 7
-        ? 'URGENTE'
-        : daysLeft <= 15
-          ? 'IMPORTANTE'
-          : 'LEMBRETE'
-
-  return pick(
-    [
-      [
-        `⏰ *${urgency} — Teu Posto*`,
-        '',
-        header,
-        '',
-        `O documento *_${title}_* vence em *${dayLabel}* (${when}).`,
-        '',
-        'Organize a renovação e atualize o arquivo no sistema.',
-      ].join('\n'),
-      [
-        `📅 *Prazo se aproximando*`,
-        '',
-        header,
-        '',
-        `Faltam *${dayLabel}* para *_${title}_* (vence em ${when}).`,
-        '',
-        'Não deixe para a última hora — prepare a renovação.',
-      ].join('\n'),
-      [
-        `📋 *Aviso de vencimento — Teu Posto*`,
-        '',
-        header,
-        '',
-        `*_${title}_* tem validade até *${when}* (*${dayLabel}* restantes).`,
-        '',
-        'Renove e anexe o novo documento no Teu Posto.',
-      ].join('\n'),
-      [
-        `🔔 *Lembrete operacional*`,
-        '',
-        header,
-        '',
-        `Em *${dayLabel}* vence *_${title}_* (${when}).`,
-        '',
-        'Mantenha a conformidade: renove e registre no app.',
-      ].join('\n'),
-      [
-        `📌 *Documento com prazo curto*`,
-        '',
-        header,
-        '',
-        `Atenção ao item *_${title}_*: faltam *${dayLabel}* (${when}).`,
-        '',
-        'Atualize o anexo assim que a renovação sair.',
-      ].join('\n'),
-      [
-        `🗓️ *Calendário Teu Posto*`,
-        '',
-        header,
-        '',
-        `Próximo vencimento: *_${title}_* em *${when}* (*${dayLabel}*).`,
-        '',
-        'Antecipe a renovação para evitar operação irregular.',
-      ].join('\n'),
-      [
-        `⚠️ *${urgency}*`,
-        '',
-        header,
-        '',
-        `*_${title}_* vence dia *${when}* — restam *${dayLabel}*.`,
-        '',
-        'Cuide da renovação e lance no Teu Posto.',
-      ].join('\n'),
-      [
-        `📣 *Comunicado do Teu Posto*`,
-        '',
-        header,
-        '',
-        `Lembrete: *_${title}_* chega ao fim da validade em *${dayLabel}* (${when}).`,
-        '',
-        'Após renovar, atualize o arquivo no sistema.',
-      ].join('\n'),
-      [
-        `🧾 *Controle de documentos*`,
-        '',
-        header,
-        '',
-        `Status: *_${title}_* vence em *${dayLabel}* (${when}).`,
-        '',
-        'Planeje a renovação e mantenha o histórico em dia.',
-      ].join('\n'),
-      [
-        `✅ *Previna pendências*`,
-        '',
-        header,
-        '',
-        `Faltam *${dayLabel}* para o vencimento de *_${title}_* (${when}).`,
-        '',
-        'Renove com antecedência e registre no Teu Posto.',
-      ].join('\n'),
-    ],
-    seed,
-  )
-}
-
-function metrologyMessage(posto: PostoRow, dueKey: string, seed: string) {
-  const header = postoHeader(posto.nome, posto.cnpj)
-  const when = formatDateKeyPtBr(dueKey)
-  return pick(
-    [
-      [
-        '🔧 *METROLOGIA EM DIA?* — Teu Posto',
-        '',
-        header,
-        '',
-        'Já se passaram *15 dias* desde a última verificação metrológica.',
-        `📅 Prazo de hoje: *${when}*`,
-        '',
-        'Faça uma nova metrologia dos bicos e registre no Teu Posto.',
-      ].join('\n'),
-      [
-        '📏 *Lembrete de metrologia*',
-        '',
-        header,
-        '',
-        `Completou o ciclo de *15 dias*. Data de referência: *${when}*.`,
-        '',
-        'Verifique os bicos e lance a medição no sistema.',
-      ].join('\n'),
-      [
-        '🛠️ *Rotina metrológica*',
-        '',
-        header,
-        '',
-        'Hora de nova verificação dos bicos (intervalo de 15 dias).',
-        `Marcado para *${when}*.`,
-        '',
-        'Registre o resultado no Teu Posto.',
-      ].join('\n'),
-      [
-        '⛽ *Bicos sob controle*',
-        '',
-        header,
-        '',
-        `Passaram *15 dias* da última metrologia. Hoje: *${when}*.`,
-        '',
-        'Realize a verificação e atualize o histórico no app.',
-      ].join('\n'),
-      [
-        '📌 *Aviso Teu Posto — metrologia*',
-        '',
-        header,
-        '',
-        'O intervalo de 15 dias foi atingido.',
-        `Faça a metrologia e registre até *${when}* no sistema.`,
-      ].join('\n'),
-      [
-        '🔔 *Checklist operacional*',
-        '',
-        header,
-        '',
-        `Item do dia: *metrologia dos bicos* (${when}).`,
-        '',
-        'Após medir, lance no Teu Posto para manter a conformidade.',
-      ].join('\n'),
-      [
-        '🧪 *Precisão dos bicos*',
-        '',
-        header,
-        '',
-        'Lembrete quinzenal: nova verificação metrológica.',
-        `Data: *${when}*. Registre no Teu Posto.`,
-      ].join('\n'),
-      [
-        '📋 *Pendência de metrologia*',
-        '',
-        header,
-        '',
-        `Hoje (*${when}*) vence o ciclo de 15 dias da última medição.`,
-        '',
-        'Execute e anote no sistema.',
-      ].join('\n'),
-      [
-        '✅ *Mantenha a medição em dia*',
-        '',
-        header,
-        '',
-        'Já faz 15 dias da última metrologia.',
-        `Refaça a verificação e lance no Teu Posto (*${when}*).`,
-      ].join('\n'),
-      [
-        '📆 *Ciclo de 15 dias*',
-        '',
-        header,
-        '',
-        `Chegou a data (*${when}*) para nova metrologia dos bicos.`,
-        '',
-        'Faça a checagem e registre no app.',
-      ].join('\n'),
-    ],
-    seed,
-  )
-}
-
-function drainageMessage(posto: PostoRow, tankName: string, dueKey: string, seed: string) {
-  const header = postoHeader(posto.nome, posto.cnpj)
-  const when = formatDateKeyPtBr(dueKey)
-  return pick(
-    [
-      [
-        '🛢️ *DRENAGEM SEMANAL* — Teu Posto',
-        '',
-        header,
-        '',
-        `Completou *7 dias* desde a última drenagem do tanque *_${tankName}_*.`,
-        `📅 Vence hoje: *${when}*`,
-        '',
-        'Realize a drenagem e lance o relatório no sistema.',
-      ].join('\n'),
-      [
-        '💧 *Lembrete de drenagem*',
-        '',
-        header,
-        '',
-        `Tanque *_${tankName}_*: ciclo semanal vencendo em *${when}*.`,
-        '',
-        'Faça a drenagem e registre no Teu Posto.',
-      ].join('\n'),
-      [
-        '🛢️ *Rotina do tanque*',
-        '',
-        header,
-        '',
-        `Já se passaram 7 dias da drenagem de *_${tankName}_*.`,
-        `Data: *${when}*. Lance o relatório após executar.`,
-      ].join('\n'),
-      [
-        '📌 *Aviso operacional — drenagem*',
-        '',
-        header,
-        '',
-        `Pendente: drenagem do tanque *_${tankName}_* (hoje, ${when}).`,
-        '',
-        'Execute e atualize o histórico no app.',
-      ].join('\n'),
-      [
-        '🔔 *Checklist semanal*',
-        '',
-        header,
-        '',
-        `Item: drenagem de *_${tankName}_* — vencimento *${when}*.`,
-        '',
-        'Não pule a rotina: drene e registre.',
-      ].join('\n'),
-      [
-        '⚠️ *Prazo de drenagem*',
-        '',
-        header,
-        '',
-        `O tanque *_${tankName}_* completa 7 dias sem drenagem em *${when}*.`,
-        '',
-        'Realize o procedimento e lance no Teu Posto.',
-      ].join('\n'),
-      [
-        '📋 *Controle de tanques*',
-        '',
-        header,
-        '',
-        `*_${tankName}_* precisa de drenagem (ciclo de 7 dias — ${when}).`,
-        '',
-        'Após concluir, registre o relatório.',
-      ].join('\n'),
-      [
-        '✅ *Mantenha a drenagem em dia*',
-        '',
-        header,
-        '',
-        `Lembrete: tanque *_${tankName}_*, data *${when}*.`,
-        '',
-        'Drene e anote no Teu Posto.',
-      ].join('\n'),
-      [
-        '🗓️ *Ciclo de 7 dias*',
-        '',
-        header,
-        '',
-        `Chegou o dia da drenagem de *_${tankName}_* (${when}).`,
-        '',
-        'Execute e lance o relatório no sistema.',
-      ].join('\n'),
-      [
-        '📣 *Comunicado Teu Posto*',
-        '',
-        header,
-        '',
-        `Drenagem pendente no tanque *_${tankName}_* — *${when}*.`,
-        '',
-        'Faça agora e registre no app para manter o histórico.',
-      ].join('\n'),
-    ],
-    seed,
-  )
-}
-
-function raqMessage(posto: PostoRow, seed: string) {
-  const header = postoHeader(posto.nome, posto.cnpj)
-  return pick(
-    [
-      [
-        '🧪 *HORA DO RAQ!* — Teu Posto',
-        '',
-        header,
-        '',
-        'Lembrete a cada *2 dias*: registre o *RAQ* (análise de qualidade) no Teu Posto.',
-        '',
-        'Mantenha o histórico em dia.',
-      ].join('\n'),
-      [
-        '⛽ *Qualidade do combustível*',
-        '',
-        header,
-        '',
-        'Chegou o lembrete periódico do *RAQ*.',
-        '',
-        'Lance a análise de qualidade no sistema.',
-      ].join('\n'),
-      [
-        '📌 *Rotina RAQ*',
-        '',
-        header,
-        '',
-        'Aviso fixo (a cada 2 dias): hora de registrar o *RAQ*.',
-        '',
-        'Abra o Teu Posto e faça o lançamento.',
-      ].join('\n'),
-      [
-        '🔔 *Checklist de qualidade*',
-        '',
-        header,
-        '',
-        'Não esqueça o *RAQ* de hoje.',
-        '',
-        'Registre a análise no Teu Posto para manter a conformidade.',
-      ].join('\n'),
-      [
-        '🧴 *Análise de qualidade*',
-        '',
-        header,
-        '',
-        'Lembrete Teu Posto: execute e registre o *RAQ*.',
-        '',
-        'Intervalo padrão: a cada 2 dias.',
-      ].join('\n'),
-      [
-        '📋 *Pendência leve — RAQ*',
-        '',
-        header,
-        '',
-        'Hora de atualizar o histórico de *RAQ*.',
-        '',
-        'Lance no app assim que concluir a análise.',
-      ].join('\n'),
-      [
-        '✅ *Mantenha o RAQ em dia*',
-        '',
-        header,
-        '',
-        'Lembrete periódico: registre o *RAQ* no Teu Posto.',
-        '',
-        'Qualidade do combustível não espera.',
-      ].join('\n'),
-      [
-        '📣 *Comunicado operacional*',
-        '',
-        header,
-        '',
-        'Ciclo de 2 dias: novo registro de *RAQ*.',
-        '',
-        'Faça o lançamento no sistema.',
-      ].join('\n'),
-      [
-        '🗓️ *Agenda Teu Posto*',
-        '',
-        header,
-        '',
-        'Item recorrente: *RAQ* (análise de qualidade).',
-        '',
-        'Registre no app e mantenha o histórico limpo.',
-      ].join('\n'),
-      [
-        '🧪 *Controle RAQ*',
-        '',
-        header,
-        '',
-        'Aviso do Teu Posto: hora do *RAQ*.',
-        '',
-        'Execute a análise e lance no sistema.',
-      ].join('\n'),
-    ],
-    seed,
-  )
-}
-
-function subscriptionMessage(
-  posto: PostoRow,
-  daysLeft: number,
-  endsKey: string,
-  seed: string,
-) {
-  const when = formatDateKeyPtBr(endsKey)
-  const header = postoHeader(posto.nome, posto.cnpj)
-  const dayLabel = daysLeft === 1 ? '1 dia' : `${daysLeft} dias`
-  const recurring = posto.billing_mode === 'recurring'
-  const cta = recurring
-    ? 'Se a cobrança for no cartão, confira se os dados estão válidos. Em caso de falha, renove pelo app.'
-    : 'Renove pelo app com *PIX* ou *boleto* para manter o acesso completo.'
-
-  if (daysLeft <= 2) {
-    return pick(
-      [
-        [
-          '⏳ *Plano quase vencendo — Teu Posto*',
-          '',
-          header,
-          '',
-          `Faltam *${dayLabel}* para o fim do plano (*${when}*).`,
-          '',
-          cta,
-        ].join('\n'),
-        [
-          '🚨 *Atenção: renovação próxima*',
-          '',
-          header,
-          '',
-          `Seu plano Teu Posto vence em *${when}* (*${dayLabel}*).`,
-          '',
-          cta,
-        ].join('\n'),
-        [
-          '📌 *Últimos dias do plano*',
-          '',
-          header,
-          '',
-          `Vencimento em *${when}* — restam *${dayLabel}*.`,
-          '',
-          cta,
-        ].join('\n'),
-        [
-          '🔔 *Lembrete urgente de assinatura*',
-          '',
-          header,
-          '',
-          `O acesso completo termina em *${dayLabel}* (${when}).`,
-          '',
-          cta,
-        ].join('\n'),
-        [
-          '⚠️ *Renovação em breve*',
-          '',
-          header,
-          '',
-          `Plano ativo até *${when}* (*${dayLabel}*).`,
-          '',
-          cta,
-        ].join('\n'),
-        [
-          '🗓️ *Calendário Teu Posto*',
-          '',
-          header,
-          '',
-          `Faltam *${dayLabel}* para renovar (*${when}*).`,
-          '',
-          cta,
-        ].join('\n'),
-        [
-          '💬 *Aviso de vencimento do plano*',
-          '',
-          header,
-          '',
-          `Seu período de 30 dias fecha em *${when}*.`,
-          '',
-          cta,
-        ].join('\n'),
-        [
-          '📣 *Não perca o acesso*',
-          '',
-          header,
-          '',
-          `Restam *${dayLabel}* até o fim do plano (*${when}*).`,
-          '',
-          cta,
-        ].join('\n'),
-        [
-          '🧾 *Assinatura Teu Posto*',
-          '',
-          header,
-          '',
-          `Vencimento: *${when}* · *${dayLabel}* restantes.`,
-          '',
-          cta,
-        ].join('\n'),
-        [
-          '✅ *Hora de renovar*',
-          '',
-          header,
-          '',
-          `O plano vence em *${dayLabel}* (${when}).`,
-          '',
-          cta,
-        ].join('\n'),
-      ],
-      seed,
-    )
-  }
-
-  return pick(
-    [
-      [
-        '🔔 *Lembrete de renovação — Teu Posto*',
-        '',
-        header,
-        '',
-        `Seu plano vence em *${dayLabel}* (*${when}*).`,
-        '',
-        cta,
-      ].join('\n'),
-      [
-        '📅 *Plano: 7 dias restantes*',
-        '',
-        header,
-        '',
-        `Data de vencimento: *${when}*.`,
-        '',
-        cta,
-      ].join('\n'),
-      [
-        '💡 *Aviso antecipado de assinatura*',
-        '',
-        header,
-        '',
-        `Faltam *${dayLabel}* para o fim do período atual (*${when}*).`,
-        '',
-        cta,
-      ].join('\n'),
-      [
-        '🏪 *Teu Posto — renovação*',
-        '',
-        header,
-        '',
-        `O plano completo segue ativo até *${when}* (*${dayLabel}*).`,
-        '',
-        cta,
-      ].join('\n'),
-      [
-        '📋 *Lembrete de plano*',
-        '',
-        header,
-        '',
-        `Vencimento em *${when}* · restam *${dayLabel}*.`,
-        '',
-        cta,
-      ].join('\n'),
-      [
-        '⏳ *Assinatura próxima do fim*',
-        '',
-        header,
-        '',
-        `Ainda há *${dayLabel}* até *${when}*.`,
-        '',
-        cta,
-      ].join('\n'),
-      [
-        '📣 *Comunicado de renovação*',
-        '',
-        header,
-        '',
-        `Seu ciclo de 30 dias termina em *${when}*.`,
-        '',
-        cta,
-      ].join('\n'),
-      [
-        '🗓️ *Agenda financeira*',
-        '',
-        header,
-        '',
-        `Reserve a renovação: vence em *${dayLabel}* (${when}).`,
-        '',
-        cta,
-      ].join('\n'),
-      [
-        '💬 *WhatsApp Teu Posto*',
-        '',
-        header,
-        '',
-        `Lembrete: plano vence em *${when}* (*${dayLabel}*).`,
-        '',
-        cta,
-      ].join('\n'),
-      [
-        '✅ *Mantenha o acesso ativo*',
-        '',
-        header,
-        '',
-        `Faltam *${dayLabel}* para renovar (*${when}*).`,
-        '',
-        cta,
-      ].join('\n'),
-    ],
-    seed,
-  )
 }
 
 Deno.serve(async (req) => {
@@ -1173,7 +430,7 @@ Deno.serve(async (req) => {
     const { data: postos, error: postosError } = await admin
       .from('postos')
       .select(
-        'id, nome, cnpj, telefone, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4, aviso_whatsapp_5, subscription_status, subscription_ends_at, billing_mode',
+        'id, nome, cnpj, endereco, telefone, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4, aviso_whatsapp_5, subscription_status, subscription_ends_at, billing_mode',
       )
       .eq('subscription_status', 'active')
 
@@ -1193,7 +450,7 @@ Deno.serve(async (req) => {
         enqueued: 0,
         deferred: flushEmpty.deferred,
         pending_left: flushEmpty.pending_left,
-        zapi_connected: flushEmpty.zapi_connected,
+        meta_configured: flushEmpty.meta_configured,
         details: flushEmpty.details,
       })
     }
@@ -1212,21 +469,30 @@ Deno.serve(async (req) => {
 
       const milestone = `d${daysLeft}`
       const phones = collectAvisoPhones(posto)
-      const seed = `${posto.id}:subscription:${endsKey}:${milestone}:${todayKey}`
-      const ok = await enqueueReminder(admin, {
-        posto_id: posto.id,
-        category: 'subscription',
-        reference_id: endsKey,
-        milestone,
-        phones,
-        message: subscriptionMessage(posto, daysLeft, endsKey, seed),
-        due_on: todayKey,
-        meta: { days_left: daysLeft, billing_mode: posto.billing_mode ?? 'one_time' },
+      const tpl = assinaturaTemplate({
+        nome: posto.nome,
+        cnpj: posto.cnpj,
+        daysLeft,
+        endsKey,
       })
+      const ok = await enqueueReminder(
+        admin,
+        jobFromTemplate(
+          {
+            posto_id: posto.id,
+            category: 'subscription',
+            reference_id: endsKey,
+            milestone,
+            phones,
+            due_on: todayKey,
+          },
+          tpl,
+        ),
+      )
       if (ok) enqueued += 1
     }
 
-    // --- Documentos regulatórios ---
+    // --- Documentos regulatórios + laudos ---
     const [{ data: regulatory }, { data: workSafety }] = await Promise.all([
       admin
         .from('regulatory_documents')
@@ -1265,20 +531,30 @@ Deno.serve(async (req) => {
       const posto = postoById.get(doc.posto_id)
       if (!posto) continue
       const phones = collectAvisoPhones(posto)
-      const seed = `${doc.posto_id}:${doc.category}:${doc.id}:${milestone}:${todayKey}`
-      const ok = await enqueueReminder(admin, {
-        posto_id: doc.posto_id,
-        category: doc.category,
-        reference_id: doc.id,
-        milestone,
-        phones,
-        message: docMessage(posto, doc.title, daysLeft, doc.expires_at, seed),
-        due_on: todayKey,
+      const tpl = docTemplate({
+        nome: posto.nome,
+        docTitle: doc.title,
+        daysLeft,
+        expiresKey: doc.expires_at,
       })
+      const ok = await enqueueReminder(
+        admin,
+        jobFromTemplate(
+          {
+            posto_id: doc.posto_id,
+            category: doc.category,
+            reference_id: doc.id,
+            milestone,
+            phones,
+            due_on: todayKey,
+          },
+          tpl,
+        ),
+      )
       if (ok) enqueued += 1
     }
 
-    // --- Metrologia (hoje ou atrasado se Z-API estava offline) ---
+    // --- Metrologia ---
     const { data: metroRows } = await admin
       .from('nozzle_metrology_verifications')
       .select('posto_id, verified_at')
@@ -1300,20 +576,25 @@ Deno.serve(async (req) => {
 
       const milestone = `due:${dueKey}`
       const phones = collectAvisoPhones(posto as PostoRow)
-      const seed = `${posto.id}:metrology:${milestone}`
-      const ok = await enqueueReminder(admin, {
-        posto_id: posto.id,
-        category: 'metrology',
-        reference_id: 'posto',
-        milestone,
-        phones,
-        message: metrologyMessage(posto as PostoRow, dueKey, seed),
-        due_on: dueKey,
-      })
+      const tpl = metrologiaTemplate({ nome: (posto as PostoRow).nome, dueKey })
+      const ok = await enqueueReminder(
+        admin,
+        jobFromTemplate(
+          {
+            posto_id: posto.id,
+            category: 'metrology',
+            reference_id: 'posto',
+            milestone,
+            phones,
+            due_on: dueKey,
+          },
+          tpl,
+        ),
+      )
       if (ok) enqueued += 1
     }
 
-    // --- Drenagem (hoje ou atrasado) ---
+    // --- Drenagem ---
     const { data: tanks } = await admin
       .from('diesel_tanks')
       .select('id, name, posto_id, is_active')
@@ -1346,16 +627,25 @@ Deno.serve(async (req) => {
         const posto = postoById.get(tank.posto_id)
         if (!posto) continue
         const phones = collectAvisoPhones(posto)
-        const seed = `${tank.posto_id}:drainage:${tank.id}:${milestone}`
-        const ok = await enqueueReminder(admin, {
-          posto_id: tank.posto_id,
-          category: 'drainage',
-          reference_id: tank.id,
-          milestone,
-          phones,
-          message: drainageMessage(posto, tank.name, dueKey, seed),
-          due_on: dueKey,
+        const tpl = drenagemTemplate({
+          nome: posto.nome,
+          tankName: tank.name,
+          dueKey,
         })
+        const ok = await enqueueReminder(
+          admin,
+          jobFromTemplate(
+            {
+              posto_id: tank.posto_id,
+              category: 'drainage',
+              reference_id: tank.id,
+              milestone,
+              phones,
+              due_on: dueKey,
+            },
+            tpl,
+          ),
+        )
         if (ok) enqueued += 1
       }
     }
@@ -1379,17 +669,27 @@ Deno.serve(async (req) => {
       }
 
       const milestone = `day:${todayKey}`
-      const phones = collectAvisoPhones(posto as PostoRow)
-      const seed = `${posto.id}:raq:${milestone}`
-      const ok = await enqueueReminder(admin, {
-        posto_id: posto.id,
-        category: 'raq',
-        reference_id: 'periodic',
-        milestone,
-        phones,
-        message: raqMessage(posto as PostoRow, seed),
-        due_on: todayKey,
+      const row = posto as PostoRow
+      const phones = collectAvisoPhones(row)
+      const tpl = raqTemplate({
+        nome: row.nome,
+        cnpj: row.cnpj,
+        endereco: row.endereco,
       })
+      const ok = await enqueueReminder(
+        admin,
+        jobFromTemplate(
+          {
+            posto_id: posto.id,
+            category: 'raq',
+            reference_id: 'periodic',
+            milestone,
+            phones,
+            due_on: todayKey,
+          },
+          tpl,
+        ),
+      )
       if (ok) enqueued += 1
     }
 
@@ -1405,8 +705,7 @@ Deno.serve(async (req) => {
       api_calls: flush.apiCalls,
       deferred: flush.deferred,
       pending_left: flush.pending_left,
-      zapi_connected: flush.zapi_connected,
-      zapi_message: flush.zapi_message,
+      meta_configured: flush.meta_configured,
       send_delay_ms: SEND_DELAY_MS,
       max_sends_per_run: MAX_SENDS_PER_RUN,
       details: flush.details,

@@ -1,39 +1,37 @@
-# Lembretes operacionais (WhatsApp / Z-API)
+# Lembretes operacionais (WhatsApp / Meta Cloud API)
 
-Edge Function que envia avisos WhatsApp para os números `aviso_whatsapp_1..4` (ou `telefone` do posto).
+Edge Function que envia avisos WhatsApp (templates) para os números `aviso_whatsapp_1..5` (ou `telefone` do posto).
 
-## Fila e Z-API offline
+## Fila
 
-1. No horário do marco, o aviso entra em `whatsapp_reminder_queue` (mesmo se a Z-API estiver desconectada).
-2. Só sai da fila e vai para `whatsapp_reminder_sends` **depois** do envio com sucesso.
-3. Se a Z-API estiver offline, os itens ficam pendentes e são reenviados assim que a conexão voltar (próximo cron ou flush ao detectar Z-API conectada no login/admin).
+1. No horário do marco, o aviso entra em `whatsapp_reminder_queue` com `template_name` + `template_params`.
+2. Só sai da fila e vai para `whatsapp_reminder_sends` **depois** do envio com sucesso via Graph API.
+3. Se Meta não estiver configurada ou o envio falhar, os itens ficam pendentes até o próximo cron.
 
 ## O que envia
 
-| Tipo | Regra | Frequência do aviso |
+| Tipo | Template | Frequência |
 | --- | --- | --- |
-| Renovação de plano | `subscription_ends_at` | 7 e 2 dias antes do vencimento (PIX/boleto e recorrente) |
-| Documentos regulatórios | `expires_at` | 30, 15, 7, 1 dia antes e no dia (expirado) |
-| Laudos (PGR/LTCAT/PCMSO) | `expires_at` | Idem |
-| Metrologia | última `verified_at` + 15 dias | No dia do vencimento (reenvia se atrasou por Z-API offline) |
-| Drenagem diesel | última `drained_at` + 7 dias (por tanque) | Idem |
-| RAQ | calendário | a cada 2 dias (não agenda novo se já há RAQ pendente na fila) |
+| Renovação de plano | `aviso_assinatura_7d` / `aviso_assinatura_2d` | 7 e 2 dias antes |
+| Documentos / laudos | `aviso_doc_prazo` / `aviso_doc_vencido` | 30, 15, 7, 1, 0 |
+| Metrologia | `aviso_metrologia` | no dia do vencimento (15 dias) |
+| Drenagem diesel | `aviso_drenagem_diesel` | no dia do vencimento (7 dias) |
+| RAQ | `aviso_raq` | a cada 2 dias |
 
 Só postos com `subscription_status = active` e pelo menos um WhatsApp cadastrado.
-
-Anti-duplicata: `whatsapp_reminder_sends`. Fila: `whatsapp_reminder_queue`.
 
 ## Secrets
 
 | Secret | Uso |
 | --- | --- |
-| `WHATSAPP_WEBHOOK_URL` | Endpoint Z-API send-text |
-| `WHATSAPP_API_KEY` | Client-Token / Bearer |
-| `OPERATIONAL_CRON_SECRET` | Header `x-operational-cron-secret` (ou reutiliza `DRAINAGE_CRON_SECRET`) |
+| `META_WHATSAPP_TOKEN` | Token permanente Cloud API |
+| `META_WHATSAPP_PHONE_NUMBER_ID` | Phone number ID |
+| `META_GRAPH_API_VERSION` | Opcional (`v21.0`) |
+| `OPERATIONAL_CRON_SECRET` | Header `x-operational-cron-secret` |
 
 ## Cron
 
-Sugestão: a cada **1–2 horas** (não só 1x/dia), para descarregar a fila logo após a Z-API reconectar.
+Sugestão: a cada **1–2 horas**.
 
 ```http
 POST https://jilzklxnejztpphbryti.supabase.co/functions/v1/operational-reminders
@@ -42,7 +40,8 @@ x-operational-cron-secret: SEU_SECRETO
 
 ## Migration
 
-`supabase/migrations/20260806160000_whatsapp_reminder_queue.sql` (SQL Editor se `db push` não aplicar).
+- `supabase/migrations/20260806160000_whatsapp_reminder_queue.sql`
+- `supabase/migrations/20260812120000_whatsapp_queue_meta_templates.sql`
 
 ## Deploy
 

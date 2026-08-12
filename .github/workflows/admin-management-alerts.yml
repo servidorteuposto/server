@@ -1,7 +1,5 @@
-# Alertas do admin (cotas, Resend, domínio, Z-API) + flush da fila WhatsApp.
-# Roda a cada hora para detectar queda da Z-API rápido.
-# Cada tipo de alerta (cota, domínio, etc.) só envia 1x por dia.
-# Exceção: Z-API desconectada — se reconectar e cair de novo no mesmo dia, avisa outra vez.
+# Alertas do admin (cotas, Resend, domínio) + flush da fila WhatsApp (Meta).
+# Roda a cada hora. Cada tipo de alerta só envia 1x por dia (dedupe last_alerts).
 
 name: Admin management alerts
 

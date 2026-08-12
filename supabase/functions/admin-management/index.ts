@@ -5,9 +5,9 @@ import {
   collectAttentionReasons,
   daysUntilDate,
   fetchResendStats,
-  fetchZApiStatus,
   formatBytes,
   isAdminAccount,
+  isMetaWhatsAppConfigured,
   isNearLimit,
   isResendDailyNearLimit,
   normalizeQuotas,
@@ -159,27 +159,6 @@ async function runAlertCheck(admin: ReturnType<typeof createClient>) {
   return processManagementAlerts(admin)
 }
 
-/** Dispara a function de lembretes para descarregar a fila (Z-API reconectada). */
-async function triggerOperationalRemindersFlush() {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  const secret =
-    Deno.env.get('OPERATIONAL_CRON_SECRET') ?? Deno.env.get('DRAINAGE_CRON_SECRET')
-  if (!supabaseUrl || !secret) return
-
-  try {
-    await fetch(`${supabaseUrl}/functions/v1/operational-reminders`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-operational-cron-secret': secret,
-      },
-      body: '{}',
-    })
-  } catch (error) {
-    console.error('triggerOperationalRemindersFlush', error)
-  }
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -231,7 +210,6 @@ Deno.serve(async (req) => {
         { data: metrics, error: metricsError },
         { data: postos, error: postosError },
         resend,
-        zapi,
       ] = await Promise.all([
         admin.rpc('admin_management_metrics'),
         admin
@@ -241,7 +219,6 @@ Deno.serve(async (req) => {
           )
           .order('created_at', { ascending: false }),
         fetchResendStats(),
-        fetchZApiStatus(),
       ])
 
       if (metricsError) {
@@ -317,7 +294,10 @@ Deno.serve(async (req) => {
           inactive: inactive.length,
         },
         supabase: supabasePanel,
-        zapi,
+        whatsapp: {
+          configured: isMetaWhatsAppConfigured(),
+          provider: 'meta',
+        },
         resend: {
           configured: resend.configured,
           message: resend.message,
@@ -465,18 +445,13 @@ Deno.serve(async (req) => {
 
     if (action === 'get_attention') {
       const attention = await collectAttentionReasons(admin)
-      // Se a Z-API voltou, descarrega a fila de avisos que ficaram pendentes.
-      if (attention.zapi.configured && attention.zapi.connected) {
-        void triggerOperationalRemindersFlush()
-      }
       return jsonResponse({
         ok: true,
         needs_attention: attention.needs_attention,
         reasons: attention.reasons,
-        zapi: {
-          configured: attention.zapi.configured,
-          connected: attention.zapi.connected,
-          message: attention.zapi.message,
+        whatsapp: {
+          configured: isMetaWhatsAppConfigured(),
+          provider: 'meta',
         },
       })
     }

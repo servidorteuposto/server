@@ -5,8 +5,8 @@ Não dependem de login nem do botão “Verificar alertas”.
 
 | Workflow | Frequência | Function |
 | --- | --- | --- |
-| `operational-reminders.yml` | a cada 1 h | lembretes dos postos + fila Z-API |
-| `admin-management-alerts.yml` | a cada 6 h | cotas / domínio / Z-API do admin |
+| `operational-reminders.yml` | a cada 1 h | lembretes dos postos (Meta templates) |
+| `admin-management-alerts.yml` | a cada 1 h | cotas / domínio / Resend do admin |
 
 ## Secrets no GitHub (obrigatório)
 
