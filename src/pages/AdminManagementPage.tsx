@@ -9,6 +9,7 @@ import {
   listSecureFiles,
   runManagementAlertCheck,
   saveManagementSettings,
+  testManagementWhatsApp,
   unlockSecureFile,
   uploadSecureFile,
   type ManagementDashboard,
@@ -69,6 +70,7 @@ export default function AdminManagementPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [checking, setChecking] = useState(false)
+  const [testingWa, setTestingWa] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -182,6 +184,20 @@ export default function AdminManagementPage() {
       setError(err instanceof Error ? err.message : 'Falha na verificação.')
     } finally {
       setChecking(false)
+    }
+  }
+
+  async function handleTestWhatsApp() {
+    setTestingWa(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const result = await testManagementWhatsApp()
+      setSuccess(result.message || `Teste ${result.template ?? ''} enviado.`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha no teste de WhatsApp.')
+    } finally {
+      setTestingWa(false)
     }
   }
 
@@ -370,6 +386,20 @@ export default function AdminManagementPage() {
             <p className="admin-mgmt-hint">
               Avisos usam modelos Utilidade aprovados na WABA do número de produção.
             </p>
+            <div className="admin-mgmt-wa-test">
+              <button
+                type="button"
+                className="btn btn--primary"
+                disabled={testingWa || !dashboard.whatsapp?.configured}
+                onClick={() => void handleTestWhatsApp()}
+              >
+                {testingWa ? 'Enviando teste…' : 'Testar WhatsApp'}
+              </button>
+              <p className="admin-mgmt-hint">
+                Envia o modelo <code>aviso_raq</code> para o WhatsApp 1/2 salvos nas configurações
+                abaixo (mensagem marcada como TESTE).
+              </p>
+            </div>
           </section>
 
           <section className="admin-mgmt-section">

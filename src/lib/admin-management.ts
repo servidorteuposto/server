@@ -316,6 +316,28 @@ export async function runManagementAlertCheck() {
   return payload
 }
 
+export async function testManagementWhatsApp(phone?: string) {
+  const { payload, invokeFailed } = await invokeManagement<{
+    ok: boolean
+    message?: string
+    template?: string
+    results?: Array<{ phone: string; sent: boolean }>
+  }>({
+    action: 'test_whatsapp',
+    ...(phone?.trim() ? { phone: phone.trim() } : {}),
+  })
+
+  if (invokeFailed || !payload) {
+    throw new Error('Não foi possível disparar o teste de WhatsApp.')
+  }
+
+  if (!payload.ok) {
+    throw new Error(payload.message || 'Falha no teste de WhatsApp.')
+  }
+
+  return payload
+}
+
 export type ManagementAttention = {
   needs_attention: boolean
   reasons: Array<{ code: string; label: string }>

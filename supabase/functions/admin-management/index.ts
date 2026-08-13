@@ -18,6 +18,11 @@ import {
   type ManagementSettings,
 } from '../_shared/admin-management.ts'
 import {
+  normalizeWaPhone,
+  sendWhatsAppTemplate,
+} from '../_shared/meta-whatsapp.ts'
+import { raqTemplate } from '../_shared/whatsapp-templates.ts'
+import {
   deleteR2Object,
   isR2Configured,
   listR2UsageByPrefix,
@@ -459,6 +464,74 @@ Deno.serve(async (req) => {
     if (action === 'run_alert_check') {
       const result = await runAlertCheck(admin)
       return jsonResponse({ ok: true, ...result })
+    }
+
+    if (action === 'test_whatsapp') {
+      if (!isMetaWhatsAppConfigured()) {
+        return jsonResponse(
+          {
+            ok: false,
+            message:
+              'Meta WhatsApp não configurada. Defina META_WHATSAPP_TOKEN e META_WHATSAPP_PHONE_NUMBER_ID.',
+          },
+          400,
+        )
+      }
+
+      const settings = await loadSettings(admin)
+      const override =
+        typeof body?.phone === 'string' ? onlyDigits(body.phone) : ''
+      const candidates = override
+        ? [override]
+        : [settings.alert_whatsapp_1, settings.alert_whatsapp_2]
+
+      const phones = [
+        ...new Set(
+          candidates
+            .filter(Boolean)
+            .map((value) => normalizeWaPhone(String(value)))
+            .filter((value) => value.length >= 12 && value.length <= 15),
+        ),
+      ]
+
+      if (!phones.length) {
+        return jsonResponse(
+          {
+            ok: false,
+            message:
+              'Nenhum WhatsApp de alerta válido. Salve o WhatsApp 1/2 abaixo ou informe um número no teste.',
+          },
+          400,
+        )
+      }
+
+      const tpl = raqTemplate({
+        nome: 'TESTE Teu Posto',
+        cnpj: ADMIN_CNPJ_DIGITS,
+        endereco: 'Mensagem de teste enviada pelo painel Gerenciamento',
+      })
+
+      const results: Array<{ phone: string; sent: boolean }> = []
+      for (const phone of phones) {
+        const sent = await sendWhatsAppTemplate({
+          to: phone,
+          name: tpl.name,
+          language: tpl.language,
+          bodyParams: tpl.bodyParams,
+        })
+        results.push({ phone, sent })
+      }
+
+      const delivered = results.filter((row) => row.sent).length
+      return jsonResponse({
+        ok: delivered > 0,
+        message:
+          delivered > 0
+            ? `Teste enviado (${tpl.name}) para ${delivered} de ${phones.length} número(s).`
+            : `Falha ao enviar ${tpl.name}. Confira o modelo na WABA e os logs da function.`,
+        template: tpl.name,
+        results,
+      })
     }
 
     if (action === 'list_secure_files') {
