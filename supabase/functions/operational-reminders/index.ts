@@ -3,6 +3,7 @@ import {
   isMetaWhatsAppConfigured,
   normalizeWaPhone,
   sendWhatsAppTemplate,
+  type NamedBodyParam,
 } from '../_shared/meta-whatsapp.ts'
 import {
   assinaturaTemplate,
@@ -34,6 +35,13 @@ type PostoRow = {
   nome: string
   cnpj: string | null
   endereco: string | null
+  cep: string | null
+  logradouro: string | null
+  numero: string | null
+  complemento: string | null
+  bairro: string | null
+  cidade: string | null
+  uf: string | null
   telefone: string | null
   aviso_whatsapp_1: string | null
   aviso_whatsapp_2: string | null
@@ -53,8 +61,24 @@ type ReminderJob = {
   phones: string[]
   message: string
   template_name: string
-  template_params: string[]
+  template_params: NamedBodyParam[]
   due_on: string
+}
+
+function parseNamedBodyParams(raw: unknown): NamedBodyParam[] {
+  if (!Array.isArray(raw)) return []
+  const out: NamedBodyParam[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const name = typeof row.name === 'string' ? row.name.trim() : ''
+    if (!name) continue
+    out.push({
+      name,
+      text: typeof row.text === 'string' ? row.text : String(row.text ?? ''),
+    })
+  }
+  return out
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -80,6 +104,23 @@ function collectAvisoPhones(posto: PostoRow) {
     if (normalized.length >= 12 && normalized.length <= 15) unique.add(normalized)
   }
   return [...unique]
+}
+
+function formatPostoAddress(posto: PostoRow) {
+  const parts = [
+    posto.logradouro,
+    posto.numero,
+    posto.complemento,
+    posto.bairro,
+    posto.cidade,
+    posto.uf,
+    posto.cep,
+  ]
+    .map((part) => (typeof part === 'string' ? part.trim() : ''))
+    .filter(Boolean)
+  if (parts.length) return parts.join(', ')
+  if (typeof posto.endereco === 'string' && posto.endereco.trim()) return posto.endereco.trim()
+  return ''
 }
 
 function pad2(value: number) {
@@ -323,9 +364,24 @@ async function flushReminderQueue(admin: ReturnType<typeof createClient>, todayK
       continue
     }
 
-    const bodyParams = Array.isArray(row.template_params)
-      ? row.template_params.map((value: unknown) => String(value ?? ''))
-      : []
+    const bodyParams = parseNamedBodyParams(row.template_params)
+    if (!bodyParams.length) {
+      await admin
+        .from('whatsapp_reminder_queue')
+        .update({
+          attempts: Number(row.attempts ?? 0) + 1,
+          last_error: 'missing_named_template_params',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', row.id)
+      details.push({
+        id: row.id,
+        category: row.category,
+        sent: false,
+        error: 'missing_named_template_params',
+      })
+      continue
+    }
 
     let ok = false
     let lastError: string | null = null
@@ -430,7 +486,7 @@ Deno.serve(async (req) => {
     const { data: postos, error: postosError } = await admin
       .from('postos')
       .select(
-        'id, nome, cnpj, endereco, telefone, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4, aviso_whatsapp_5, subscription_status, subscription_ends_at, billing_mode',
+        'id, nome, cnpj, endereco, cep, logradouro, numero, complemento, bairro, cidade, uf, telefone, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4, aviso_whatsapp_5, subscription_status, subscription_ends_at, billing_mode',
       )
       .eq('subscription_status', 'active')
 
@@ -472,6 +528,7 @@ Deno.serve(async (req) => {
       const tpl = assinaturaTemplate({
         nome: posto.nome,
         cnpj: posto.cnpj,
+        endereco: formatPostoAddress(posto),
         daysLeft,
         endsKey,
       })
@@ -533,6 +590,8 @@ Deno.serve(async (req) => {
       const phones = collectAvisoPhones(posto)
       const tpl = docTemplate({
         nome: posto.nome,
+        cnpj: posto.cnpj,
+        endereco: formatPostoAddress(posto),
         docTitle: doc.title,
         daysLeft,
         expiresKey: doc.expires_at,
@@ -576,7 +635,12 @@ Deno.serve(async (req) => {
 
       const milestone = `due:${dueKey}`
       const phones = collectAvisoPhones(posto as PostoRow)
-      const tpl = metrologiaTemplate({ nome: (posto as PostoRow).nome, dueKey })
+      const tpl = metrologiaTemplate({
+        nome: (posto as PostoRow).nome,
+        cnpj: (posto as PostoRow).cnpj,
+        endereco: formatPostoAddress(posto as PostoRow),
+        dueKey,
+      })
       const ok = await enqueueReminder(
         admin,
         jobFromTemplate(
@@ -629,6 +693,8 @@ Deno.serve(async (req) => {
         const phones = collectAvisoPhones(posto)
         const tpl = drenagemTemplate({
           nome: posto.nome,
+          cnpj: posto.cnpj,
+          endereco: formatPostoAddress(posto),
           tankName: tank.name,
           dueKey,
         })
@@ -674,7 +740,7 @@ Deno.serve(async (req) => {
       const tpl = raqTemplate({
         nome: row.nome,
         cnpj: row.cnpj,
-        endereco: row.endereco,
+        endereco: formatPostoAddress(row),
       })
       const ok = await enqueueReminder(
         admin,

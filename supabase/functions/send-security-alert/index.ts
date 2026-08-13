@@ -178,9 +178,15 @@ Deno.serve(async (req) => {
         ? payloadObj.nome.trim()
         : 'Seu posto'
     const cnpj = typeof payloadObj.cnpj === 'string' ? payloadObj.cnpj : ''
+    const endereco =
+      typeof payloadObj.endereco === 'string' && payloadObj.endereco.trim()
+        ? payloadObj.endereco.trim()
+        : typeof payloadObj.address === 'string'
+          ? payloadObj.address
+          : ''
 
     const phones = collectPhones(phone, payloadObj)
-    const tpl = bloqueioTemplate(postoNome, cnpj)
+    const tpl = bloqueioTemplate(postoNome, cnpj, endereco)
     const emailHtml = buildSecurityAlertEmailHtml(postoNome, cnpj)
 
     const [emailSent, ...whatsappResults] = await Promise.all([

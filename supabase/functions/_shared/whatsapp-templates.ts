@@ -1,7 +1,9 @@
 /**
- * Nomes e ordem de variáveis dos modelos Meta (Utilidade / pt_BR).
- * Ajuste as constantes se o nome Ativo na WABA for diferente (ex.: truncado).
+ * Nomes e variáveis dos modelos Meta (Utilidade / pt_BR) — params NOMEADOS.
+ * Alinhado aos modelos ativos na WABA (prints ago/2026).
  */
+
+import { sanitizeWaParam, type NamedBodyParam } from './meta-whatsapp.ts'
 
 export const WA_LANG = 'pt_BR'
 
@@ -28,9 +30,13 @@ export const POSTO_TEMPLATES = {
 export type TemplatePayload = {
   name: string
   language: string
-  bodyParams: string[]
+  bodyParams: NamedBodyParam[]
   /** Resumo legível para log / coluna message da fila. */
   summary: string
+}
+
+function p(name: string, text: string | null | undefined): NamedBodyParam {
+  return { name, text: sanitizeWaParam(text) }
 }
 
 function formatCnpj(value: string | null | undefined) {
@@ -45,7 +51,11 @@ function formatDateKeyPtBr(dateKey: string) {
   return `${day}/${month}/${year}`
 }
 
-/** aviso_admin_db / aviso_admin_r2: {{1}}% {{2}}usado {{3}}cota */
+function formatEndereco(value: string | null | undefined) {
+  return sanitizeWaParam(value, 'nao informado')
+}
+
+/** aviso_admin_db / aviso_admin_r2: {{porcentagem}} {{um}} {{dois}} */
 export function adminDbOrR2Template(
   kind: 'db' | 'r2',
   pct: number,
@@ -57,12 +67,16 @@ export function adminDbOrR2Template(
   return {
     name,
     language: WA_LANG,
-    bodyParams: [pctStr, usedLabel, quotaLabel],
+    bodyParams: [
+      p('porcentagem', pctStr),
+      p('um', usedLabel),
+      p('dois', quotaLabel),
+    ],
     summary: `${name}: ${pctStr}% · ${usedLabel} / ${quotaLabel}`,
   }
 }
 
-/** aviso_admin_resend: {{1}}periodo {{2}}usados {{3}}limite {{4}}restantes */
+/** aviso_admin_resend: {{um}} {{dois}} {{tres}} {{quatro}} */
 export function adminResendTemplate(
   periodLabel: 'diaria' | 'mensal',
   used: number,
@@ -73,39 +87,45 @@ export function adminResendTemplate(
   return {
     name: ADMIN_TEMPLATES.resend,
     language: WA_LANG,
-    bodyParams: [period, String(used), String(quota), String(left)],
+    bodyParams: [
+      p('um', period),
+      p('dois', String(used)),
+      p('tres', String(quota)),
+      p('quatro', String(left)),
+    ],
     summary: `aviso_admin_resend: ${period} ${used}/${quota} (restam ${left})`,
   }
 }
 
-/** aviso_admin_dominio: {{1}}dias {{2}}data */
+/** aviso_admin_dominio: {{x}} {{y}} */
 export function adminDominioTemplate(daysLeft: number, expiresOn: string): TemplatePayload {
   const days = String(Math.max(0, daysLeft))
   const when = formatDateKeyPtBr(expiresOn)
   return {
     name: ADMIN_TEMPLATES.dominio,
     language: WA_LANG,
-    bodyParams: [days, when],
+    bodyParams: [p('x', days), p('y', when)],
     summary: `aviso_admin_dominio: ${days} dia(s) · ${when}`,
   }
 }
 
-/** aviso_bloqueio: {{1}}razao {{2}}cnpj */
-export function bloqueioTemplate(postoNome: string, cnpj: string | null | undefined): TemplatePayload {
+/** aviso_bloqueio: {{razao}} {{cnpj}} {{endereco}} */
+export function bloqueioTemplate(
+  postoNome: string,
+  cnpj: string | null | undefined,
+  endereco?: string | null,
+): TemplatePayload {
   const razao = postoNome.trim() || 'Posto'
   const cnpjFmt = formatCnpj(cnpj)
   return {
     name: POSTO_TEMPLATES.bloqueio,
     language: WA_LANG,
-    bodyParams: [razao, cnpjFmt],
+    bodyParams: [p('razao', razao), p('cnpj', cnpjFmt), p('endereco', formatEndereco(endereco))],
     summary: `aviso_bloqueio: ${razao} · ${cnpjFmt}`,
   }
 }
 
-/**
- * aviso_raq — alinhado ao texto sugerido:
- * {{1}} razao · {{2}} cnpj · {{3}} endereco
- */
+/** aviso_raq: {{razao}} {{cnpj}} {{endereco}} */
 export function raqTemplate(input: {
   nome: string
   cnpj: string | null | undefined
@@ -113,22 +133,23 @@ export function raqTemplate(input: {
 }): TemplatePayload {
   const razao = input.nome.trim() || 'Posto'
   const cnpjFmt = formatCnpj(input.cnpj)
-  const endereco = (input.endereco ?? '').trim() || '-'
   return {
     name: POSTO_TEMPLATES.raq,
     language: WA_LANG,
-    bodyParams: [razao, cnpjFmt, endereco],
+    bodyParams: [
+      p('razao', razao),
+      p('cnpj', cnpjFmt),
+      p('endereco', formatEndereco(input.endereco)),
+    ],
     summary: `aviso_raq: ${razao}`,
   }
 }
 
-/**
- * Assinatura 7d/2d — params genericos:
- * {{1}} razao · {{2}} cnpj · {{3}} dias · {{4}} data fim
- */
+/** aviso_assinatura_7d / 2d: {{razao}} {{cnpj}} {{endereco}} (dias fixos no texto do modelo) */
 export function assinaturaTemplate(input: {
   nome: string
   cnpj: string | null | undefined
+  endereco?: string | null
   daysLeft: number
   endsKey: string
 }): TemplatePayload {
@@ -136,22 +157,26 @@ export function assinaturaTemplate(input: {
     input.daysLeft <= 2 ? POSTO_TEMPLATES.assinatura2d : POSTO_TEMPLATES.assinatura7d
   const razao = input.nome.trim() || 'Posto'
   const cnpjFmt = formatCnpj(input.cnpj)
-  const days = String(input.daysLeft)
-  const when = formatDateKeyPtBr(input.endsKey)
   return {
     name,
     language: WA_LANG,
-    bodyParams: [razao, cnpjFmt, days, when],
-    summary: `${name}: ${razao} · ${days}d · ${when}`,
+    bodyParams: [
+      p('razao', razao),
+      p('cnpj', cnpjFmt),
+      p('endereco', formatEndereco(input.endereco)),
+    ],
+    summary: `${name}: ${razao} · ${input.daysLeft}d · ${formatDateKeyPtBr(input.endsKey)}`,
   }
 }
 
 /**
- * Doc prazo/vencido:
- * {{1}} razao · {{2}} documento · {{3}} dias · {{4}} data
+ * aviso_doc_prazo: {{razao}} {{cnpj}} {{endereco}} {{documento}} {{dias}}
+ * aviso_doc_vencido: {{razao}} {{cnpj}} {{endereco}} {{documento}}
  */
 export function docTemplate(input: {
   nome: string
+  cnpj?: string | null
+  endereco?: string | null
   docTitle: string
   daysLeft: number
   expiresKey: string
@@ -159,49 +184,63 @@ export function docTemplate(input: {
   const expired = input.daysLeft <= 0
   const name = expired ? POSTO_TEMPLATES.docVencido : POSTO_TEMPLATES.docPrazo
   const razao = input.nome.trim() || 'Posto'
+  const cnpjFmt = formatCnpj(input.cnpj)
   const doc = input.docTitle.trim() || 'Documento'
   const days = String(Math.max(0, input.daysLeft))
-  const when = formatDateKeyPtBr(input.expiresKey)
+  const bodyParams: NamedBodyParam[] = [
+    p('razao', razao),
+    p('cnpj', cnpjFmt),
+    p('endereco', formatEndereco(input.endereco)),
+    p('documento', doc),
+  ]
+  if (!expired) bodyParams.push(p('dias', days))
   return {
     name,
     language: WA_LANG,
-    bodyParams: [razao, doc, days, when],
-    summary: `${name}: ${doc} · ${days}d · ${when}`,
+    bodyParams,
+    summary: `${name}: ${doc} · ${days}d · ${formatDateKeyPtBr(input.expiresKey)}`,
   }
 }
 
-/**
- * Metrologia: {{1}} razao · {{2}} data
- */
+/** aviso_metrologia: {{razao}} {{cnpj}} {{endereco}} */
 export function metrologiaTemplate(input: {
   nome: string
+  cnpj?: string | null
+  endereco?: string | null
   dueKey: string
 }): TemplatePayload {
   const razao = input.nome.trim() || 'Posto'
-  const when = formatDateKeyPtBr(input.dueKey)
   return {
     name: POSTO_TEMPLATES.metrologia,
     language: WA_LANG,
-    bodyParams: [razao, when],
-    summary: `aviso_metrologia: ${razao} · ${when}`,
+    bodyParams: [
+      p('razao', razao),
+      p('cnpj', formatCnpj(input.cnpj)),
+      p('endereco', formatEndereco(input.endereco)),
+    ],
+    summary: `aviso_metrologia: ${razao} · ${formatDateKeyPtBr(input.dueKey)}`,
   }
 }
 
-/**
- * Drenagem: {{1}} razao · {{2}} tanque · {{3}} data
- */
+/** aviso_drenagem_diesel: {{razao}} {{cnpj}} {{endereco}} {{tanque}} */
 export function drenagemTemplate(input: {
   nome: string
+  cnpj?: string | null
+  endereco?: string | null
   tankName: string
   dueKey: string
 }): TemplatePayload {
   const razao = input.nome.trim() || 'Posto'
   const tank = input.tankName.trim() || 'Tanque'
-  const when = formatDateKeyPtBr(input.dueKey)
   return {
     name: POSTO_TEMPLATES.drenagem,
     language: WA_LANG,
-    bodyParams: [razao, tank, when],
-    summary: `aviso_drenagem_diesel: ${tank} · ${when}`,
+    bodyParams: [
+      p('razao', razao),
+      p('cnpj', formatCnpj(input.cnpj)),
+      p('endereco', formatEndereco(input.endereco)),
+      p('tanque', tank),
+    ],
+    summary: `aviso_drenagem_diesel: ${tank} · ${formatDateKeyPtBr(input.dueKey)}`,
   }
 }

@@ -20,12 +20,28 @@ export function isMetaWhatsAppConfigured() {
   )
 }
 
+/** Variável nomeada do corpo (ex.: {{razao}} → parameter_name: "razao"). */
+export type NamedBodyParam = {
+  name: string
+  text: string
+}
+
 export type SendTemplateInput = {
   to: string
   name: string
   language?: string
-  /** Valores na ordem de {{1}}, {{2}}, … do corpo do modelo. */
-  bodyParams?: string[]
+  /** Preferir parâmetros nomeados (WABA atual). */
+  bodyParams?: NamedBodyParam[]
+}
+
+/** Sanitiza texto para parâmetros Meta (sem quebra de linha; máx. 1024). */
+export function sanitizeWaParam(value: string | null | undefined, fallback = '-') {
+  const cleaned = String(value ?? '')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s{5,}/g, '    ')
+    .trim()
+  const text = cleaned || fallback
+  return text.length > 1024 ? `${text.slice(0, 1021)}...` : text
 }
 
 export async function sendWhatsAppTemplate(input: SendTemplateInput): Promise<boolean> {
@@ -41,13 +57,21 @@ export async function sendWhatsAppTemplate(input: SendTemplateInput): Promise<bo
   const to = normalizeWaPhone(input.to)
   if (to.length < 12 || to.length > 15) return false
 
-  const bodyParams = (input.bodyParams ?? []).map((value) => String(value ?? '').trim() || '-')
+  const bodyParams = (input.bodyParams ?? []).map((param) => ({
+    name: String(param.name ?? '').trim(),
+    text: sanitizeWaParam(param.text),
+  })).filter((param) => param.name.length > 0)
+
   const components =
     bodyParams.length > 0
       ? [
           {
             type: 'body',
-            parameters: bodyParams.map((text) => ({ type: 'text', text })),
+            parameters: bodyParams.map((param) => ({
+              type: 'text',
+              parameter_name: param.name,
+              text: param.text,
+            })),
           },
         ]
       : undefined
