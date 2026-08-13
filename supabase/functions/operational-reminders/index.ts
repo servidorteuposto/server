@@ -26,9 +26,9 @@ const SUBSCRIPTION_MILESTONES = [7, 2] as const
 const METROLOGY_INTERVAL_DAYS = 15
 const DRAINAGE_INTERVAL_DAYS = 7
 const RAQ_INTERVAL_DAYS = 2
-/** ~6 msgs/min */
-const SEND_DELAY_MS = 10_000
-const MAX_SENDS_PER_RUN = Number(Deno.env.get('OPERATIONAL_MAX_SENDS') ?? '40')
+/** ~6 msgs/min — lote curto para caber no wall-clock da Edge Function */
+const SEND_DELAY_MS = 3_000
+const MAX_SENDS_PER_RUN = Number(Deno.env.get('OPERATIONAL_MAX_SENDS') ?? '12')
 
 type PostoRow = {
   id: string

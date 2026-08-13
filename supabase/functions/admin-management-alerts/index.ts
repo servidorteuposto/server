@@ -20,18 +20,16 @@ async function triggerOperationalRemindersFlush() {
     Deno.env.get('OPERATIONAL_CRON_SECRET') ?? Deno.env.get('DRAINAGE_CRON_SECRET')
   if (!supabaseUrl || !secret) return
 
-  try {
-    await fetch(`${supabaseUrl}/functions/v1/operational-reminders`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-operational-cron-secret': secret,
-      },
-      body: '{}',
-    })
-  } catch (error) {
-    console.error('triggerOperationalRemindersFlush', error)
-  }
+  // Não aguarda o flush completo (pode estourar o wall-clock desta function).
+  // O workflow operational-reminders já roda sozinho a cada hora.
+  void fetch(`${supabaseUrl}/functions/v1/operational-reminders`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-operational-cron-secret': secret,
+    },
+    body: '{}',
+  }).catch((error) => console.error('triggerOperationalRemindersFlush', error))
 }
 
 Deno.serve(async (req) => {

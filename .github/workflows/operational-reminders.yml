@@ -12,6 +12,7 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Disparar operational-reminders
         env:
@@ -21,11 +22,20 @@ jobs:
             echo "Falta o secret OPERATIONAL_CRON_SECRET no GitHub."
             exit 1
           fi
-          code=$(curl -sS -o /tmp/cron-body.json -w "%{http_code}" -X POST \
+          code=$(curl -sS -o /tmp/cron-body.json -w "%{http_code}" --max-time 240 -X POST \
             "https://jilzklxnejztpphbryti.supabase.co/functions/v1/operational-reminders" \
             -H "Content-Type: application/json" \
             -H "x-operational-cron-secret: ${SECRET}" \
             -d '{}')
           echo "HTTP $code"
-          cat /tmp/cron-body.json
-          test "$code" = "200"
+          cat /tmp/cron-body.json || true
+          echo
+          if [ "$code" != "200" ]; then
+            echo "Falha ao chamar operational-reminders (HTTP $code)."
+            exit 1
+          fi
+          # Resposta JSON com ok:false ainda conta como falha operacional
+          if grep -q '"ok":false' /tmp/cron-body.json 2>/dev/null; then
+            echo "Function respondeu ok:false."
+            exit 1
+          fi

@@ -1,5 +1,6 @@
-# Alertas do admin (cotas, Resend, domínio) + flush da fila WhatsApp (Meta).
+# Alertas do admin (cotas, Resend, domínio).
 # Roda a cada hora. Cada tipo de alerta só envia 1x por dia (dedupe last_alerts).
+# A fila dos postos é do workflow Operational reminders (não bloqueia este).
 
 name: Admin management alerts
 
@@ -11,6 +12,7 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     steps:
       - name: Disparar admin-management-alerts
         env:
@@ -20,11 +22,15 @@ jobs:
             echo "Falta o secret ADMIN_MGMT_CRON_SECRET no GitHub."
             exit 1
           fi
-          code=$(curl -sS -o /tmp/cron-body.json -w "%{http_code}" -X POST \
+          code=$(curl -sS -o /tmp/cron-body.json -w "%{http_code}" --max-time 120 -X POST \
             "https://jilzklxnejztpphbryti.supabase.co/functions/v1/admin-management-alerts" \
             -H "Content-Type: application/json" \
             -H "x-admin-mgmt-cron-secret: ${SECRET}" \
             -d '{}')
           echo "HTTP $code"
-          cat /tmp/cron-body.json
-          test "$code" = "200"
+          cat /tmp/cron-body.json || true
+          echo
+          if [ "$code" != "200" ]; then
+            echo "Falha ao chamar admin-management-alerts (HTTP $code)."
+            exit 1
+          fi
