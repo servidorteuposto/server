@@ -58,6 +58,51 @@ type NozzleDraft = {
   displayBurned: boolean | null
 }
 
+type MetrologyComposerDraft = {
+  v: 1
+  savedAt: string
+  employeeName: string
+  quantityInput: string
+  sheetReady: boolean
+  nozzles: NozzleDraft[]
+}
+
+const DRAFT_KEY_PREFIX = 'teuposto_nozzle_metrology_draft:'
+
+function draftStorageKey(postoId: string) {
+  return `${DRAFT_KEY_PREFIX}${postoId}`
+}
+
+function isMeaningfulDraft(input: {
+  employeeName: string
+  sheetReady: boolean
+  nozzles: NozzleDraft[]
+}) {
+  if (input.employeeName.trim()) return true
+  if (input.sheetReady || input.nozzles.length > 0) return true
+  return false
+}
+
+function readComposerDraft(postoId: string): MetrologyComposerDraft | null {
+  try {
+    const raw = window.localStorage.getItem(draftStorageKey(postoId))
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as MetrologyComposerDraft
+    if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.nozzles)) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function writeComposerDraft(postoId: string, draft: MetrologyComposerDraft) {
+  window.localStorage.setItem(draftStorageKey(postoId), JSON.stringify(draft))
+}
+
+function clearComposerDraft(postoId: string) {
+  window.localStorage.removeItem(draftStorageKey(postoId))
+}
+
 function readGeolocation(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -121,6 +166,8 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
   const [photoCapturedAt, setPhotoCapturedAt] = useState<string | null>(null)
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [viewRow, setViewRow] = useState<NozzleMetrologyVerification | null>(null)
+  const [draftHydrated, setDraftHydrated] = useState(false)
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null)
 
   const loadPage = useCallback(async () => {
     setLoading(true)
@@ -140,6 +187,58 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
   useEffect(() => {
     void loadPage()
   }, [loadPage])
+
+  useEffect(() => {
+    if (!postoId || isReadOnly) {
+      setDraftHydrated(true)
+      return
+    }
+
+    const stored = readComposerDraft(postoId)
+    if (stored && isMeaningfulDraft(stored)) {
+      setEmployeeName(stored.employeeName)
+      setQuantityInput(stored.quantityInput || String(stored.nozzles.length || 1))
+      setSheetReady(stored.sheetReady && stored.nozzles.length > 0)
+      setNozzles(stored.nozzles)
+      setDraftSavedAt(stored.savedAt)
+    }
+    setDraftHydrated(true)
+  }, [postoId, isReadOnly])
+
+  useEffect(() => {
+    if (!draftHydrated || !postoId || isReadOnly) return
+
+    const payload = { employeeName, sheetReady, nozzles }
+    const timer = window.setTimeout(() => {
+      if (!isMeaningfulDraft(payload)) {
+        clearComposerDraft(postoId)
+        setDraftSavedAt(null)
+        return
+      }
+      const savedAt = new Date().toISOString()
+      writeComposerDraft(postoId, {
+        v: 1,
+        savedAt,
+        employeeName,
+        quantityInput,
+        sheetReady,
+        nozzles,
+      })
+      setDraftSavedAt(savedAt)
+    }, 400)
+
+    return () => window.clearTimeout(timer)
+  }, [draftHydrated, postoId, isReadOnly, employeeName, quantityInput, sheetReady, nozzles])
+
+  useEffect(() => {
+    const onLeave = () => persistDraftNow()
+    window.addEventListener('pagehide', onLeave)
+    window.addEventListener('beforeunload', onLeave)
+    return () => {
+      window.removeEventListener('pagehide', onLeave)
+      window.removeEventListener('beforeunload', onLeave)
+    }
+  })
 
   useEffect(() => {
     if (!composerOpen) return
@@ -175,6 +274,28 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
     return 'aprovado'
   }, [nozzleEvaluations])
 
+  const hasDraft = isMeaningfulDraft({ employeeName, sheetReady, nozzles })
+
+  function persistDraftNow() {
+    if (!postoId || isReadOnly) return
+    const payload = { employeeName, sheetReady, nozzles }
+    if (!isMeaningfulDraft(payload)) {
+      clearComposerDraft(postoId)
+      setDraftSavedAt(null)
+      return
+    }
+    const savedAt = new Date().toISOString()
+    writeComposerDraft(postoId, {
+      v: 1,
+      savedAt,
+      employeeName,
+      quantityInput,
+      sheetReady,
+      nozzles,
+    })
+    setDraftSavedAt(savedAt)
+  }
+
   function clearLivePhoto() {
     if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
     setPhotoFile(null)
@@ -198,11 +319,17 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
   }
 
   function openComposer() {
-    resetComposer()
     setComposerOpen(true)
   }
 
   function closeComposer() {
+    persistDraftNow()
+    setComposerOpen(false)
+  }
+
+  function discardDraft() {
+    if (postoId) clearComposerDraft(postoId)
+    setDraftSavedAt(null)
     resetComposer()
     setComposerOpen(false)
   }
@@ -309,7 +436,10 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
         }),
       })
       setHistory((current) => [saved, ...current.filter((row) => row.id !== saved.id)])
-      closeComposer()
+      if (postoId) clearComposerDraft(postoId)
+      setDraftSavedAt(null)
+      resetComposer()
+      setComposerOpen(false)
     } catch {
       setFormError('Não foi possível salvar a verificação. Tente novamente.')
     } finally {
@@ -336,12 +466,20 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
         </div>
         {!composerOpen && !isReadOnly && (
           <button type="button" className="reg-docs-page__add-btn" onClick={openComposer}>
-            Lançar verificação
+            {hasDraft ? 'Continuar rascunho' : 'Lançar verificação'}
           </button>
         )}
       </header>
 
       {pageError && <p className="reg-doc-form__error reg-docs-page__banner">{pageError}</p>}
+
+      {!composerOpen && !isReadOnly && hasDraft && (
+        <p className="nozzle-draft-banner" role="status">
+          Há um rascunho salvo
+          {draftSavedAt ? ` (${formatDateTimePtBr(draftSavedAt)})` : ''}. Você pode continuar de onde
+          parou — foto e assinatura precisam ser feitas de novo na hora de salvar.
+        </p>
+      )}
 
       {composerOpen && (
         <section className="diesel-panel nozzle-composer">
@@ -362,10 +500,29 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
                 mínima: pelo menos {FLOW_MIN_LITERS_LIMIT} L em {FLOW_MIN_TIME_LABEL}; máxima: pelo menos{' '}
                 {FLOW_MAX_LITERS_REQUIRED} L em {FLOW_MAX_TIME_LABEL}.
               </p>
+              {hasDraft && (
+                <p className="nozzle-draft-hint" role="status">
+                  Rascunho salvo automaticamente
+                  {draftSavedAt ? ` às ${formatDateTimePtBr(draftSavedAt)}` : ''}. Foto e assinatura
+                  não entram no rascunho.
+                </p>
+              )}
             </div>
-            <button type="button" className="btn btn--secondary" onClick={closeComposer} disabled={busy}>
-              Cancelar
-            </button>
+            <div className="nozzle-composer__actions">
+              {hasDraft && (
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={discardDraft}
+                  disabled={busy}
+                >
+                  Descartar rascunho
+                </button>
+              )}
+              <button type="button" className="btn btn--secondary" onClick={closeComposer} disabled={busy}>
+                Fechar
+              </button>
+            </div>
           </div>
 
           {!sheetReady ? (

@@ -27,6 +27,31 @@
   gap: 1rem;
 }
 
+.nozzle-composer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.nozzle-draft-banner,
+.nozzle-draft-hint {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.nozzle-draft-hint {
+  margin-top: 0.65rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.82rem;
+}
+
 .nozzle-qty {
   display: flex;
   flex-wrap: wrap;
