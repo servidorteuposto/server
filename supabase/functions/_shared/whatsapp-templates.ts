@@ -18,7 +18,7 @@ export const ADMIN_TEMPLATES = {
 /** Modelos enviados aos postos. */
 export const POSTO_TEMPLATES = {
   bloqueio: 'aviso_bloqueio',
-  raq: 'aviso_raq',
+  raq: 'aviso_raq1',
   assinatura7d: 'aviso_assinatura_7d',
   assinatura2d: 'aviso_assinatura_2d',
   drenagem: 'aviso_drenagem_diesel',
@@ -125,7 +125,7 @@ export function bloqueioTemplate(
   }
 }
 
-/** aviso_raq: {{razao}} {{cnpj}} {{endereco}} */
+/** aviso_raq1: {{razao}} {{cnpj}} {{endereco}} — periódico a cada 4 dias */
 export function raqTemplate(input: {
   nome: string
   cnpj: string | null | undefined
@@ -141,7 +141,7 @@ export function raqTemplate(input: {
       p('cnpj', cnpjFmt),
       p('endereco', formatEndereco(input.endereco)),
     ],
-    summary: `aviso_raq: ${razao}`,
+    summary: `aviso_raq1: ${razao}`,
   }
 }
 

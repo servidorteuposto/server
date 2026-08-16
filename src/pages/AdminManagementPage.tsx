@@ -396,7 +396,7 @@ export default function AdminManagementPage() {
                 {testingWa ? 'Enviando teste…' : 'Testar WhatsApp'}
               </button>
               <p className="admin-mgmt-hint">
-                Envia o modelo <code>aviso_raq</code> para o WhatsApp 1/2 salvos nas configurações
+                Envia o modelo <code>aviso_raq1</code> para o WhatsApp 1/2 salvos nas configurações
                 abaixo (mensagem marcada como TESTE).
               </p>
             </div>
