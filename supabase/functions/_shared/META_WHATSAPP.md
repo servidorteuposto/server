@@ -20,6 +20,7 @@ npm run supabase:deploy-admin-management-alerts
 npm run supabase:deploy-operational-reminders
 npm run supabase:deploy-alerts
 npm run supabase:deploy-drainage-reminders
+npm run supabase:deploy-metrology-alert
 ```
 
 ## Modelos admin (criar na WABA do número real)
@@ -29,4 +30,12 @@ npm run supabase:deploy-drainage-reminders
 - `aviso_admin_resend`
 - `aviso_admin_dominio`
 
-Textos e variáveis: ver plano / `whatsapp-templates.ts`.
+## Modelo posto — metrologia fora das especificações
+
+Nome na WABA: `aviso_metrologia_fora` (Utilidade / Portuguese (BR)), params **nomeados**:
+
+`combustivel`, `aspecto`, `cor`, `meobservada`, `temperatura`, `meconvertida`, `vazamento`, `mangueiras`, `lacres`, `display`, `data`, `razao`, `cnpj`, `endereco`
+
+Botão estático: **Acesse Teu Posto**.
+
+Enviado ao lançar verificação de bicos **reprovada** (um aviso por bico). Aspecto/cor/ME/temperatura vêm do último RAQ daquele combustível, se houver.

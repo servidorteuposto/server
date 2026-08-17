@@ -74,6 +74,19 @@ export type SaveNozzleMetrologyInput = {
 
 export { getMyPostoId }
 
+async function notifyMetrologyOutOfSpec(verificationId: string) {
+  try {
+    const { error } = await supabase.functions.invoke('send-metrology-alert', {
+      body: { verification_id: verificationId },
+    })
+    if (error) {
+      console.warn('notifyMetrologyOutOfSpec failed', error)
+    }
+  } catch (error) {
+    console.warn('notifyMetrologyOutOfSpec failed', error)
+  }
+}
+
 export async function listNozzleMetrologyVerifications(postoId: string) {
   const { data, error } = await supabase
     .from('nozzle_metrology_verifications')
@@ -108,6 +121,7 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
   const signaturePath = `${input.postoId}/${verificationId}/signature.${signaturePrepared.extension}`
   const photoPath = `${input.postoId}/${verificationId}/photo.${photoPrepared.extension}`
   const uploadedPaths = [signaturePath]
+  let saved: NozzleMetrologyVerification | undefined
 
   try {
     await uploadObject(
@@ -165,12 +179,17 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
     if (itemsError) throw itemsError
 
     const rows = await listNozzleMetrologyVerifications(input.postoId)
-    const saved = rows.find((row) => row.id === verificationId)
+    saved = rows.find((row) => row.id === verificationId)
     if (!saved) throw new Error('verification_not_found')
-    return saved
   } catch (error) {
     await removeObjects(NOZZLE_METROLOGY_STORAGE_BUCKET, uploadedPaths)
     await supabase.from('nozzle_metrology_verifications').delete().eq('id', verificationId)
     throw error
   }
+
+  if (!saved) throw new Error('verification_not_found')
+  if (saved.overall_status === 'reprovado') {
+    await notifyMetrologyOutOfSpec(saved.id)
+  }
+  return saved
 }
