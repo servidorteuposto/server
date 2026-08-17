@@ -1,5 +1,6 @@
 import {
   NOZZLE_METROLOGY_STORAGE_BUCKET,
+  type MetrologyItemStatus,
   type MetrologyStatus,
   type NozzleFuelKey,
 } from '../config/nozzle-metrology'
@@ -15,15 +16,15 @@ export type NozzleMetrologyItem = {
   nozzle_number: number
   fuel_product_key: NozzleFuelKey
   fuel_other_label: string | null
-  volumetry_min: number
-  volumetry_max: number
-  flow_min_liters: number
-  flow_max_liters: number
-  seals_ok: boolean
-  leakage: boolean
-  hose_ok: boolean
-  display_burned: boolean
-  item_status: MetrologyStatus
+  volumetry_min: number | null
+  volumetry_max: number | null
+  flow_min_liters: number | null
+  flow_max_liters: number | null
+  seals_ok: boolean | null
+  leakage: boolean | null
+  hose_ok: boolean | null
+  display_burned: boolean | null
+  item_status: MetrologyItemStatus
   created_at: string
 }
 
@@ -48,15 +49,15 @@ export type SaveNozzleMetrologyItemInput = {
   nozzleNumber: number
   fuelProductKey: NozzleFuelKey
   fuelOtherLabel: string | null
-  volumetryMin: number
-  volumetryMax: number
-  flowMinLiters: number
-  flowMaxLiters: number
-  sealsOk: boolean
-  leakage: boolean
-  hoseOk: boolean
-  displayBurned: boolean
-  itemStatus: MetrologyStatus
+  volumetryMin: number | null
+  volumetryMax: number | null
+  flowMinLiters: number | null
+  flowMaxLiters: number | null
+  sealsOk: boolean | null
+  leakage: boolean | null
+  hoseOk: boolean | null
+  displayBurned: boolean | null
+  itemStatus: MetrologyItemStatus
 }
 
 export type SaveNozzleMetrologyInput = {

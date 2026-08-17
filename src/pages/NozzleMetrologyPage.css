@@ -159,6 +159,22 @@
   color: #92400e;
 }
 
+.nozzle-card--maintenance {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.nozzle-maintenance-hint {
+  margin: 0;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  border: 1px dashed #94a3b8;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
 .nozzle-card__fuel {
   display: grid;
   gap: 0.4rem;

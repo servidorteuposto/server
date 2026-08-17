@@ -124,7 +124,7 @@ async function loadLatestRaqByProduct(
   productKeys: string[],
 ) {
   const map = new Map<string, MetrologyRaqSnapshot>()
-  const keys = [...new Set(productKeys.filter((key) => key && key !== 'outro'))]
+  const keys = [...new Set(productKeys.filter((key) => key && key !== 'outro' && key !== 'manutencao'))]
   if (!keys.length) return map
 
   const { data: reports } = await admin

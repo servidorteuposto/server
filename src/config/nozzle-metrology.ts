@@ -31,17 +31,24 @@ export const FLOW_MIN_TIME_LABEL = '1 minuto'
 export const FLOW_MAX_TIME_LABEL = '12 segundos'
 
 export type MetrologyStatus = 'aprovado' | 'reprovado'
+export type MetrologyItemStatus = MetrologyStatus | 'manutencao'
 
-export type NozzleFuelKey = FuelProductKey | 'outro'
+export type NozzleFuelKey = FuelProductKey | 'outro' | 'manutencao'
+
+export const NOZZLE_MAINTENANCE_KEY = 'manutencao' as const
 
 export const NOZZLE_FUEL_OPTIONS: { key: NozzleFuelKey; label: string }[] = [
   ...FUEL_PRODUCTS.map((product) => ({
     key: product.key as NozzleFuelKey,
     label: product.label,
   })),
-  { key: 'gnv', label: 'Gás Natural Veicular' },
+  { key: 'manutencao', label: 'Bico em manutenção' },
   { key: 'outro', label: 'Outro' },
 ]
+
+export function isMaintenanceFuel(key: string | null | undefined) {
+  return key === NOZZLE_MAINTENANCE_KEY
+}
 
 export const VOLUMETRY_OPTIONS: number[] = Array.from(
   { length: (VOLUMETRY_MAX - VOLUMETRY_MIN) / VOLUMETRY_STEP + 1 },
@@ -113,7 +120,7 @@ export function isFlowMaxApproved(liters: number) {
 }
 
 export type NozzleDraftEvaluation = {
-  status: MetrologyStatus | 'pendente'
+  status: MetrologyItemStatus | 'pendente'
   reasons: string[]
 }
 
@@ -131,6 +138,10 @@ export type NozzleDraftInput = {
 }
 
 export function evaluateNozzleDraft(input: NozzleDraftInput): NozzleDraftEvaluation {
+  if (isMaintenanceFuel(input.fuelProductKey)) {
+    return { status: 'manutencao', reasons: [] }
+  }
+
   const reasons: string[] = []
   const incomplete =
     !input.fuelProductKey ||
@@ -196,11 +207,13 @@ export function evaluateNozzleDraft(input: NozzleDraftInput): NozzleDraftEvaluat
 
 export function fuelLabel(key: NozzleFuelKey, otherLabel?: string | null) {
   if (key === 'outro') return otherLabel?.trim() || 'Outro'
+  if (key === 'gnv') return 'Gás Natural Veicular'
   return NOZZLE_FUEL_OPTIONS.find((option) => option.key === key)?.label ?? key
 }
 
-export function statusLabel(status: MetrologyStatus | 'pendente') {
+export function statusLabel(status: MetrologyItemStatus | 'pendente') {
   if (status === 'aprovado') return 'APROVADO'
   if (status === 'reprovado') return 'REPROVADO'
+  if (status === 'manutencao') return 'EM MANUTENÇÃO'
   return 'PENDENTE'
 }

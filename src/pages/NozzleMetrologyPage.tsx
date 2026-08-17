@@ -16,6 +16,7 @@ import {
   formatNozzleLabel,
   formatVolumetryLabel,
   fuelLabel,
+  isMaintenanceFuel,
   NOZZLE_FUEL_OPTIONS,
   NOZZLE_METROLOGY_MAX_NOZZLES,
   NOZZLE_METROLOGY_REGULATION,
@@ -23,6 +24,7 @@ import {
   VOLUMETRY_SPREAD_MAX_PERCENT,
   VOLUMETRY_TOLERANCE_MAX,
   VOLUMETRY_TOLERANCE_MIN,
+  type MetrologyItemStatus,
   type MetrologyStatus,
   type NozzleFuelKey,
 } from '../config/nozzle-metrology'
@@ -123,6 +125,16 @@ function parseLiters(raw: string): number | null {
   const value = Number(cleaned)
   if (!Number.isFinite(value) || value <= 0) return null
   return value
+}
+
+function dashText(value: string | number | null | undefined) {
+  if (value == null || value === '') return '—'
+  return String(value)
+}
+
+function boolLabel(value: boolean | null | undefined, yes: string, no: string) {
+  if (value == null) return '—'
+  return value ? yes : no
 }
 
 function createEmptyNozzle(nozzleNumber: number): NozzleDraft {
@@ -385,7 +397,7 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
     if (!postoId || isReadOnly || !sheetReady) return
 
     if (overallStatus === 'pendente') {
-      setFormError('Preencha todos os campos de todos os bicos antes de salvar.')
+      setFormError('Preencha todos os campos dos bicos com combustível antes de salvar.')
       return
     }
     if (!employeeName.trim()) {
@@ -423,15 +435,15 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
             fuelProductKey: nozzle.fuelProductKey as NozzleFuelKey,
             fuelOtherLabel:
               nozzle.fuelProductKey === 'outro' ? nozzle.fuelOtherLabel.trim() : null,
-            volumetryMin: nozzle.volumetryMin!,
-            volumetryMax: nozzle.volumetryMax!,
-            flowMinLiters: parseLiters(nozzle.flowMinLiters)!,
-            flowMaxLiters: parseLiters(nozzle.flowMaxLiters)!,
-            sealsOk: nozzle.sealsOk!,
-            leakage: nozzle.leakage!,
-            hoseOk: nozzle.hoseOk!,
-            displayBurned: nozzle.displayBurned!,
-            itemStatus: evaluation.status as MetrologyStatus,
+            volumetryMin: nozzle.volumetryMin,
+            volumetryMax: nozzle.volumetryMax,
+            flowMinLiters: parseLiters(nozzle.flowMinLiters),
+            flowMaxLiters: parseLiters(nozzle.flowMaxLiters),
+            sealsOk: nozzle.sealsOk,
+            leakage: nozzle.leakage,
+            hoseOk: nozzle.hoseOk,
+            displayBurned: nozzle.displayBurned,
+            itemStatus: evaluation.status as MetrologyItemStatus,
           }
         }),
       })
@@ -593,8 +605,12 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
               <div className="nozzle-cards">
                 {nozzles.map((nozzle, index) => {
                   const evaluation = nozzleEvaluations[index]
+                  const maintenance = isMaintenanceFuel(nozzle.fuelProductKey)
                   return (
-                    <article key={nozzle.id} className="nozzle-card">
+                    <article
+                      key={nozzle.id}
+                      className={`nozzle-card${maintenance ? ' nozzle-card--maintenance' : ''}`}
+                    >
                       <header className="nozzle-card__header">
                         <h3>{formatNozzleLabel(nozzle.nozzleNumber)}</h3>
                         <span className={`nozzle-badge nozzle-badge--${evaluation.status}`}>
@@ -640,6 +656,11 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
                           </label>
                         )}
                       </div>
+                      {maintenance && (
+                        <p className="nozzle-maintenance-hint">
+                          Bico em manutenção: o restante dos dados é opcional.
+                        </p>
+                      )}
 
                       <div className="nozzle-vol-grid">
                         <VolumetrySuggestField
@@ -996,31 +1017,36 @@ function VerificationDetailModal({
                 <div>
                   <dt>Volumetria mín / máx</dt>
                   <dd>
-                    {formatVolumetryLabel(item.volumetry_min)} /{' '}
-                    {formatVolumetryLabel(item.volumetry_max)}
+                    {item.volumetry_min == null && item.volumetry_max == null
+                      ? '—'
+                      : `${item.volumetry_min == null ? '—' : formatVolumetryLabel(item.volumetry_min)} / ${
+                          item.volumetry_max == null ? '—' : formatVolumetryLabel(item.volumetry_max)
+                        }`}
                   </dd>
                 </div>
                 <div>
                   <dt>Vazão mín / máx (L)</dt>
                   <dd>
-                    {item.flow_min_liters} / {item.flow_max_liters}
+                    {item.flow_min_liters == null && item.flow_max_liters == null
+                      ? '—'
+                      : `${dashText(item.flow_min_liters)} / ${dashText(item.flow_max_liters)}`}
                   </dd>
                 </div>
                 <div>
                   <dt>Lacres</dt>
-                  <dd>{item.seals_ok ? 'OK' : 'Não OK'}</dd>
+                  <dd>{boolLabel(item.seals_ok, 'OK', 'Não OK')}</dd>
                 </div>
                 <div>
                   <dt>Vazamento</dt>
-                  <dd>{item.leakage ? 'Sim' : 'Não'}</dd>
+                  <dd>{boolLabel(item.leakage, 'Sim', 'Não')}</dd>
                 </div>
                 <div>
                   <dt>Mangueira OK?</dt>
-                  <dd>{item.hose_ok ? 'Sim' : 'Não'}</dd>
+                  <dd>{boolLabel(item.hose_ok, 'Sim', 'Não')}</dd>
                 </div>
                 <div>
                   <dt>Display queimado?</dt>
-                  <dd>{item.display_burned ? 'Sim' : 'Não'}</dd>
+                  <dd>{boolLabel(item.display_burned, 'Sim', 'Não')}</dd>
                 </div>
               </dl>
             </article>

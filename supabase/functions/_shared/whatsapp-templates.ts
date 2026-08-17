@@ -235,6 +235,7 @@ const METROLOGY_FUEL_LABELS: Record<string, string> = {
   'diesel-s500-comum': 'Diesel S-500 Comum',
   'diesel-s500-aditivado': 'Diesel S-500 Aditivado',
   gnv: 'Gás Natural Veicular',
+  manutencao: 'Bico em manutenção',
 }
 
 export function metrologyFuelLabel(key: string, otherLabel?: string | null) {
