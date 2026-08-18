@@ -20,7 +20,7 @@ npm run supabase:deploy-admin-management-alerts
 npm run supabase:deploy-operational-reminders
 npm run supabase:deploy-alerts
 npm run supabase:deploy-drainage-reminders
-npm run supabase:deploy-metrology-alert
+npm run supabase:deploy-raq-alert
 ```
 
 ## Modelos admin (criar na WABA do número real)
@@ -30,12 +30,33 @@ npm run supabase:deploy-metrology-alert
 - `aviso_admin_resend`
 - `aviso_admin_dominio`
 
-## Modelo posto — metrologia fora das especificações
+## Modelo posto — RAQ fora das especificações
 
-Nome na WABA: `aviso_metrologia_fora` (Utilidade / Portuguese (BR)), params **nomeados**:
+Nome na WABA: `aviso_raq_fora` (Utilidade / Portuguese (BR)), params **nomeados**.
 
-`combustivel`, `aspecto`, `cor`, `meobservada`, `temperatura`, `meconvertida`, `vazamento`, `mangueiras`, `lacres`, `display`, `data`, `razao`, `cnpj`, `endereco`
+Cabeçalho (texto): `Teu Posto:`
 
-Botão estático: **Acesse Teu Posto**.
+Corpo:
 
-Enviado ao lançar verificação de bicos **reprovada** (um aviso por bico). Aspecto/cor/ME/temperatura vêm do último RAQ daquele combustível, se houver.
+```
+A metrologia acusou uma medida do combustível {{combustivel}} fora das especificações!
+
+Dados completos:
+Aspecto: {{aspecto}}
+Cor: {{cor}}
+ME Observada: {{meobservada}}
+Temperatura: {{temperatura}}
+ME Convertida 20°C: {{meconvertida}}
+Data da verificação: {{data}}
+Razão Social: {{razao}}
+CNPJ: {{cnpj}}
+Endereço: {{endereco}}
+
+Verifique os dados do seu combustível.
+```
+
+Variáveis: `combustivel`, `aspecto`, `cor`, `meobservada`, `temperatura`, `meconvertida`, `data`, `razao`, `cnpj`, `endereco`
+
+Botão URL estático: **Acesse Teu Posto** → `https://www.appteuposto.com.br`
+
+Enviado ao lançar análise do RAQ com status **Fora das Especificações** (um aviso por combustível inapto).

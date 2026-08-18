@@ -13,5 +13,5 @@ verify_jwt = true
 [functions.admin-management-alerts]
 verify_jwt = false
 
-[functions.send-metrology-alert]
+[functions.send-raq-alert]
 verify_jwt = true

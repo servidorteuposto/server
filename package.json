@@ -21,11 +21,11 @@
     "supabase:deploy-mp-billing": "npx supabase functions deploy mercadopago-billing --project-ref jilzklxnejztpphbryti --use-api",
     "supabase:deploy-r2-storage": "npx supabase functions deploy r2-storage --project-ref jilzklxnejztpphbryti --no-verify-jwt --use-api",
     "supabase:deploy-admin-management": "npx supabase functions deploy admin-management --project-ref jilzklxnejztpphbryti --use-api",
-    "supabase:deploy-metrology-alert": "npx supabase functions deploy send-metrology-alert --project-ref jilzklxnejztpphbryti --use-api",
+    "supabase:deploy-raq-alert": "npx supabase functions deploy send-raq-alert --project-ref jilzklxnejztpphbryti --use-api",
     "supabase:set-r2-secrets": "powershell -ExecutionPolicy Bypass -File scripts/set-r2-secrets.ps1",
     "storage:migrate-r2": "node scripts/migrate-supabase-storage-to-r2.mjs",
     "storage:cleanup-supabase": "node scripts/migrate-supabase-storage-to-r2.mjs --cleanup",
-    "supabase:deploy-functions": "npm run supabase:deploy-auth && npm run supabase:deploy-alerts && npm run supabase:deploy-support-admin && npm run supabase:deploy-drainage-reminders && npm run supabase:deploy-operational-reminders && npm run supabase:deploy-admin-ops && npm run supabase:deploy-mp-checkout && npm run supabase:deploy-mp-webhook && npm run supabase:deploy-mp-billing && npm run supabase:deploy-r2-storage && npm run supabase:deploy-admin-management && npm run supabase:deploy-metrology-alert"
+    "supabase:deploy-functions": "npm run supabase:deploy-auth && npm run supabase:deploy-alerts && npm run supabase:deploy-support-admin && npm run supabase:deploy-drainage-reminders && npm run supabase:deploy-operational-reminders && npm run supabase:deploy-admin-ops && npm run supabase:deploy-mp-checkout && npm run supabase:deploy-mp-webhook && npm run supabase:deploy-mp-billing && npm run supabase:deploy-r2-storage && npm run supabase:deploy-admin-management && npm run supabase:deploy-raq-alert"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",

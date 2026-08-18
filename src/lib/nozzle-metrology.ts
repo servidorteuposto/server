@@ -75,19 +75,6 @@ export type SaveNozzleMetrologyInput = {
 
 export { getMyPostoId }
 
-async function notifyMetrologyOutOfSpec(verificationId: string) {
-  try {
-    const { error } = await supabase.functions.invoke('send-metrology-alert', {
-      body: { verification_id: verificationId },
-    })
-    if (error) {
-      console.warn('notifyMetrologyOutOfSpec failed', error)
-    }
-  } catch (error) {
-    console.warn('notifyMetrologyOutOfSpec failed', error)
-  }
-}
-
 export async function listNozzleMetrologyVerifications(postoId: string) {
   const { data, error } = await supabase
     .from('nozzle_metrology_verifications')
@@ -189,8 +176,5 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
   }
 
   if (!saved) throw new Error('verification_not_found')
-  if (saved.overall_status === 'reprovado') {
-    await notifyMetrologyOutOfSpec(saved.id)
-  }
   return saved
 }

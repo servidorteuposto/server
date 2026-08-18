@@ -4,11 +4,7 @@ import {
   normalizeWaPhone,
   sendWhatsAppTemplate,
 } from '../_shared/meta-whatsapp.ts'
-import {
-  metrologiaForaTemplate,
-  type MetrologyOutOfSpecItem,
-  type MetrologyRaqSnapshot,
-} from '../_shared/whatsapp-templates.ts'
+import { raqForaTemplate, type RaqOutOfSpecItem } from '../_shared/whatsapp-templates.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,22 +12,12 @@ const corsHeaders = {
 }
 
 const TIME_ZONE = 'America/Sao_Paulo'
-const CATEGORY = 'metrology_out_of_spec'
+const CATEGORY = 'raq_out_of_spec'
 const SEND_DELAY_MS = 800
 const MAX_SENDS = 12
 
 type PostoRow = {
   id: string
-  nome: string
-  cnpj: string | null
-  endereco: string | null
-  cep: string | null
-  logradouro: string | null
-  numero: string | null
-  complemento: string | null
-  bairro: string | null
-  cidade: string | null
-  uf: string | null
   telefone: string | null
   aviso_whatsapp_1: string | null
   aviso_whatsapp_2: string | null
@@ -79,23 +65,6 @@ function formatSaoPauloDate(iso: string) {
   return `${day}/${month}/${year}`
 }
 
-function formatPostoAddress(posto: PostoRow) {
-  const parts = [
-    posto.logradouro,
-    posto.numero,
-    posto.complemento,
-    posto.bairro,
-    posto.cidade,
-    posto.uf,
-    posto.cep,
-  ]
-    .map((part) => (typeof part === 'string' ? part.trim() : ''))
-    .filter(Boolean)
-  if (parts.length) return parts.join(', ')
-  if (typeof posto.endereco === 'string' && posto.endereco.trim()) return posto.endereco.trim()
-  return ''
-}
-
 function collectAvisoPhones(posto: PostoRow) {
   const avisos = [
     posto.aviso_whatsapp_1,
@@ -114,57 +83,8 @@ function collectAvisoPhones(posto: PostoRow) {
   return [...unique]
 }
 
-function milestoneFor(nozzleNumber: number) {
-  return `fora:${nozzleNumber}`
-}
-
-async function loadLatestRaqByProduct(
-  admin: ReturnType<typeof createClient>,
-  postoId: string,
-  productKeys: string[],
-) {
-  const map = new Map<string, MetrologyRaqSnapshot>()
-  const keys = [...new Set(productKeys.filter((key) => key && key !== 'outro' && key !== 'manutencao'))]
-  if (!keys.length) return map
-
-  const { data: reports } = await admin
-    .from('fuel_analysis_reports')
-    .select('id, submitted_at')
-    .eq('posto_id', postoId)
-    .order('submitted_at', { ascending: false })
-    .limit(40)
-
-  const reportIds = (reports ?? []).map((row) => row.id as string)
-  if (!reportIds.length) return map
-
-  const { data: items } = await admin
-    .from('fuel_analysis_items')
-    .select(
-      'report_id, product_key, aspecto, cor, temperatura_observada, massa_especifica_observada, massa_especifica_convertida',
-    )
-    .in('report_id', reportIds)
-    .in('product_key', keys)
-
-  const reportOrder = new Map(reportIds.map((id, index) => [id, index]))
-  const rows = [...(items ?? [])].sort((a, b) => {
-    const aOrder = reportOrder.get(a.report_id as string) ?? 999
-    const bOrder = reportOrder.get(b.report_id as string) ?? 999
-    return aOrder - bOrder
-  })
-
-  for (const row of rows) {
-    const key = String(row.product_key ?? '')
-    if (!key || map.has(key)) continue
-    map.set(key, {
-      aspecto: row.aspecto,
-      cor: row.cor,
-      temperatura_observada: row.temperatura_observada,
-      massa_especifica_observada: row.massa_especifica_observada,
-      massa_especifica_convertida: row.massa_especifica_convertida,
-    })
-  }
-
-  return map
+function milestoneFor(productKey: string) {
+  return `fora:${productKey}`
 }
 
 Deno.serve(async (req) => {
@@ -206,16 +126,15 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}))
-    const verificationId =
-      typeof body?.verification_id === 'string' ? body.verification_id.trim() : ''
-    if (!verificationId) {
-      return jsonResponse({ ok: false, message: 'Informe a verificação.' }, 400)
+    const reportId = typeof body?.report_id === 'string' ? body.report_id.trim() : ''
+    if (!reportId) {
+      return jsonResponse({ ok: false, message: 'Informe o relatório.' }, 400)
     }
 
     const { data: postoRow } = await admin
       .from('postos')
       .select(
-        'id, nome, cnpj, endereco, cep, logradouro, numero, complemento, bairro, cidade, uf, telefone, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4, aviso_whatsapp_5',
+        'id, telefone, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4, aviso_whatsapp_5',
       )
       .eq('user_id', user.id)
       .maybeSingle()
@@ -226,77 +145,66 @@ Deno.serve(async (req) => {
 
     const posto = postoRow as PostoRow
 
-    const { data: verification, error: verificationError } = await admin
-      .from('nozzle_metrology_verifications')
-      .select('id, posto_id, overall_status, verified_at')
-      .eq('id', verificationId)
+    const { data: report, error: reportError } = await admin
+      .from('fuel_analysis_reports')
+      .select('id, posto_id, razao_social, cnpj, endereco, submitted_at')
+      .eq('id', reportId)
       .eq('posto_id', posto.id)
       .maybeSingle()
 
-    if (verificationError) throw verificationError
-    if (!verification) {
-      return jsonResponse({ ok: false, message: 'Verificação não encontrada.' }, 404)
-    }
-    if (verification.overall_status !== 'reprovado') {
-      return jsonResponse({ ok: true, skipped: 'approved' })
+    if (reportError) throw reportError
+    if (!report) {
+      return jsonResponse({ ok: false, message: 'Relatório não encontrado.' }, 404)
     }
 
     const { data: itemRows, error: itemsError } = await admin
-      .from('nozzle_metrology_items')
+      .from('fuel_analysis_items')
       .select(
-        'nozzle_number, fuel_product_key, fuel_other_label, item_status, seals_ok, leakage, hose_ok, display_burned',
+        'product_key, aspecto, cor, temperatura_observada, massa_especifica_observada, massa_especifica_convertida, densidade_status, photo_captured_at',
       )
-      .eq('verification_id', verificationId)
-      .eq('posto_id', posto.id)
-      .eq('item_status', 'reprovado')
-      .order('nozzle_number', { ascending: true })
+      .eq('report_id', reportId)
+      .eq('densidade_status', 'inapto')
 
     if (itemsError) throw itemsError
 
-    const failed = (itemRows ?? []) as MetrologyOutOfSpecItem[]
+    const failed = (itemRows ?? []) as Array<RaqOutOfSpecItem & { photo_captured_at?: string | null }>
     if (!failed.length) {
       return jsonResponse({ ok: true, skipped: 'no_failed_items' })
     }
 
     const phones = collectAvisoPhones(posto)
     if (!phones.length) {
-      return jsonResponse({ ok: true, skipped: 'no_phones', template: 'aviso_metrologia_fora' })
+      return jsonResponse({ ok: true, skipped: 'no_phones', template: 'aviso_raq_fora' })
     }
 
-    const raqByProduct = await loadLatestRaqByProduct(
-      admin,
-      posto.id,
-      failed.map((item) => item.fuel_product_key),
-    )
-
     const todayKey = saoPauloTodayKey()
-    const dataVerificacao = formatSaoPauloDate(String(verification.verified_at ?? new Date().toISOString()))
-    const endereco = formatPostoAddress(posto)
     const metaConfigured = isMetaWhatsAppConfigured()
     let apiCalls = 0
     let deliveredJobs = 0
     let queuedJobs = 0
 
     for (const item of failed) {
-      const milestone = milestoneFor(item.nozzle_number)
+      const milestone = milestoneFor(item.product_key)
       const { data: already } = await admin
         .from('whatsapp_reminder_sends')
         .select('id')
         .eq('posto_id', posto.id)
         .eq('category', CATEGORY)
-        .eq('reference_id', verificationId)
+        .eq('reference_id', reportId)
         .eq('milestone', milestone)
         .maybeSingle()
 
       if (already?.id) continue
 
-      const tpl = metrologiaForaTemplate({
-        nome: posto.nome,
-        cnpj: posto.cnpj,
-        endereco,
+      const dataVerificacao = formatSaoPauloDate(
+        String(item.photo_captured_at || report.submitted_at || new Date().toISOString()),
+      )
+      const tpl = raqForaTemplate({
+        nome: report.razao_social,
+        cnpj: report.cnpj,
+        endereco: report.endereco,
         data: dataVerificacao,
         item,
-        raq: raqByProduct.get(item.fuel_product_key) ?? null,
       })
 
       async function enqueueRetry(lastError: string) {
@@ -305,7 +213,7 @@ Deno.serve(async (req) => {
           {
             posto_id: posto.id,
             category: CATEGORY,
-            reference_id: verificationId,
+            reference_id: reportId,
             milestone,
             message: tpl.summary,
             template_name: tpl.name,
@@ -343,19 +251,19 @@ Deno.serve(async (req) => {
         const { error: markError } = await admin.from('whatsapp_reminder_sends').insert({
           posto_id: posto.id,
           category: CATEGORY,
-          reference_id: verificationId,
+          reference_id: reportId,
           milestone,
           sent_on: todayKey,
         })
         if (markError && !String(markError.message ?? '').includes('duplicate')) {
-          console.error('send-metrology-alert markSent failed', markError)
+          console.error('send-raq-alert markSent failed', markError)
         }
         await admin
           .from('whatsapp_reminder_queue')
           .delete()
           .eq('posto_id', posto.id)
           .eq('category', CATEGORY)
-          .eq('reference_id', verificationId)
+          .eq('reference_id', reportId)
           .eq('milestone', milestone)
       } else {
         await enqueueRetry('whatsapp_send_failed')
@@ -364,14 +272,14 @@ Deno.serve(async (req) => {
 
     return jsonResponse({
       ok: true,
-      template: 'aviso_metrologia_fora',
-      failed_nozzles: failed.length,
+      template: 'aviso_raq_fora',
+      failed_products: failed.length,
       targets: phones.length,
       delivered_jobs: deliveredJobs,
       queued_jobs: queuedJobs,
     })
   } catch (error) {
-    console.error('send-metrology-alert error', error)
-    return jsonResponse({ ok: false, message: 'Erro ao enviar aviso de metrologia.' }, 500)
+    console.error('send-raq-alert error', error)
+    return jsonResponse({ ok: false, message: 'Erro ao enviar aviso de RAQ.' }, 500)
   }
 })

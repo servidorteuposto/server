@@ -260,6 +260,19 @@ export async function getFuelFileUrl(path: string) {
   return getSignedObjectUrl(FUEL_ANALYSES_STORAGE_BUCKET, path, 60 * 60)
 }
 
+async function notifyRaqOutOfSpec(reportId: string) {
+  try {
+    const { error } = await supabase.functions.invoke('send-raq-alert', {
+      body: { report_id: reportId },
+    })
+    if (error) {
+      console.warn('notifyRaqOutOfSpec failed', error)
+    }
+  } catch (error) {
+    console.warn('notifyRaqOutOfSpec failed', error)
+  }
+}
+
 export async function saveFuelAnalysisReport(input: SaveFuelAnalysisReportInput) {
   const reportId = crypto.randomUUID()
   const uploadedPaths: string[] = []
@@ -362,10 +375,13 @@ export async function saveFuelAnalysisReport(input: SaveFuelAnalysisReportInput)
       const { error } = await supabase.from('fuel_analysis_items').insert(analysisRows)
       if (error) throw error
     }
-
-    return reportId
   } catch (error) {
     await removeStorageObjects(uploadedPaths)
     throw error
   }
+
+  if (input.analysisItems.some((item) => item.densidadeStatus === 'inapto')) {
+    await notifyRaqOutOfSpec(reportId)
+  }
+  return reportId
 }
