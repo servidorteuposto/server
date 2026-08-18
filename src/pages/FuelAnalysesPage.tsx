@@ -9,6 +9,7 @@ import {
   formatDateTimePtBr,
   formatRaqVolumeLabel,
   FUEL_PRODUCT_LABELS,
+  isFuelProductKey,
   isRaqVolumePreset,
   productAlcoholKind,
   productHasAlcoholContent,
@@ -45,6 +46,14 @@ import {
   type RaqItemInput,
 } from '../lib/fuel-analyses'
 import { listPartners, type PostoPartner } from '../lib/partners'
+import {
+  clearLocalFormDraft,
+  deletePostoFormDraft,
+  POSTO_FORM_DRAFT_KINDS,
+  resolvePostoFormDraft,
+  savePostoFormDraft,
+  writeLocalFormDraft,
+} from '../lib/posto-form-drafts'
 import {
   buildRaqPdfFileName,
   downloadRaqPdf,
@@ -133,6 +142,99 @@ function emptyAnalysis(): AnalysisDraft {
     photoLongitude: null,
     photoCapturedAt: null,
     photoError: null,
+  }
+}
+
+type AnalysisDraftStored = Omit<
+  AnalysisDraft,
+  'photoFile' | 'photoPreviewUrl' | 'photoLatitude' | 'photoLongitude' | 'photoCapturedAt' | 'photoError'
+>
+
+type FuelRaqComposerDraft = {
+  v: 1
+  savedAt: string
+  authorName: string
+  launchProductKeys: FuelProductKey[]
+  raqDrafts: Partial<Record<FuelProductKey, RaqDraft>>
+  analysisDrafts: Partial<Record<FuelProductKey, AnalysisDraftStored>>
+  openRaq: FuelProductKey | null
+  openAnalysis: FuelProductKey | null
+}
+
+const DRAFT_KIND = POSTO_FORM_DRAFT_KINDS.fuelRaq
+const DRAFT_KEY_PREFIX = 'teuposto_fuel_raq_draft:'
+const DRAFT_SAVE_DEBOUNCE_MS = 800
+
+function draftStorageKey(postoId: string) {
+  return `${DRAFT_KEY_PREFIX}${postoId}`
+}
+
+function isFuelRaqComposerDraft(value: FuelRaqComposerDraft | null): value is FuelRaqComposerDraft {
+  return Boolean(value && value.v === 1 && Array.isArray(value.launchProductKeys))
+}
+
+function isMeaningfulDraft(input: {
+  authorName: string
+  launchProductKeys: FuelProductKey[]
+}) {
+  if (input.authorName.trim()) return true
+  if (input.launchProductKeys.length > 0) return true
+  return false
+}
+
+function serializableAnalysis(draft: AnalysisDraft): AnalysisDraftStored {
+  return {
+    aspecto: draft.aspecto,
+    cor: draft.cor,
+    temperaturaObservada: draft.temperaturaObservada,
+    massaEspecificaObservada: draft.massaEspecificaObservada,
+    massaEspecificaConvertida: draft.massaEspecificaConvertida,
+    teorAlcoolGasolina: draft.teorAlcoolGasolina,
+    densidadeStatus: draft.densidadeStatus,
+    coeficienteGamma: draft.coeficienteGamma,
+    densidadeFormula: draft.densidadeFormula,
+    densidadeLimitLabel: draft.densidadeLimitLabel,
+    densidadeStatusReason: draft.densidadeStatusReason,
+    densidadeStatusLabel: draft.densidadeStatusLabel,
+  }
+}
+
+function restoreAnalysis(productKey: FuelProductKey, stored: AnalysisDraftStored): AnalysisDraft {
+  const merged: AnalysisDraft = {
+    ...emptyAnalysis(),
+    ...stored,
+    photoFile: null,
+    photoPreviewUrl: null,
+    photoLatitude: null,
+    photoLongitude: null,
+    photoCapturedAt: null,
+    photoError: null,
+  }
+  return { ...merged, ...applyDensityCorrection(productKey, merged) }
+}
+
+function buildFuelRaqComposerDraft(input: {
+  authorName: string
+  launchProductKeys: FuelProductKey[]
+  raqDrafts: Partial<Record<FuelProductKey, RaqDraft>>
+  analysisDrafts: Partial<Record<FuelProductKey, AnalysisDraft>>
+  openRaq: FuelProductKey | null
+  openAnalysis: FuelProductKey | null
+}): FuelRaqComposerDraft {
+  const storedAnalysis: Partial<Record<FuelProductKey, AnalysisDraftStored>> = {}
+  for (const key of input.launchProductKeys) {
+    const draft = input.analysisDrafts[key]
+    if (draft) storedAnalysis[key] = serializableAnalysis(draft)
+  }
+  return {
+    v: 1,
+    savedAt: new Date().toISOString(),
+    authorName: input.authorName,
+    launchProductKeys: input.launchProductKeys,
+    raqDrafts: input.raqDrafts,
+    analysisDrafts: storedAnalysis,
+    openRaq: input.openRaq,
+    openAnalysis: input.openAnalysis,
   }
 }
 
@@ -228,6 +330,8 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
   const [authorName, setAuthorName] = useState('')
   const [signatureBlob, setSignatureBlob] = useState<Blob | null>(null)
   const [submittedAtPreview, setSubmittedAtPreview] = useState(() => new Date().toISOString())
+  const [draftHydrated, setDraftHydrated] = useState(false)
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null)
   const [viewReport, setViewReport] = useState<FuelAnalysisReport | null>(null)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [publicUrl, setPublicUrl] = useState<string | null>(null)
@@ -426,6 +530,139 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
     loadPage()
   }, [loadPage])
 
+  const applyFuelRaqDraft = useCallback((stored: FuelRaqComposerDraft) => {
+    const keys = stored.launchProductKeys.filter(isFuelProductKey)
+    const nextRaq: Partial<Record<FuelProductKey, RaqDraft>> = {}
+    const nextAnalysis: Partial<Record<FuelProductKey, AnalysisDraft>> = {}
+    for (const key of keys) {
+      nextRaq[key] = stored.raqDrafts[key] ?? emptyRaq()
+      nextAnalysis[key] = stored.analysisDrafts[key]
+        ? restoreAnalysis(key, stored.analysisDrafts[key]!)
+        : emptyAnalysis()
+    }
+    setAuthorName(stored.authorName)
+    setLaunchProductKeys(keys)
+    setRaqDrafts(nextRaq)
+    setAnalysisDrafts(nextAnalysis)
+    setOpenRaq(stored.openRaq && keys.includes(stored.openRaq) ? stored.openRaq : keys[0] ?? null)
+    setOpenAnalysis(
+      stored.openAnalysis && keys.includes(stored.openAnalysis)
+        ? stored.openAnalysis
+        : keys[0] ?? null,
+    )
+    setDraftSavedAt(stored.savedAt)
+  }, [])
+
+  useEffect(() => {
+    if (isReadOnly) {
+      setDraftHydrated(true)
+      return
+    }
+    if (!posto?.id) return
+
+    let cancelled = false
+    void (async () => {
+      const stored = await resolvePostoFormDraft(
+        posto.id,
+        DRAFT_KIND,
+        draftStorageKey(posto.id),
+        isFuelRaqComposerDraft,
+      )
+      if (cancelled) return
+      if (stored && isMeaningfulDraft(stored)) {
+        applyFuelRaqDraft(stored)
+      }
+      setDraftHydrated(true)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [posto?.id, isReadOnly, applyFuelRaqDraft])
+
+  useEffect(() => {
+    if (isReadOnly || !posto?.id || !draftHydrated || formOpen) return
+
+    const refresh = () => {
+      void (async () => {
+        const stored = await resolvePostoFormDraft(
+          posto.id,
+          DRAFT_KIND,
+          draftStorageKey(posto.id),
+          isFuelRaqComposerDraft,
+        )
+        if (stored && isMeaningfulDraft(stored)) {
+          applyFuelRaqDraft(stored)
+          return
+        }
+        setDraftSavedAt(null)
+      })()
+    }
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [isReadOnly, posto?.id, draftHydrated, formOpen, applyFuelRaqDraft])
+
+  useEffect(() => {
+    if (!draftHydrated || !posto?.id || isReadOnly || !formOpen) return
+
+    const payload = { authorName, launchProductKeys }
+    const timer = window.setTimeout(() => {
+      if (!isMeaningfulDraft(payload)) {
+        clearLocalFormDraft(draftStorageKey(posto.id))
+        setDraftSavedAt(null)
+        void deletePostoFormDraft(posto.id, DRAFT_KIND)
+        return
+      }
+      const draft = buildFuelRaqComposerDraft({
+        authorName,
+        launchProductKeys,
+        raqDrafts,
+        analysisDrafts,
+        openRaq,
+        openAnalysis,
+      })
+      writeLocalFormDraft(draftStorageKey(posto.id), draft)
+      setDraftSavedAt(draft.savedAt)
+      void savePostoFormDraft(posto.id, DRAFT_KIND, draft)
+    }, DRAFT_SAVE_DEBOUNCE_MS)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    draftHydrated,
+    posto?.id,
+    isReadOnly,
+    formOpen,
+    authorName,
+    launchProductKeys,
+    raqDrafts,
+    analysisDrafts,
+    openRaq,
+    openAnalysis,
+  ])
+
+  useEffect(() => {
+    const onLeave = () => persistDraftNow()
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') onLeave()
+    }
+    window.addEventListener('pagehide', onLeave)
+    window.addEventListener('beforeunload', onLeave)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pagehide', onLeave)
+      window.removeEventListener('beforeunload', onLeave)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  })
+
   useEffect(() => {
     if (!posto?.public_slug) {
       setQrDataUrl(null)
@@ -462,7 +699,39 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
     return () => window.clearInterval(timer)
   }, [formOpen])
 
-  function openForm() {
+  const hasDraft = isMeaningfulDraft({ authorName, launchProductKeys })
+
+  function persistDraftNow() {
+    if (!posto?.id || isReadOnly) return
+    const payload = { authorName, launchProductKeys }
+    if (!isMeaningfulDraft(payload)) {
+      if (!formOpen) return
+      clearLocalFormDraft(draftStorageKey(posto.id))
+      setDraftSavedAt(null)
+      void deletePostoFormDraft(posto.id, DRAFT_KIND)
+      return
+    }
+    const draft = buildFuelRaqComposerDraft({
+      authorName,
+      launchProductKeys,
+      raqDrafts,
+      analysisDrafts,
+      openRaq,
+      openAnalysis,
+    })
+    writeLocalFormDraft(draftStorageKey(posto.id), draft)
+    setDraftSavedAt(draft.savedAt)
+    void savePostoFormDraft(posto.id, DRAFT_KIND, draft)
+  }
+
+  function revokeAnalysisPreviews() {
+    for (const draft of Object.values(analysisDrafts)) {
+      if (draft?.photoPreviewUrl) URL.revokeObjectURL(draft.photoPreviewUrl)
+    }
+  }
+
+  function resetComposer() {
+    revokeAnalysisPreviews()
     setLaunchProductKeys([])
     setRaqDrafts({})
     setAnalysisDrafts({})
@@ -472,6 +741,11 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
     setSignatureBlob(null)
     setFormError(null)
     setSubmittedAtPreview(new Date().toISOString())
+  }
+
+  function openForm() {
+    if (!hasDraft) resetComposer()
+    setFormError(null)
     setShowQrPanel(false)
     setFormOpen(true)
 
@@ -485,6 +759,21 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
           /* mantém a lista já carregada */
         })
     }
+  }
+
+  function closeForm() {
+    persistDraftNow()
+    setFormOpen(false)
+  }
+
+  function discardDraft() {
+    if (posto?.id) {
+      clearLocalFormDraft(draftStorageKey(posto.id))
+      void deletePostoFormDraft(posto.id, DRAFT_KIND)
+    }
+    setDraftSavedAt(null)
+    resetComposer()
+    setFormOpen(false)
   }
 
   function toggleLaunchProduct(key: FuelProductKey) {
@@ -718,6 +1007,10 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
         analysisItems,
       })
 
+      clearLocalFormDraft(draftStorageKey(posto.id))
+      void deletePostoFormDraft(posto.id, DRAFT_KIND)
+      setDraftSavedAt(null)
+      resetComposer()
       setFormOpen(false)
       await loadPage()
     } catch {
@@ -807,7 +1100,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
             </button>
             {!isReadOnly && (
               <button type="button" className="reg-docs-page__add-btn" onClick={openForm}>
-                Incluir RAQ
+                {hasDraft ? 'Continuar rascunho' : 'Incluir RAQ'}
               </button>
             )}
           </div>
@@ -815,6 +1108,13 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
       </header>
 
       {pageError && <p className="reg-doc-form__error reg-docs-page__banner">{pageError}</p>}
+      {!formOpen && !isReadOnly && hasDraft && (
+        <p className="fuel-draft-banner" role="status">
+          Há um rascunho salvo neste posto
+          {draftSavedAt ? ` (${formatDateTimePtBr(draftSavedAt)})` : ''}. Você pode continuar no
+          computador ou no celular — foto e assinatura precisam ser feitas de novo na hora de lançar.
+        </p>
+      )}
       {exportError && !formOpen && (
         <p className="reg-doc-form__error reg-docs-page__banner">{exportError}</p>
       )}
@@ -965,6 +1265,33 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
       {formOpen && (
         <form className="fuel-form" onSubmit={handleSubmit}>
           <section className="fuel-panel">
+            <div className="fuel-panel__header">
+              <div>
+                <h2>Novo RAQ</h2>
+                {hasDraft && (
+                  <p className="fuel-draft-hint" role="status">
+                    Rascunho salvo neste posto
+                    {draftSavedAt ? ` às ${formatDateTimePtBr(draftSavedAt)}` : ''}. Foto e
+                    assinatura não entram no rascunho.
+                  </p>
+                )}
+              </div>
+              <div className="fuel-panel__header-actions">
+                {hasDraft && (
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    onClick={discardDraft}
+                    disabled={busy}
+                  >
+                    Descartar rascunho
+                  </button>
+                )}
+                <button type="button" className="btn btn--secondary" onClick={closeForm} disabled={busy}>
+                  Fechar
+                </button>
+              </div>
+            </div>
             <h2>Combustíveis deste recebimento</h2>
             <p className="fuel-panel__hint">
               Marque só o que chegou agora. Os produtos não marcados não entram neste lançamento e
@@ -1452,13 +1779,23 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
           {formError && <p className="reg-doc-form__error">{formError}</p>}
 
           <div className="reg-doc-card__actions fuel-form__actions">
+            {hasDraft && (
+              <button
+                type="button"
+                className="btn btn--secondary"
+                onClick={discardDraft}
+                disabled={busy}
+              >
+                Descartar rascunho
+              </button>
+            )}
             <button
               type="button"
               className="btn btn--secondary"
-              onClick={() => setFormOpen(false)}
+              onClick={closeForm}
               disabled={busy}
             >
-              Cancelar
+              Fechar
             </button>
             <button type="submit" className="btn btn--primary" disabled={busy}>
               {busy ? 'Lançando...' : 'Lançar relatório'}

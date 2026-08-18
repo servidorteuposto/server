@@ -14,7 +14,12 @@ import {
   saveRegulatoryDocument,
   type RegulatoryDocument,
 } from '../lib/regulatory-documents'
-import { revokePdfPreviewObjectUrl } from '../lib/pdf-preview'
+import {
+  cancelPdfPreviewTarget,
+  createPdfPreviewTarget,
+  deliverPdfPreview,
+  revokePdfPreviewObjectUrl,
+} from '../lib/pdf-preview'
 import './RegulatoryDocumentsPage.css'
 
 type RegulatoryDocumentsPageProps = {
@@ -174,19 +179,28 @@ export default function RegulatoryDocumentsPage({ isReadOnly }: RegulatoryDocume
   }
 
   async function handlePreview(document: RegulatoryDocument) {
-    setPreviewOpen(true)
+    const target = createPdfPreviewTarget()
     setPreviewTitle(document.title)
     revokePdfPreviewObjectUrl(previewUrl)
     setPreviewUrl(null)
     setPreviewError(null)
     setPreviewLoading(true)
     setActionBusyId(document.id)
+    if (!target.useNative || !target.nativeTab) {
+      setPreviewOpen(true)
+    }
 
     try {
       // getSignedObjectUrl já devolve blob: — não re-fetch (CSP connect-src).
       const objectUrl = await getRegulatoryDocumentUrl(getDocumentPreviewPath(document))
+      const mode = deliverPdfPreview(objectUrl, target)
       setPreviewUrl(objectUrl)
+      if (mode === 'embed' || !target.nativeTab) {
+        setPreviewOpen(true)
+      }
     } catch {
+      cancelPdfPreviewTarget(target)
+      setPreviewOpen(true)
       setPreviewError('Não foi possível carregar a visualização do documento.')
     } finally {
       setPreviewLoading(false)

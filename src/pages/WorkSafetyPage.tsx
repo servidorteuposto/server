@@ -26,7 +26,12 @@ import {
   type WorkSafetyDocument,
 } from '../lib/work-safety-documents'
 import type { RegulatoryDocument } from '../lib/regulatory-documents'
-import { revokePdfPreviewObjectUrl } from '../lib/pdf-preview'
+import {
+  cancelPdfPreviewTarget,
+  createPdfPreviewTarget,
+  deliverPdfPreview,
+  revokePdfPreviewObjectUrl,
+} from '../lib/pdf-preview'
 import '../pages/RegulatoryDocumentsPage.css'
 import './WorkSafetyPage.css'
 
@@ -166,18 +171,27 @@ export default function WorkSafetyPage({ isReadOnly }: WorkSafetyPageProps) {
   }
 
   async function handlePreviewDocument(document: WorkSafetyDocument) {
-    setPreviewOpen(true)
+    const target = createPdfPreviewTarget()
     setPreviewTitle(document.title)
     revokePdfPreviewObjectUrl(previewUrl)
     setPreviewUrl(null)
     setPreviewError(null)
     setPreviewLoading(true)
     setActionBusyId(document.id)
+    if (!target.useNative || !target.nativeTab) {
+      setPreviewOpen(true)
+    }
 
     try {
       const objectUrl = await getWorkSafetyDocumentUrl(getWorkSafetyDocumentPreviewPath(document))
+      const mode = deliverPdfPreview(objectUrl, target)
       setPreviewUrl(objectUrl)
+      if (mode === 'embed' || !target.nativeTab) {
+        setPreviewOpen(true)
+      }
     } catch {
+      cancelPdfPreviewTarget(target)
+      setPreviewOpen(true)
       setPreviewError('Não foi possível carregar a visualização do documento.')
     } finally {
       setPreviewLoading(false)
@@ -197,17 +211,26 @@ export default function WorkSafetyPage({ isReadOnly }: WorkSafetyPageProps) {
   }
 
   async function handlePreviewFile(title: string, urlPromise: Promise<string>) {
-    setPreviewOpen(true)
+    const target = createPdfPreviewTarget()
     setPreviewTitle(title)
     revokePdfPreviewObjectUrl(previewUrl)
     setPreviewUrl(null)
     setPreviewError(null)
     setPreviewLoading(true)
+    if (!target.useNative || !target.nativeTab) {
+      setPreviewOpen(true)
+    }
 
     try {
       const objectUrl = await urlPromise
+      const mode = deliverPdfPreview(objectUrl, target)
       setPreviewUrl(objectUrl)
+      if (mode === 'embed' || !target.nativeTab) {
+        setPreviewOpen(true)
+      }
     } catch {
+      cancelPdfPreviewTarget(target)
+      setPreviewOpen(true)
       setPreviewError('Não foi possível carregar a visualização do documento.')
     } finally {
       setPreviewLoading(false)

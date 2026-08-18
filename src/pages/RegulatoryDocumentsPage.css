@@ -621,3 +621,21 @@
   color: var(--gray-600);
   font-size: 0.9rem;
 }
+
+.reg-doc-preview__native {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.9rem;
+  min-height: 40vh;
+  padding: 1.5rem 1.25rem;
+  text-align: center;
+}
+
+.reg-doc-preview__native p {
+  margin: 0;
+  max-width: 22rem;
+  color: var(--gray-600);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}

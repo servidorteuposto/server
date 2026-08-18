@@ -43,3 +43,68 @@ export function revokePdfPreviewObjectUrl(url: string | null | undefined) {
     URL.revokeObjectURL(url)
   }
 }
+
+/** iOS/Android não renderizam PDF dentro de iframe — o visualizador nativo precisa de uma aba. */
+export function pdfNeedsNativeViewer() {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  if (/iPad|iPhone|iPod/.test(ua)) return true
+  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true
+  if (/Android/i.test(ua)) return true
+  return window.matchMedia('(pointer: coarse) and (max-width: 900px)').matches
+}
+
+export type PdfPreviewTarget = {
+  useNative: boolean
+  nativeTab: Window | null
+}
+
+export function createPdfPreviewTarget(): PdfPreviewTarget {
+  const useNative = pdfNeedsNativeViewer()
+  if (!useNative) return { useNative: false, nativeTab: null }
+
+  try {
+    const nativeTab = window.open('about:blank', '_blank')
+    if (nativeTab) {
+      try {
+        nativeTab.document.open()
+        nativeTab.document.write(
+          '<!doctype html><title>Carregando PDF</title><p style="font-family:system-ui,sans-serif;padding:1.5rem">Carregando documento...</p>',
+        )
+        nativeTab.document.close()
+      } catch {
+        /* aba em branco ainda serve para receber o blob */
+      }
+    }
+    return { useNative: true, nativeTab }
+  } catch {
+    return { useNative: true, nativeTab: null }
+  }
+}
+
+export function deliverPdfPreview(url: string, target: PdfPreviewTarget): 'native' | 'embed' {
+  if (!target.useNative) return 'embed'
+  if (target.nativeTab && !target.nativeTab.closed) {
+    try {
+      target.nativeTab.location.replace(url)
+      target.nativeTab.focus()
+      return 'native'
+    } catch {
+      /* cai no fallback abaixo */
+    }
+  }
+  const opened = window.open(url, '_blank')
+  if (!opened) {
+    window.location.assign(url)
+  }
+  return 'native'
+}
+
+export function cancelPdfPreviewTarget(target: PdfPreviewTarget) {
+  if (!target.nativeTab || target.nativeTab.closed) return
+  try {
+    target.nativeTab.close()
+  } catch {
+    /* ignore */
+  }
+}

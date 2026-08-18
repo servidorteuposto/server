@@ -21,6 +21,7 @@ npm run supabase:deploy-operational-reminders
 npm run supabase:deploy-alerts
 npm run supabase:deploy-drainage-reminders
 npm run supabase:deploy-raq-alert
+npm run supabase:deploy-metrology-alert
 ```
 
 ## Modelos admin (criar na WABA do número real)
@@ -60,3 +61,22 @@ Variáveis: `combustivel`, `aspecto`, `cor`, `meobservada`, `temperatura`, `meco
 Botão URL estático: **Acesse Teu Posto** → `https://www.appteuposto.com.br`
 
 Enviado ao lançar análise do RAQ com status **Fora das Especificações** (um aviso por combustível inapto).
+
+## Modelo posto — Metrologia reprovada
+
+Nome na WABA: `aviso_metrologia_fora` (Utilidade / Portuguese (BR)), params **nomeados**.
+
+Variáveis do modelo já criado: `combustivel`, `aspecto`, `cor`, `meobservada`, `temperatura`, `meconvertida`, `vazamento`, `mangueiras`, `lacres`, `display`, `data`, `razao`, `cnpj`, `endereco`
+
+Valores enviados no bico:
+
+- **Lacres (`lacres`):** `OK` ou `FALTANDO`
+- **Vazamento (`vazamento`):** `POSSUI` ou `NÃO POSSUI`
+- **Mangueira (`mangueiras`):** `OK` ou `DANIFICADA`
+- **Display (`display`):** `OK` ou `QUEIMADO`
+
+`combustivel` vai como `DIESEL S10 ADITIVADO (BICO Nº 01)`. Aspecto/cor/ME/temperatura vêm do último RAQ daquele combustível; se não houver, vai `-`.
+
+Botão URL estático: **Acesse Teu Posto** → `https://www.appteuposto.com.br`
+
+Enviado ao **salvar** a verificação metrológica com resultado **REPROVADO** (um aviso por bico reprovado). Rascunho não dispara.

@@ -176,5 +176,21 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
   }
 
   if (!saved) throw new Error('verification_not_found')
+  if (input.overallStatus === 'reprovado') {
+    await notifyMetrologyFailed(saved.id)
+  }
   return saved
+}
+
+async function notifyMetrologyFailed(verificationId: string) {
+  try {
+    const { error } = await supabase.functions.invoke('send-metrology-alert', {
+      body: { verification_id: verificationId },
+    })
+    if (error) {
+      console.warn('notifyMetrologyFailed failed', error)
+    }
+  } catch (error) {
+    console.warn('notifyMetrologyFailed failed', error)
+  }
 }

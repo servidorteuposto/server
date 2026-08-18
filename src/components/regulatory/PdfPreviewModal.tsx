@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { pdfNeedsNativeViewer } from '../../lib/pdf-preview'
 
 type PdfPreviewModalProps = {
   open: boolean
@@ -28,7 +29,8 @@ export default function PdfPreviewModal({
 
   if (!open) return null
 
-  const viewerSrc = url ? `${url}#view=FitH&toolbar=1` : null
+  const useNativeViewer = pdfNeedsNativeViewer()
+  const viewerSrc = url && !useNativeViewer ? `${url}#view=FitH&toolbar=1` : null
 
   return (
     <div className="reg-doc-modal reg-doc-preview" role="presentation" onClick={onClose}>
@@ -63,6 +65,19 @@ export default function PdfPreviewModal({
           {error && <p className="reg-doc-form__error">{error}</p>}
           {!loading && !error && viewerSrc && (
             <iframe className="reg-doc-preview__frame" src={viewerSrc} title={title} />
+          )}
+          {!loading && !error && url && useNativeViewer && (
+            <div className="reg-doc-preview__native">
+              <p>No celular o PDF abre no visualizador do aparelho.</p>
+              <a
+                className="btn btn--primary"
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Abrir PDF
+              </a>
+            </div>
           )}
         </div>
       </div>

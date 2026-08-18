@@ -24,6 +24,7 @@ export const POSTO_TEMPLATES = {
   drenagem: 'aviso_drenagem_diesel',
   metrologia: 'aviso_metrologia',
   raqFora: 'aviso_raq_fora',
+  metrologiaFora: 'aviso_metrologia_fora',
   docPrazo: 'aviso_doc_prazo',
   docVencido: 'aviso_doc_vencido',
 } as const
@@ -283,6 +284,103 @@ export function raqForaTemplate(input: {
       p('endereco', formatEndereco(input.endereco)),
     ],
     summary: `aviso_raq_fora: ${razao} · ${combustivel}`,
+  }
+}
+
+export type MetrologyRaqSnapshot = {
+  aspecto?: string | null
+  cor?: string | null
+  temperatura_observada?: string | null
+  massa_especifica_observada?: string | null
+  massa_especifica_convertida?: string | null
+}
+
+export type MetrologyOutOfSpecItem = {
+  nozzle_number: number
+  fuel_product_key: string
+  fuel_other_label?: string | null
+  item_status?: string
+  seals_ok?: boolean | null
+  leakage?: boolean | null
+  hose_ok?: boolean | null
+  display_burned?: boolean | null
+}
+
+function metrologySealsLabel(value: boolean | null | undefined) {
+  if (value === false) return 'FALTANDO'
+  if (value === true) return 'OK'
+  return '-'
+}
+
+function metrologyLeakageLabel(value: boolean | null | undefined) {
+  if (value === true) return 'POSSUI'
+  if (value === false) return 'NÃO POSSUI'
+  return '-'
+}
+
+function metrologyHoseLabel(value: boolean | null | undefined) {
+  if (value === false) return 'DANIFICADA'
+  if (value === true) return 'OK'
+  return '-'
+}
+
+function metrologyDisplayLabel(value: boolean | null | undefined) {
+  if (value === true) return 'QUEIMADO'
+  if (value === false) return 'OK'
+  return '-'
+}
+
+function metrologyFuelLabel(key: string, otherLabel?: string | null) {
+  if (key === 'outro') return otherLabel?.trim() || 'Outro'
+  if (key === 'manutencao') return 'Bico em manutenção'
+  return raqFuelLabel(key)
+}
+
+function formatNozzleWaLabel(nozzleNumber: number) {
+  return `BICO Nº ${String(nozzleNumber).padStart(2, '0')}`
+}
+
+/**
+ * aviso_metrologia_fora — params nomeados do modelo na WABA:
+ * {{combustivel}} {{aspecto}} {{cor}} {{meobservada}} {{temperatura}}
+ * {{meconvertida}} {{vazamento}} {{mangueiras}} {{lacres}} {{display}}
+ * {{data}} {{razao}} {{cnpj}} {{endereco}}
+ */
+export function metrologiaForaTemplate(input: {
+  nome: string
+  cnpj?: string | null
+  endereco?: string | null
+  data: string
+  item: MetrologyOutOfSpecItem
+  raq?: MetrologyRaqSnapshot | null
+}): TemplatePayload {
+  const razao = input.nome.trim() || 'Posto'
+  const fuel = metrologyFuelLabel(input.item.fuel_product_key, input.item.fuel_other_label)
+    .toUpperCase()
+    .replace(/S-10/g, 'S10')
+    .replace(/S-500/g, 'S500')
+  const combustivel = `${fuel} (${formatNozzleWaLabel(input.item.nozzle_number)})`
+  const raq = input.raq ?? {}
+  return {
+    name: POSTO_TEMPLATES.metrologiaFora,
+    language: WA_LANG,
+    bodyParams: [
+      p('combustivel', combustivel),
+      p('aspecto', raq.aspecto),
+      p('cor', raq.cor),
+      p('meobservada', raq.massa_especifica_observada),
+      p('temperatura', raq.temperatura_observada),
+      p('meconvertida', raq.massa_especifica_convertida),
+      p('vazamento', metrologyLeakageLabel(input.item.leakage)),
+      p('mangueiras', metrologyHoseLabel(input.item.hose_ok)),
+      p('lacres', metrologySealsLabel(input.item.seals_ok)),
+      p('display', metrologyDisplayLabel(input.item.display_burned)),
+      p('data', input.data),
+      p('razao', razao),
+      p('cnpj', formatCnpj(input.cnpj)),
+      p('endereco', formatEndereco(input.endereco)),
+    ],
+    summary: `aviso_metrologia_fora: ${razao} · ${combustivel}`,
   }
 }
 

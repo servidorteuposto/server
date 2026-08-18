@@ -16,6 +16,7 @@ Edge Function que envia avisos WhatsApp (templates) para os números `aviso_what
 | Documentos / laudos | `aviso_doc_prazo` / `aviso_doc_vencido` | 30, 15, 7, 1, 0 |
 | Metrologia | `aviso_metrologia` | no dia do vencimento (15 dias) |
 | RAQ fora das especificações | `aviso_raq_fora` | no lançamento inapto (envio imediato; reenvio pela fila se falhar) |
+| Metrologia reprovada | `aviso_metrologia_fora` | no lançamento reprovado (envio imediato; reenvio pela fila se falhar) |
 | Drenagem diesel | `aviso_drenagem_diesel` | no dia do vencimento (7 dias) |
 | RAQ | `aviso_raq1` | a cada 4 dias |
 
