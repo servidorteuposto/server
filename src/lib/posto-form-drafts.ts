@@ -7,7 +7,7 @@ export const POSTO_FORM_DRAFT_KINDS = {
 
 export type PostoFormDraftKind = (typeof POSTO_FORM_DRAFT_KINDS)[keyof typeof POSTO_FORM_DRAFT_KINDS]
 
-type DraftWithSavedAt = {
+export type DraftWithSavedAt = {
   savedAt?: string
 }
 
@@ -78,15 +78,15 @@ export async function resolvePostoFormDraft<T extends DraftWithSavedAt>(
   postoId: string,
   kind: PostoFormDraftKind,
   storageKey: string,
-  isValid: (value: T) => boolean,
+  isValid: (value: unknown) => value is T,
 ): Promise<T | null> {
-  const localRaw = readLocalFormDraft<T>(storageKey)
-  const local = localRaw && isValid(localRaw) ? localRaw : null
+  const localRaw = readLocalFormDraft<unknown>(storageKey)
+  const local = isValid(localRaw) ? localRaw : null
 
   let remote: T | null = null
   try {
-    const loaded = await getPostoFormDraft<T>(postoId, kind)
-    remote = loaded && isValid(loaded) ? loaded : null
+    const loaded = await getPostoFormDraft<unknown>(postoId, kind)
+    remote = isValid(loaded) ? loaded : null
   } catch {
     remote = null
   }

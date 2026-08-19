@@ -86,8 +86,10 @@ function draftStorageKey(postoId: string) {
   return `${DRAFT_KEY_PREFIX}${postoId}`
 }
 
-function isMetrologyComposerDraft(value: MetrologyComposerDraft | null): value is MetrologyComposerDraft {
-  return Boolean(value && value.v === 1 && Array.isArray(value.nozzles))
+function isMetrologyComposerDraft(value: unknown): value is MetrologyComposerDraft {
+  if (!value || typeof value !== 'object') return false
+  const draft = value as MetrologyComposerDraft
+  return draft.v === 1 && Array.isArray(draft.nozzles)
 }
 
 function isMeaningfulDraft(input: {

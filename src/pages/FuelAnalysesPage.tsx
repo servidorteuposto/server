@@ -169,8 +169,10 @@ function draftStorageKey(postoId: string) {
   return `${DRAFT_KEY_PREFIX}${postoId}`
 }
 
-function isFuelRaqComposerDraft(value: FuelRaqComposerDraft | null): value is FuelRaqComposerDraft {
-  return Boolean(value && value.v === 1 && Array.isArray(value.launchProductKeys))
+function isFuelRaqComposerDraft(value: unknown): value is FuelRaqComposerDraft {
+  if (!value || typeof value !== 'object') return false
+  const draft = value as FuelRaqComposerDraft
+  return draft.v === 1 && Array.isArray(draft.launchProductKeys)
 }
 
 function isMeaningfulDraft(input: {
