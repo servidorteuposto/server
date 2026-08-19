@@ -66,6 +66,7 @@ type NozzleDraft = {
   leakage: boolean | null
   hoseOk: boolean | null
   displayBurned: boolean | null
+  nozzleOk: boolean | null
 }
 
 type MetrologyComposerDraft = {
@@ -145,6 +146,7 @@ function createEmptyNozzle(nozzleNumber: number): NozzleDraft {
     leakage: null,
     hoseOk: null,
     displayBurned: null,
+    nozzleOk: null,
   }
 }
 
@@ -322,6 +324,7 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
           leakage: nozzle.leakage,
           hoseOk: nozzle.hoseOk,
           displayBurned: nozzle.displayBurned,
+          nozzleOk: nozzle.nozzleOk,
         }),
       ),
     [nozzles],
@@ -497,6 +500,7 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
             leakage: nozzle.leakage,
             hoseOk: nozzle.hoseOk,
             displayBurned: nozzle.displayBurned,
+            nozzleOk: nozzle.nozzleOk,
             itemStatus: evaluation.status as MetrologyItemStatus,
           }
         }),
@@ -727,7 +731,7 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
                           onChange={(value) => updateNozzle(nozzle.id, { volumetryMin: value })}
                         />
                         <label className="reg-doc-form__field">
-                          <span>Vazão (1 min)</span>
+                          <span>Vazão (1 min) mínimo 5 litros</span>
                           <input
                             type="text"
                             inputMode="decimal"
@@ -746,7 +750,7 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
                           onChange={(value) => updateNozzle(nozzle.id, { volumetryMax: value })}
                         />
                         <label className="reg-doc-form__field">
-                          <span>Vazão (12 s)</span>
+                          <span>Vazão mínimo 5 litros (12 s)</span>
                           <input
                             type="text"
                             inputMode="decimal"
@@ -861,6 +865,32 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
                                 onChange={() => updateNozzle(nozzle.id, { displayBurned: true })}
                               />
                               Sim
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="reg-doc-form__field">
+                          <span>Bico de acordo?</span>
+                          <div className="nozzle-choice-row">
+                            <label>
+                              <input
+                                type="radio"
+                                name={`nozzle-ok-${nozzle.id}`}
+                                checked={nozzle.nozzleOk === true}
+                                disabled={isReadOnly || busy}
+                                onChange={() => updateNozzle(nozzle.id, { nozzleOk: true })}
+                              />
+                              Sim
+                            </label>
+                            <label>
+                              <input
+                                type="radio"
+                                name={`nozzle-ok-${nozzle.id}`}
+                                checked={nozzle.nozzleOk === false}
+                                disabled={isReadOnly || busy}
+                                onChange={() => updateNozzle(nozzle.id, { nozzleOk: false })}
+                              />
+                              Não
                             </label>
                           </div>
                         </div>
@@ -1104,6 +1134,10 @@ function VerificationDetailModal({
                 <div>
                   <dt>Display queimado?</dt>
                   <dd>{boolLabel(item.display_burned, 'Sim', 'Não')}</dd>
+                </div>
+                <div>
+                  <dt>Bico de acordo?</dt>
+                  <dd>{boolLabel(item.nozzle_ok, 'Sim', 'Não')}</dd>
                 </div>
               </dl>
             </article>

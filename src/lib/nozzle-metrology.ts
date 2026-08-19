@@ -24,6 +24,7 @@ export type NozzleMetrologyItem = {
   leakage: boolean | null
   hose_ok: boolean | null
   display_burned: boolean | null
+  nozzle_ok: boolean | null
   item_status: MetrologyItemStatus
   created_at: string
 }
@@ -57,6 +58,7 @@ export type SaveNozzleMetrologyItemInput = {
   leakage: boolean | null
   hoseOk: boolean | null
   displayBurned: boolean | null
+  nozzleOk: boolean | null
   itemStatus: MetrologyItemStatus
 }
 
@@ -160,6 +162,7 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
         leakage: item.leakage,
         hose_ok: item.hoseOk,
         display_burned: item.displayBurned,
+        nozzle_ok: item.nozzleOk,
         item_status: item.itemStatus,
       })),
     )

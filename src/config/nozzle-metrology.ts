@@ -135,6 +135,7 @@ export type NozzleDraftInput = {
   leakage: boolean | null
   hoseOk: boolean | null
   displayBurned: boolean | null
+  nozzleOk: boolean | null
 }
 
 export function evaluateNozzleDraft(input: NozzleDraftInput): NozzleDraftEvaluation {
@@ -153,7 +154,8 @@ export function evaluateNozzleDraft(input: NozzleDraftInput): NozzleDraftEvaluat
     input.sealsOk == null ||
     input.leakage == null ||
     input.hoseOk == null ||
-    input.displayBurned == null
+    input.displayBurned == null ||
+    input.nozzleOk == null
 
   if (incomplete) {
     return { status: 'pendente', reasons: ['Preencha todos os campos do bico.'] }
@@ -197,6 +199,9 @@ export function evaluateNozzleDraft(input: NozzleDraftInput): NozzleDraftEvaluat
   }
   if (input.displayBurned === true) {
     reasons.push('Display queimado.')
+  }
+  if (input.nozzleOk === false) {
+    reasons.push('Bico não está de acordo.')
   }
 
   return {
