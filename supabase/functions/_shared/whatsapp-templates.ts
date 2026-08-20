@@ -21,12 +21,15 @@ export const POSTO_TEMPLATES = {
   raq: 'aviso_raq1',
   assinatura7d: 'aviso_assinatura_7d',
   assinatura2d: 'aviso_assinatura_2d',
+  assinaturaVencida: 'aviso_assinatura_vencida',
   drenagem: 'aviso_drenagem_diesel',
   metrologia: 'aviso_metrologia',
   raqFora: 'aviso_raq_fora',
   metrologiaFora: 'aviso_metrologia_fora',
   docPrazo: 'aviso_doc_prazo',
   docVencido: 'aviso_doc_vencido',
+  laudosEngenharia: 'aviso_laudos_de_engenharia_e_saude_ocupacional',
+  cursosFuncionarios: 'aviso_treinamentos',
 } as const
 
 export type TemplatePayload = {
@@ -147,6 +150,26 @@ export function raqTemplate(input: {
   }
 }
 
+/** aviso_assinatura_vencida: {{razao}} {{cnpj}} {{endereco}} — acesso finalizado / renovar plano */
+export function assinaturaVencidaTemplate(input: {
+  nome: string
+  cnpj: string | null | undefined
+  endereco?: string | null
+}): TemplatePayload {
+  const razao = input.nome.trim() || 'Posto'
+  const cnpjFmt = formatCnpj(input.cnpj)
+  return {
+    name: POSTO_TEMPLATES.assinaturaVencida,
+    language: WA_LANG,
+    bodyParams: [
+      p('razao', razao),
+      p('cnpj', cnpjFmt),
+      p('endereco', formatEndereco(input.endereco)),
+    ],
+    summary: `aviso_assinatura_vencida: ${razao}`,
+  }
+}
+
 /** aviso_assinatura_7d / 2d: {{razao}} {{cnpj}} {{endereco}} (dias fixos no texto do modelo) */
 export function assinaturaTemplate(input: {
   nome: string
@@ -168,6 +191,64 @@ export function assinaturaTemplate(input: {
       p('endereco', formatEndereco(input.endereco)),
     ],
     summary: `${name}: ${razao} · ${input.daysLeft}d · ${formatDateKeyPtBr(input.endsKey)}`,
+  }
+}
+
+/**
+ * aviso_laudos_de_engenharia_e_saude_ocupacional:
+ * {{doc}} {{x}} {{razao}} {{cnpj}} {{endereco}}
+ */
+export function laudosEngenhariaTemplate(input: {
+  nome: string
+  cnpj?: string | null
+  endereco?: string | null
+  docTitle: string
+  expiresKey: string
+}): TemplatePayload {
+  const razao = input.nome.trim() || 'Posto'
+  const cnpjFmt = formatCnpj(input.cnpj)
+  const doc = input.docTitle.trim() || 'Documento'
+  const when = formatDateKeyPtBr(input.expiresKey)
+  return {
+    name: POSTO_TEMPLATES.laudosEngenharia,
+    language: WA_LANG,
+    bodyParams: [
+      p('doc', doc),
+      p('x', when),
+      p('razao', razao),
+      p('cnpj', cnpjFmt),
+      p('endereco', formatEndereco(input.endereco)),
+    ],
+    summary: `${POSTO_TEMPLATES.laudosEngenharia}: ${doc} · ${when}`,
+  }
+}
+
+/**
+ * aviso_treinamentos:
+ * {{curso}} {{funcionario}} {{x}} {{razao}} {{cnpj}} {{endereco}}
+ */
+export function cursosFuncionariosTemplate(input: {
+  nome: string
+  cnpj?: string | null
+  endereco?: string | null
+  curso: string
+  funcionario: string
+  expiresKey: string
+}): TemplatePayload {
+  const razao = input.nome.trim() || 'Posto'
+  const when = formatDateKeyPtBr(input.expiresKey)
+  return {
+    name: POSTO_TEMPLATES.cursosFuncionarios,
+    language: WA_LANG,
+    bodyParams: [
+      p('curso', input.curso),
+      p('funcionario', input.funcionario),
+      p('x', when),
+      p('razao', razao),
+      p('cnpj', formatCnpj(input.cnpj)),
+      p('endereco', formatEndereco(input.endereco)),
+    ],
+    summary: `${POSTO_TEMPLATES.cursosFuncionarios}: ${input.curso} · ${input.funcionario} · ${when}`,
   }
 }
 

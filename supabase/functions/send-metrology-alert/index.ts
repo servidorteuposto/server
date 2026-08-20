@@ -9,6 +9,7 @@ import {
   type MetrologyOutOfSpecItem,
   type MetrologyRaqSnapshot,
 } from '../_shared/whatsapp-templates.ts'
+import { isSaoPauloBusinessHours } from '../_shared/business-hours.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -318,6 +319,11 @@ Deno.serve(async (req) => {
           },
           { onConflict: 'posto_id,category,reference_id,milestone' },
         )
+      }
+
+      if (!isSaoPauloBusinessHours()) {
+        await enqueueRetry('outside_business_hours')
+        continue
       }
 
       if (!metaConfigured || apiCalls >= MAX_SENDS) {

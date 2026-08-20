@@ -341,6 +341,7 @@ async function handleLogin(
   identifier: string,
   password: string,
   ipHash: string,
+  allowExpiredLogin = false,
 ): Promise<LoginResult> {
   const accessResult = await admin.rpc('get_account_access_by_identifier', {
     p_identifier: identifier,
@@ -389,6 +390,20 @@ async function handleLogin(
       ok: false,
       code: 'pending_payment',
       message: 'Finalize o pagamento para ativar sua conta antes de fazer login.',
+      posto: {
+        nome: access.nome ?? '',
+        cnpj: access.cnpj ?? '',
+        telefone: access.telefone ?? '',
+        email: access.email ?? '',
+      },
+    }
+  }
+
+  if (!adminAccount && access?.subscription_status === 'expired' && !allowExpiredLogin) {
+    return {
+      ok: false,
+      code: 'subscription_inactive',
+      message: 'O prazo de utilização venceu. Renove o plano para continuar.',
       posto: {
         nome: access.nome ?? '',
         cnpj: access.cnpj ?? '',
@@ -577,7 +592,14 @@ Deno.serve(async (req) => {
     const action = body.action as string
 
     if (action === 'login') {
-      const result = await handleLogin(admin, supabaseUrl, body.identifier, body.password, ipHash)
+      const result = await handleLogin(
+        admin,
+        supabaseUrl,
+        body.identifier,
+        body.password,
+        ipHash,
+        Boolean(body.allow_expired_login),
+      )
       return jsonResponse(result, 200)
     }
 

@@ -31,7 +31,44 @@ npm run supabase:deploy-metrology-alert
 - `aviso_admin_resend`
 - `aviso_admin_dominio`
 
+## Modelo posto — Assinatura vencida / acesso pausado
+
+Nome na WABA: `aviso_assinatura_vencida` (Utilidade / Portuguese (BR)), params **nomeados**.
+
+Corpo (modelo na Meta):
+
+```
+O prazo da utilização da plataforma expirou!
+
+Razão Social: {{razao}}
+CNPJ: {{cnpj}}
+Endereço: {{endereco}}
+
+Renove seu plano para continuar utilizando nossos serviços.
+```
+
+Variáveis: `razao`, `cnpj`, `endereco`
+
+Enviado quando o admin pausa o acesso da conta.
+
+## Modelo posto — Laudos de Engenharia e Saúde Ocupacional
+
+Nome na WABA: `aviso_laudos_de_engenharia_e_saude_ocupacional` (Utilidade / pt_BR).
+
+Variáveis: `doc`, `x` (data de vencimento dd/mm/aaaa), `razao`, `cnpj`, `endereco`
+
+Avisos 30, 15, 7, 1 e 0 dias antes do vencimento — só após cadastrar o laudo em Segurança do Trabalho.
+
+## Modelo posto — Cursos de funcionários (NR-20 / NR-35)
+
+Nome na WABA: `aviso_treinamentos` (Utilidade / pt_BR).
+
+Variáveis: `curso`, `funcionario`, `x` (data de vencimento), `razao`, `cnpj`, `endereco`
+
+Avisos 30, 15, 7, 1 e 0 dias antes — só após anexar o certificado do funcionário.
+
 ## Modelo posto — RAQ fora das especificações
+
 
 Nome na WABA: `aviso_raq_fora` (Utilidade / Portuguese (BR)), params **nomeados**.
 

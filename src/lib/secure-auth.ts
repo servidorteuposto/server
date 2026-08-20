@@ -65,11 +65,16 @@ type SecureAuthLoginPayload = {
   session?: { access_token: string; refresh_token: string }
 }
 
-export async function secureLogin(identifier: string, password: string): Promise<SecureLoginResult> {
+export async function secureLogin(
+  identifier: string,
+  password: string,
+  options?: { allowExpiredLogin?: boolean },
+): Promise<SecureLoginResult> {
   const { payload, invokeFailed } = await invokeSecureAuth<SecureAuthLoginPayload>({
     action: 'login',
     identifier: identifier.trim(),
     password,
+    allow_expired_login: Boolean(options?.allowExpiredLogin),
   })
 
   if (invokeFailed || !payload) {

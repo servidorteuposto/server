@@ -204,6 +204,7 @@ export default function LoginPage() {
   const [paymentActivation, setPaymentActivation] = useState<PaymentActivation | null>(null)
   const [preRegisterHint, setPreRegisterHint] = useState(false)
   const [pendingPaymentAlert, setPendingPaymentAlert] = useState(false)
+  const [expiredRenewalAlert, setExpiredRenewalAlert] = useState(false)
   const [honeypot, setHoneypot] = useState('')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
 
@@ -233,6 +234,7 @@ export default function LoginPage() {
     setPaymentActivation(null)
     setPreRegisterHint(false)
     setPendingPaymentAlert(false)
+    setExpiredRenewalAlert(false)
   }
 
   function fillRegistrationFromAccess(access: AccountAccess) {
@@ -256,6 +258,18 @@ export default function LoginPage() {
     setPreRegisterHint(true)
     setPendingPaymentAlert(true)
     setView('register')
+  }
+
+  function goToExpiredRenewal(access: AccountAccess) {
+    fillRegistrationFromAccess(access)
+    setPreRegisterHint(true)
+    setPendingPaymentAlert(false)
+    setExpiredRenewalAlert(true)
+    setError(null)
+    setSuccess(null)
+    setPaymentError(null)
+    setPaymentSuccess(false)
+    setView('payment')
   }
 
   function goToPaymentFromRegister() {
@@ -328,6 +342,18 @@ export default function LoginPage() {
           goToPendingPayment({
             found: true,
             subscription_status: 'pending_payment',
+            nome: result.posto.nome,
+            cnpj: result.posto.cnpj,
+            telefone: result.posto.telefone,
+            email: result.posto.email,
+          })
+          return
+        }
+
+        if (result.code === 'subscription_inactive' && result.posto) {
+          goToExpiredRenewal({
+            found: true,
+            subscription_status: 'expired',
             nome: result.posto.nome,
             cnpj: result.posto.cnpj,
             telefone: result.posto.telefone,
@@ -456,6 +482,22 @@ export default function LoginPage() {
     setPendingPaymentAlert(false)
     persistPreRegistration(true)
     switchView('payment')
+  }
+
+  async function handleViewOnlyLogin() {
+    setLoading(true)
+    setError(null)
+    setPaymentError(null)
+    try {
+      const result = await secureLogin(identifier, password, { allowExpiredLogin: true })
+      if (!result.ok) {
+        setPaymentError(result.message)
+      }
+    } catch {
+      setPaymentError('Não foi possível entrar no sistema. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handlePaymentActivated(activation: PaymentActivation) {
@@ -734,9 +776,20 @@ export default function LoginPage() {
             ) : view === 'payment' ? (
               <>
                 <header className="login-card__header">
-                  <h1>Assinatura</h1>
-                  <p>Finalize o pagamento para ativar sua conta</p>
+                  <h1>{expiredRenewalAlert ? 'Assinatura vencida' : 'Assinatura'}</h1>
+                  <p>
+                    {expiredRenewalAlert
+                      ? 'O prazo de utilização venceu. Renove o plano para voltar a lançar dados.'
+                      : 'Finalize o pagamento para ativar sua conta'}
+                  </p>
                 </header>
+
+                {expiredRenewalAlert && !paymentSuccess && (
+                  <div className="login-form__warning" role="alert">
+                    Seu acesso foi finalizado. Pague a renovação para liberar mais 30 dias, ou entre
+                    em modo visualização para consultar os dados sem alterar nada.
+                  </div>
+                )}
 
                 {paymentSuccess ? (
                   <div className="payment-success">
@@ -754,16 +807,30 @@ export default function LoginPage() {
                     </button>
                   </div>
                 ) : (
-                  <PaymentForm
-                    postoName={postoName}
-                    cnpj={cnpj}
-                    email={email}
-                    loading={paymentLoading}
-                    error={paymentError}
-                    onBusy={setPaymentLoading}
-                    onError={setPaymentError}
-                    onActivated={handlePaymentActivated}
-                  />
+                  <>
+                    <PaymentForm
+                      postoName={postoName}
+                      cnpj={cnpj}
+                      email={email}
+                      loading={paymentLoading}
+                      error={paymentError}
+                      onBusy={setPaymentLoading}
+                      onError={setPaymentError}
+                      onActivated={handlePaymentActivated}
+                    />
+                    {expiredRenewalAlert && (
+                      <p className="login-card__footer">
+                        <button
+                          type="button"
+                          className="login-card__link"
+                          disabled={loading || paymentLoading}
+                          onClick={() => void handleViewOnlyLogin()}
+                        >
+                          {loading ? 'Entrando...' : 'Entrar em modo visualização'}
+                        </button>
+                      </p>
+                    )}
+                  </>
                 )}
               </>
             ) : view === 'support' ? (

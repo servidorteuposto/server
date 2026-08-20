@@ -1,3 +1,11 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import {
+  isMetaWhatsAppConfigured,
+  normalizeWaPhone,
+  sendWhatsAppTemplate,
+} from '../_shared/meta-whatsapp.ts'
+import { assinaturaVencidaTemplate } from '../_shared/whatsapp-templates.ts'
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -49,6 +57,74 @@ async function clearLoginLockout(
   }
 }
 
+function formatPostoAddress(posto: {
+  endereco?: string | null
+  cep?: string | null
+  logradouro?: string | null
+  numero?: string | null
+  complemento?: string | null
+  bairro?: string | null
+  cidade?: string | null
+  uf?: string | null
+}) {
+  const parts = [
+    posto.logradouro,
+    posto.numero,
+    posto.complemento,
+    posto.bairro,
+    posto.cidade,
+    posto.uf,
+    posto.cep,
+  ]
+    .map((part) => (typeof part === 'string' ? part.trim() : ''))
+    .filter(Boolean)
+  if (parts.length) return parts.join(', ')
+  if (typeof posto.endereco === 'string' && posto.endereco.trim()) return posto.endereco.trim()
+  return ''
+}
+
+function collectAvisoPhones(posto: {
+  telefone?: string | null
+  aviso_whatsapp_1?: string | null
+  aviso_whatsapp_2?: string | null
+  aviso_whatsapp_3?: string | null
+  aviso_whatsapp_4?: string | null
+  aviso_whatsapp_5?: string | null
+}) {
+  const avisos = [
+    posto.aviso_whatsapp_1,
+    posto.aviso_whatsapp_2,
+    posto.aviso_whatsapp_3,
+    posto.aviso_whatsapp_4,
+    posto.aviso_whatsapp_5,
+  ]
+  const candidates = avisos.some(Boolean) ? avisos : [posto.telefone]
+  const unique = new Set<string>()
+  for (const candidate of candidates) {
+    if (!candidate) continue
+    const normalized = normalizeWaPhone(candidate)
+    if (normalized.length >= 12 && normalized.length <= 15) unique.add(normalized)
+  }
+  return [...unique]
+}
+
+async function cancelMercadoPagoPreapproval(preapprovalId: string) {
+  const accessToken = Deno.env.get('MP_ACCESS_TOKEN')?.trim()
+  if (!accessToken) return
+  try {
+    await fetch(`https://api.mercadopago.com/preapproval/${preapprovalId}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status: 'cancelled' }),
+    })
+  } catch (error) {
+    console.error('pause_access MP cancel failed', error)
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -76,8 +152,6 @@ Deno.serve(async (req) => {
     if (!accessToken || accessToken === anonKey) {
       return jsonResponse({ ok: false, message: 'Não autenticado.' }, 401)
     }
-
-    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.49.1')
 
     const admin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -160,6 +234,90 @@ Deno.serve(async (req) => {
         ok: true,
         message: 'Acesso liberado com sucesso.',
         account: updated,
+      })
+    }
+
+    if (action === 'pause_access') {
+      const postoId = body?.posto_id
+      if (!postoId || typeof postoId !== 'string') {
+        return jsonResponse({ ok: false, message: 'Informe o posto.' }, 400)
+      }
+
+      const { data: posto, error: postoError } = await admin
+        .from('postos')
+        .select(
+          'id, nome, cnpj, email, telefone, endereco, cep, logradouro, numero, complemento, bairro, cidade, uf, aviso_whatsapp_1, aviso_whatsapp_2, aviso_whatsapp_3, aviso_whatsapp_4, aviso_whatsapp_5, subscription_status, mp_preapproval_id',
+        )
+        .eq('id', postoId)
+        .maybeSingle()
+
+      if (postoError || !posto) {
+        return jsonResponse({ ok: false, message: 'Posto não encontrado.' }, 404)
+      }
+
+      if (
+        onlyDigits(posto.cnpj ?? '') === ADMIN_CNPJ_DIGITS ||
+        String(posto.email ?? '').trim().toLowerCase() === ADMIN_EMAIL
+      ) {
+        return jsonResponse({ ok: false, message: 'Conta administrativa não pode ser alterada.' }, 400)
+      }
+
+      if (posto.subscription_status !== 'active') {
+        return jsonResponse({ ok: false, message: 'Esta conta já está inativa.' }, 400)
+      }
+
+      if (posto.mp_preapproval_id) {
+        await cancelMercadoPagoPreapproval(String(posto.mp_preapproval_id))
+      }
+
+      const nowIso = new Date().toISOString()
+      const { data: updated, error: updateError } = await admin
+        .from('postos')
+        .update({
+          subscription_status: 'expired',
+          subscription_ends_at: nowIso,
+          cancel_at_period_end: true,
+          subscription_cancelled_at: nowIso,
+          billing_mode: 'one_time',
+          mp_preapproval_id: null,
+          updated_at: nowIso,
+        })
+        .eq('id', postoId)
+        .select(
+          'id, nome, cnpj, email, telefone, subscription_status, subscription_ends_at, user_id, created_at',
+        )
+        .single()
+
+      if (updateError || !updated) {
+        return jsonResponse({ ok: false, message: updateError?.message ?? 'Falha ao pausar acesso.' }, 500)
+      }
+
+      let whatsappSent = false
+      const phones = collectAvisoPhones(posto)
+      if (isMetaWhatsAppConfigured() && phones.length) {
+        const tpl = assinaturaVencidaTemplate({
+          nome: posto.nome,
+          cnpj: posto.cnpj,
+          endereco: formatPostoAddress(posto),
+        })
+        const results = await Promise.all(
+          phones.map((phone) =>
+            sendWhatsAppTemplate({
+              to: phone,
+              name: tpl.name,
+              language: tpl.language,
+              bodyParams: tpl.bodyParams,
+            }),
+          ),
+        )
+        whatsappSent = results.some(Boolean)
+      }
+
+      return jsonResponse({
+        ok: true,
+        message: 'Acesso pausado. A conta permanece inativa até a renovação.',
+        account: updated,
+        whatsapp_sent: whatsappSent,
       })
     }
 

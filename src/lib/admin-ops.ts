@@ -80,6 +80,20 @@ export async function unlockAdminAccount(postoId: string): Promise<AdminAccount>
   return payload.account
 }
 
+export async function pauseAdminAccount(postoId: string): Promise<AdminAccount> {
+  const { payload, invokeFailed } = await invokeAdminOps<{
+    ok: boolean
+    message?: string
+    account?: AdminAccount
+  }>({ action: 'pause_access', posto_id: postoId })
+
+  if (invokeFailed || !payload?.ok || !payload.account) {
+    throw new Error(payload?.message || 'Não foi possível pausar o acesso.')
+  }
+
+  return payload.account
+}
+
 export async function startAdminImpersonation(postoId: string) {
   const { payload, invokeFailed } = await invokeAdminOps<{
     ok: boolean
@@ -130,6 +144,6 @@ export async function setAdminAccountPassword(postoId: string, password: string)
 
 export function subscriptionStatusLabel(status: AdminAccount['subscription_status']) {
   if (status === 'active') return 'Ativo'
-  if (status === 'expired') return 'Expirado'
+  if (status === 'expired') return 'Inativo'
   return 'Aguardando pagamento'
 }

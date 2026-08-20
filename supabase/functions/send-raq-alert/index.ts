@@ -5,6 +5,7 @@ import {
   sendWhatsAppTemplate,
 } from '../_shared/meta-whatsapp.ts'
 import { raqForaTemplate, type RaqOutOfSpecItem } from '../_shared/whatsapp-templates.ts'
+import { isSaoPauloBusinessHours } from '../_shared/business-hours.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -157,6 +158,13 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, message: 'Relatório não encontrado.' }, 404)
     }
 
+    await admin
+      .from('whatsapp_reminder_queue')
+      .delete()
+      .eq('posto_id', posto.id)
+      .eq('category', 'raq')
+      .eq('reference_id', 'periodic')
+
     const { data: itemRows, error: itemsError } = await admin
       .from('fuel_analysis_items')
       .select(
@@ -225,6 +233,11 @@ Deno.serve(async (req) => {
           },
           { onConflict: 'posto_id,category,reference_id,milestone' },
         )
+      }
+
+      if (!isSaoPauloBusinessHours()) {
+        await enqueueRetry('outside_business_hours')
+        continue
       }
 
       if (!metaConfigured || apiCalls >= MAX_SENDS) {

@@ -377,9 +377,8 @@ export default function AppShell({
       )}
       {isReadOnly && (
         <div className="readonly-banner" role="status">
-          Sua assinatura venceu. O sistema está em modo visualização — você pode consultar os dados,
-          mas não preencher ou alterar nada até renovar a assinatura. Saia e entre novamente na tela
-          de pagamento para renovar.
+          O prazo de utilização venceu. Você pode consultar os dados, mas para lançar ou alterar
+          precisa renovar o plano (mais 30 dias).
         </div>
       )}
       {!isReadOnly && renewalNotice === 'day_before' && (

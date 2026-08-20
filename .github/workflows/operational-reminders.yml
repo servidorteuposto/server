@@ -5,8 +5,8 @@ name: Operational reminders
 
 on:
   schedule:
-    # A cada hora (UTC). Fila Meta templates + marcos do dia.
-    - cron: '5 * * * *'
+    # 08:05–17:05 horário de Brasília (UTC−3, sem horário de verão).
+    - cron: '5 11-20 * * *'
   workflow_dispatch:
 
 jobs:

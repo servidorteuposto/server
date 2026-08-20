@@ -1,12 +1,12 @@
 # Alertas do admin (cotas, Resend, domínio).
-# Roda a cada hora. Cada tipo de alerta só envia 1x por dia (dedupe last_alerts).
+# Roda no horário comercial de Brasília (08:20–17:20). Cada tipo só envia 1x por dia.
 # A fila dos postos é do workflow Operational reminders (não bloqueia este).
 
 name: Admin management alerts
 
 on:
   schedule:
-    - cron: '20 * * * *'
+    - cron: '20 11-20 * * *'
   workflow_dispatch:
 
 jobs:

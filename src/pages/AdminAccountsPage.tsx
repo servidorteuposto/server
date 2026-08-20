@@ -3,6 +3,7 @@ import ConfirmDialog from '../components/regulatory/ConfirmDialog'
 import {
   deleteAdminAccount,
   listAdminAccounts,
+  pauseAdminAccount,
   setAdminAccountPassword,
   startAdminImpersonation,
   subscriptionStatusLabel,
@@ -30,6 +31,8 @@ export default function AdminAccountsPage() {
   const [savingPassword, setSavingPassword] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<AdminAccount | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [pauseTarget, setPauseTarget] = useState<AdminAccount | null>(null)
+  const [pausing, setPausing] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -94,6 +97,27 @@ export default function AdminAccountsPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao liberar acesso.')
     } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function confirmPauseAccount() {
+    if (!pauseTarget || pausing) return
+
+    setPausing(true)
+    setBusyId(pauseTarget.id)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const updated = await pauseAdminAccount(pauseTarget.id)
+      setAccounts((current) => current.map((row) => (row.id === updated.id ? updated : row)))
+      setSuccess(`Acesso pausado para ${updated.nome}. A conta permanece inativa até a renovação.`)
+      setPauseTarget(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao pausar acesso.')
+    } finally {
+      setPausing(false)
       setBusyId(null)
     }
   }
@@ -181,7 +205,7 @@ export default function AdminAccountsPage() {
         <div className="reg-docs-page__header-text">
           <h1>Contas dos usuários</h1>
           <p>
-            Liberar acesso, entrar no sistema, alterar senha e excluir contas dos postos.
+            Liberar ou pausar acesso, entrar no sistema, alterar senha e excluir contas dos postos.
           </p>
         </div>
         <button type="button" className="btn btn--primary" onClick={() => void load()} disabled={loading}>
@@ -252,14 +276,29 @@ export default function AdminAccountsPage() {
                   </dl>
                 </div>
                 <div className="admin-accounts-card__actions">
-                  <button
-                    type="button"
-                    className="btn btn--secondary"
-                    disabled={busy || unlocked}
-                    onClick={() => void handleUnlock(account)}
-                  >
-                    {unlocked ? 'Acesso liberado' : busy ? 'Liberando...' : 'Liberar acesso'}
-                  </button>
+                  {unlocked ? (
+                    <button
+                      type="button"
+                      className="btn btn--secondary"
+                      disabled={busy}
+                      onClick={() => {
+                        setError(null)
+                        setSuccess(null)
+                        setPauseTarget(account)
+                      }}
+                    >
+                      {busy ? 'Pausando...' : 'Pausar acesso'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn--secondary"
+                      disabled={busy}
+                      onClick={() => void handleUnlock(account)}
+                    >
+                      {busy ? 'Liberando...' : 'Liberar acesso'}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="btn btn--primary"
@@ -290,6 +329,23 @@ export default function AdminAccountsPage() {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pauseTarget)}
+        title="Pausar acesso"
+        message={
+          pauseTarget
+            ? `Pausar o acesso de "${pauseTarget.nome}" (CNPJ ${formatCnpj(pauseTarget.cnpj)})?\n\nNada é excluído. A conta fica inativa: o posto vê que o prazo venceu e precisa renovar o plano. Um aviso será enviado no WhatsApp.`
+            : ''
+        }
+        confirmLabel="Pausar acesso"
+        busyLabel="Pausando..."
+        busy={pausing}
+        onConfirm={() => void confirmPauseAccount()}
+        onCancel={() => {
+          if (!pausing) setPauseTarget(null)
+        }}
+      />
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}

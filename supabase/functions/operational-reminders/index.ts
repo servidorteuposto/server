@@ -7,12 +7,16 @@ import {
 } from '../_shared/meta-whatsapp.ts'
 import {
   assinaturaTemplate,
+  assinaturaVencidaTemplate,
+  cursosFuncionariosTemplate,
   docTemplate,
   drenagemTemplate,
+  laudosEngenhariaTemplate,
   metrologiaTemplate,
   raqTemplate,
   type TemplatePayload,
 } from '../_shared/whatsapp-templates.ts'
+import { isSaoPauloBusinessHours } from '../_shared/business-hours.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -248,6 +252,83 @@ async function enqueueReminder(
   return true
 }
 
+/** Só avisa depois do primeiro lançamento daquele tipo no posto. */
+async function untriggeredSkipReason(
+  admin: ReturnType<typeof createClient>,
+  row: { category: string; reference_id: string; posto_id: string },
+  todayKey: string,
+) {
+  if (row.category === 'raq' && row.reference_id === 'periodic') {
+    const { data: lastReport } = await admin
+      .from('fuel_analysis_reports')
+      .select('submitted_at')
+      .eq('posto_id', row.posto_id)
+      .order('submitted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (!lastReport?.submitted_at) return 'raq_never_submitted'
+    const lastReportKey = toSaoPauloDateKey(lastReport.submitted_at)
+    if (lastReportKey && daysBetweenKeys(lastReportKey, todayKey) < RAQ_INTERVAL_DAYS) {
+      return 'raq_interval_reset'
+    }
+    return null
+  }
+
+  if (row.category === 'metrology') {
+    const { data } = await admin
+      .from('nozzle_metrology_verifications')
+      .select('id')
+      .eq('posto_id', row.posto_id)
+      .limit(1)
+      .maybeSingle()
+    if (!data?.id) return 'metrology_never_submitted'
+    return null
+  }
+
+  if (row.category === 'drainage') {
+    const { data } = await admin
+      .from('diesel_drainage_reports')
+      .select('id')
+      .eq('tank_id', row.reference_id)
+      .limit(1)
+      .maybeSingle()
+    if (!data?.id) return 'drainage_never_submitted'
+    return null
+  }
+
+  if (row.category === 'regulatory_doc') {
+    const { data } = await admin
+      .from('regulatory_documents')
+      .select('id')
+      .eq('id', row.reference_id)
+      .maybeSingle()
+    if (!data?.id) return 'document_missing'
+    return null
+  }
+
+  if (row.category === 'work_safety_doc') {
+    const { data } = await admin
+      .from('work_safety_documents')
+      .select('id')
+      .eq('id', row.reference_id)
+      .maybeSingle()
+    if (!data?.id) return 'document_missing'
+    return null
+  }
+
+  if (row.category === 'work_safety_training') {
+    const { data } = await admin
+      .from('work_safety_employee_trainings')
+      .select('id')
+      .eq('id', row.reference_id)
+      .maybeSingle()
+    if (!data?.id) return 'training_missing'
+    return null
+  }
+
+  return null
+}
+
 async function hasPendingRaq(
   admin: ReturnType<typeof createClient>,
   postoId: string,
@@ -327,6 +408,17 @@ async function flushReminderQueue(admin: ReturnType<typeof createClient>, todayK
     ) {
       await admin.from('whatsapp_reminder_queue').delete().eq('id', row.id)
       details.push({ id: row.id, category: row.category, skipped: 'already_sent' })
+      continue
+    }
+
+    const untriggered = await untriggeredSkipReason(admin, row, todayKey)
+    if (untriggered) {
+      await admin.from('whatsapp_reminder_queue').delete().eq('id', row.id)
+      details.push({
+        id: row.id,
+        category: row.category,
+        skipped: untriggered,
+      })
       continue
     }
 
@@ -483,6 +575,16 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, message: 'Invalid today date' }, 500)
     }
 
+    if (!isSaoPauloBusinessHours()) {
+      return jsonResponse({
+        ok: true,
+        skipped: 'outside_business_hours',
+        timezone: TIME_ZONE,
+        window: '08:00-18:00',
+        today: todayKey,
+      })
+    }
+
     const { data: postos, error: postosError } = await admin
       .from('postos')
       .select(
@@ -555,12 +657,14 @@ Deno.serve(async (req) => {
         .from('regulatory_documents')
         .select('id, posto_id, title, expires_at')
         .in('posto_id', postoIds)
-        .not('expires_at', 'is', null),
+        .not('expires_at', 'is', null)
+        .not('storage_path', 'is', null),
       admin
         .from('work_safety_documents')
         .select('id, posto_id, title, expires_at')
         .in('posto_id', postoIds)
-        .not('expires_at', 'is', null),
+        .not('expires_at', 'is', null)
+        .not('storage_path', 'is', null),
     ])
 
     const docJobs = [
@@ -588,14 +692,23 @@ Deno.serve(async (req) => {
       const posto = postoById.get(doc.posto_id)
       if (!posto) continue
       const phones = collectAvisoPhones(posto)
-      const tpl = docTemplate({
-        nome: posto.nome,
-        cnpj: posto.cnpj,
-        endereco: formatPostoAddress(posto),
-        docTitle: doc.title,
-        daysLeft,
-        expiresKey: doc.expires_at,
-      })
+      const tpl =
+        doc.category === 'work_safety_doc'
+          ? laudosEngenhariaTemplate({
+              nome: posto.nome,
+              cnpj: posto.cnpj,
+              endereco: formatPostoAddress(posto),
+              docTitle: doc.title,
+              expiresKey: doc.expires_at,
+            })
+          : docTemplate({
+              nome: posto.nome,
+              cnpj: posto.cnpj,
+              endereco: formatPostoAddress(posto),
+              docTitle: doc.title,
+              daysLeft,
+              expiresKey: doc.expires_at,
+            })
       const ok = await enqueueReminder(
         admin,
         jobFromTemplate(
@@ -603,6 +716,70 @@ Deno.serve(async (req) => {
             posto_id: doc.posto_id,
             category: doc.category,
             reference_id: doc.id,
+            milestone,
+            phones,
+            due_on: todayKey,
+          },
+          tpl,
+        ),
+      )
+      if (ok) enqueued += 1
+    }
+
+    // --- Cursos de funcionários (NR-20 / NR-35) ---
+    const { data: trainingRows } = await admin
+      .from('work_safety_employee_trainings')
+      .select('id, posto_id, employee_id, training_type, expires_at')
+      .in('posto_id', postoIds)
+      .not('expires_at', 'is', null)
+      .not('storage_path', 'is', null)
+
+    const trainingEmployeeIds = [
+      ...new Set((trainingRows ?? []).map((row) => row.employee_id as string)),
+    ]
+    const employeeNameById = new Map<string, string>()
+    if (trainingEmployeeIds.length) {
+      const { data: employees } = await admin
+        .from('work_safety_employees')
+        .select('id, full_name')
+        .in('id', trainingEmployeeIds)
+      for (const employee of employees ?? []) {
+        employeeNameById.set(employee.id, String(employee.full_name ?? '').trim())
+      }
+    }
+
+    const TRAINING_LABELS: Record<string, string> = {
+      nr20: 'NR-20',
+      nr35: 'NR-35',
+    }
+
+    for (const row of trainingRows ?? []) {
+      const expiresKey = String(row.expires_at).slice(0, 10)
+      const daysLeft = daysBetweenKeys(todayKey, expiresKey)
+      if (!(DOC_MILESTONES as readonly number[]).includes(daysLeft)) continue
+
+      const posto = postoById.get(row.posto_id)
+      if (!posto) continue
+
+      const funcionario = employeeNameById.get(row.employee_id) || 'Funcionário'
+      const curso = TRAINING_LABELS[String(row.training_type)] ?? String(row.training_type)
+      const milestone = `d${daysLeft}`
+      const phones = collectAvisoPhones(posto)
+      const tpl = cursosFuncionariosTemplate({
+        nome: posto.nome,
+        cnpj: posto.cnpj,
+        endereco: formatPostoAddress(posto),
+        curso,
+        funcionario,
+        expiresKey,
+      })
+      const ok = await enqueueReminder(
+        admin,
+        jobFromTemplate(
+          {
+            posto_id: row.posto_id,
+            category: 'work_safety_training',
+            reference_id: row.id,
             milestone,
             phones,
             due_on: todayKey,
@@ -716,23 +893,44 @@ Deno.serve(async (req) => {
       }
     }
 
-    // --- RAQ ---
+    // --- RAQ (aviso_raq1): 4 dias a partir do último lançamento; se não houver, do último aviso ---
+    const resetRaqPostoIds: string[] = []
     for (const posto of activePostos) {
-      if (await hasPendingRaq(admin, posto.id)) continue
+      const [{ data: lastReport }, { data: lastSend }] = await Promise.all([
+        admin
+          .from('fuel_analysis_reports')
+          .select('submitted_at')
+          .eq('posto_id', posto.id)
+          .order('submitted_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        admin
+          .from('whatsapp_reminder_sends')
+          .select('sent_on')
+          .eq('posto_id', posto.id)
+          .eq('category', 'raq')
+          .order('sent_on', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ])
 
-      const { data: lastRaq } = await admin
-        .from('whatsapp_reminder_sends')
-        .select('sent_on')
-        .eq('posto_id', posto.id)
-        .eq('category', 'raq')
-        .order('sent_on', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (lastRaq?.sent_on) {
-        const lastKey = String(lastRaq.sent_on).slice(0, 10)
-        if (daysBetweenKeys(lastKey, todayKey) < RAQ_INTERVAL_DAYS) continue
+      const reportKey = lastReport?.submitted_at
+        ? toSaoPauloDateKey(lastReport.submitted_at)
+        : null
+      if (!reportKey) {
+        resetRaqPostoIds.push(posto.id)
+        continue
       }
+
+      const sendKey = lastSend?.sent_on ? String(lastSend.sent_on).slice(0, 10) : null
+      const lastAnchor = [reportKey, sendKey].filter(Boolean).sort().at(-1)
+
+      if (lastAnchor && daysBetweenKeys(lastAnchor, todayKey) < RAQ_INTERVAL_DAYS) {
+        resetRaqPostoIds.push(posto.id)
+        continue
+      }
+
+      if (await hasPendingRaq(admin, posto.id)) continue
 
       const milestone = `day:${todayKey}`
       const row = posto as PostoRow
@@ -757,6 +955,15 @@ Deno.serve(async (req) => {
         ),
       )
       if (ok) enqueued += 1
+    }
+
+    if (resetRaqPostoIds.length) {
+      await admin
+        .from('whatsapp_reminder_queue')
+        .delete()
+        .eq('category', 'raq')
+        .eq('reference_id', 'periodic')
+        .in('posto_id', resetRaqPostoIds)
     }
 
     const flush = await flushReminderQueue(admin, todayKey)

@@ -13,12 +13,15 @@ Edge Function que envia avisos WhatsApp (templates) para os números `aviso_what
 | Tipo | Template | Frequência |
 | --- | --- | --- |
 | Renovação de plano | `aviso_assinatura_7d` / `aviso_assinatura_2d` | 7 e 2 dias antes |
-| Documentos / laudos | `aviso_doc_prazo` / `aviso_doc_vencido` | 30, 15, 7, 1, 0 |
-| Metrologia | `aviso_metrologia` | no dia do vencimento (15 dias) |
-| RAQ fora das especificações | `aviso_raq_fora` | no lançamento inapto (envio imediato; reenvio pela fila se falhar) |
-| Metrologia reprovada | `aviso_metrologia_fora` | no lançamento reprovado (envio imediato; reenvio pela fila se falhar) |
-| Drenagem diesel | `aviso_drenagem_diesel` | no dia do vencimento (7 dias) |
-| RAQ | `aviso_raq1` | a cada 4 dias |
+| Documentos regulatórios | `aviso_doc_prazo` / `aviso_doc_vencido` | só depois de cadastrar o documento; 30, 15, 7, 1 e 0 dias |
+| Laudos (Seg. do Trabalho) | `aviso_laudos_de_engenharia_e_saude_ocupacional` | só depois de cadastrar o laudo; 30, 15, 7, 1 e 0 dias antes |
+| Cursos NR-20/NR-35 | `aviso_treinamentos` | só depois de anexar o certificado; 30, 15, 7, 1 e 0 dias antes |
+| Assinatura vencida | `aviso_assinatura_vencida` | quando o admin pausa o acesso ou o plano expira |
+| Metrologia | `aviso_metrologia` | só depois da primeira verificação; 15 dias depois do último lançamento |
+| RAQ fora das especificações | `aviso_raq_fora` | no lançamento inapto (fila se fora do horário comercial) |
+| Metrologia reprovada | `aviso_metrologia_fora` | no lançamento reprovado (fila se fora do horário comercial) |
+| Drenagem diesel | `aviso_drenagem_diesel` | só depois da primeira drenagem; 7 dias depois do último lançamento |
+| RAQ | `aviso_raq1` | só depois do primeiro RAQ; 4 dias após o último lançamento (a contagem reinicia se lançar de novo) |
 
 Só postos com `subscription_status = active` e pelo menos um WhatsApp cadastrado.
 
@@ -31,9 +34,13 @@ Só postos com `subscription_status = active` e pelo menos um WhatsApp cadastrad
 | `META_GRAPH_API_VERSION` | Opcional (`v21.0`) |
 | `OPERATIONAL_CRON_SECRET` | Header `x-operational-cron-secret` |
 
+## Horário
+
+Envios só das **08:00 às 18:00** em `America/Sao_Paulo`, qualquer dia da semana. Fora disso a function não dispara a fila; avisos imediatos (RAQ/metrologia fora) entram na fila e saem no próximo horário comercial.
+
 ## Cron
 
-Sugestão: a cada **1–2 horas**.
+Das 08:05 às 17:05 em Brasília (`5 11-20 * * *` em UTC).
 
 ```http
 POST https://jilzklxnejztpphbryti.supabase.co/functions/v1/operational-reminders
