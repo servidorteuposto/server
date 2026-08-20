@@ -62,13 +62,33 @@ export const RAQ_VOLUME_PRESETS = [
 
 export const RAQ_VOLUME_CUSTOM_OPTION = 'custom'
 
+/**
+ * Converte volume digitado (pt-BR) em litros.
+ * Aceita "7000", "7.000", "7.000,5", "7000,5".
+ * Evita o bug de Number("7.000") === 7.
+ */
+export function parseLitersInput(value: string): number | null {
+  const raw = value.trim()
+  if (!raw) return null
+
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : /^\d{1,3}(\.\d{3})+$/.test(raw)
+      ? raw.replace(/\./g, '')
+      : raw
+
+  const parsed = Number(normalized)
+  if (!Number.isFinite(parsed) || parsed <= 0) return null
+  return parsed
+}
+
 export function formatRaqVolumeLabel(liters: number) {
   return `${new Intl.NumberFormat('pt-BR').format(liters)} L`
 }
 
 export function isRaqVolumePreset(value: string) {
-  const normalized = Number(value.replace(/\./g, '').replace(',', '.'))
-  if (Number.isNaN(normalized)) return false
+  const normalized = parseLitersInput(value)
+  if (normalized == null) return false
   return (RAQ_VOLUME_PRESETS as readonly number[]).includes(normalized)
 }
 

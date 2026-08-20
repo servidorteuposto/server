@@ -1,5 +1,6 @@
 import {
   FUEL_ANALYSES_STORAGE_BUCKET,
+  parseLitersInput,
   type FuelProductKey,
 } from '../config/fuel-analyses'
 import { cnpjDigits } from './cnpj'
@@ -304,7 +305,7 @@ export async function saveFuelAnalysisReport(input: SaveFuelAnalysisReportInput)
         report_id: reportId,
         product_key: item.productKey,
         volume_received_liters: item.volumeReceivedLiters
-          ? Number(item.volumeReceivedLiters.replace(',', '.'))
+          ? parseLitersInput(item.volumeReceivedLiters)
           : null,
         collection_date: item.collectionDate || null,
         transporter_name: item.transporterName.trim() || null,

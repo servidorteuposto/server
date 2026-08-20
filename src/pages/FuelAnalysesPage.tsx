@@ -11,6 +11,7 @@ import {
   FUEL_PRODUCT_LABELS,
   isFuelProductKey,
   isRaqVolumePreset,
+  parseLitersInput,
   productAlcoholKind,
   productHasAlcoholContent,
   RAQ_VOLUME_CUSTOM_OPTION,
@@ -893,8 +894,8 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
       if (!raq.volumeReceivedLiters.trim()) {
         return `${product.label}: informe o volume recebido.`
       }
-      const volumeNumber = Number(raq.volumeReceivedLiters.replace(/\./g, '').replace(',', '.'))
-      if (Number.isNaN(volumeNumber) || volumeNumber <= 0) {
+      const volumeNumber = parseLitersInput(raq.volumeReceivedLiters)
+      if (volumeNumber == null) {
         return `${product.label}: informe um volume válido em litros.`
       }
       if (!raq.collectionDate) return `${product.label}: informe a data da coleta.`
@@ -1379,21 +1380,23 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                             <label className="reg-doc-form__field">
                               <span>Informe o volume (litros) *</span>
                               <input
-                                type="number"
-                                inputMode="decimal"
-                                min="1"
-                                step="1"
+                                type="text"
+                                inputMode="numeric"
+                                autoComplete="off"
+                                placeholder="Ex.: 7000 ou 7.000"
                                 value={draft.volumeReceivedLiters}
                                 onChange={(event) =>
                                   updateRaq(product.key, {
                                     volumeIsCustom: true,
-                                    volumeReceivedLiters: event.target.value,
+                                    volumeReceivedLiters: event.target.value.replace(/[^\d.,]/g, ''),
                                   })
                                 }
                                 disabled={busy}
                                 required
-                                placeholder="Ex.: 3500"
                               />
+                              <p className="fuel-panel__hint">
+                                Digite o total em litros (ex.: 7000). Pontos de milhar são aceitos.
+                              </p>
                             </label>
                           )}
                           <label className="reg-doc-form__field">
@@ -2058,7 +2061,7 @@ function ReportDetailsModal({
           return (
             <div key={item.id} className="fuel-details__block">
               <strong>{FUEL_PRODUCT_LABELS[item.product_key]}</strong>
-              <p>Volume: {item.volume_received_liters ?? '—'} L</p>
+              <p>Volume: {item.volume_received_liters != null ? formatRaqVolumeLabel(item.volume_received_liters) : '—'}</p>
               <p>
                 Coleta:{' '}
                 {item.collection_date ? formatDatePtBr(item.collection_date) : '—'}

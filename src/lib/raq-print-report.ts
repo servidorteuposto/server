@@ -149,7 +149,9 @@ function fitImageSize(image: PDFImage, maxWidth: number, maxHeight: number) {
 
 function buildRaqRows(item: PublicPostoBoard['raq_items'][number]): FieldRow[] {
   return [
-    ['Volume', `${textOrDash(item.volume_received_liters)} L`],
+    ['Volume', item.volume_received_liters != null
+      ? `${new Intl.NumberFormat('pt-BR').format(item.volume_received_liters)} L`
+      : '-'],
     ['Coleta', item.collection_date ? formatDatePtBr(item.collection_date) : '-'],
     [
       'Transportador',

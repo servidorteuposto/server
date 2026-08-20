@@ -312,7 +312,11 @@ function FuelPublicCard({
             <dl>
               <div>
                 <dt>Volume</dt>
-                <dd>{raq.volume_received_liters ?? '—'} L</dd>
+                <dd>
+                  {raq.volume_received_liters != null
+                    ? `${new Intl.NumberFormat('pt-BR').format(raq.volume_received_liters)} L`
+                    : '—'}
+                </dd>
               </div>
               <div>
                 <dt>Coleta</dt>
