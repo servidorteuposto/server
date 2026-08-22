@@ -409,6 +409,10 @@
   gap: 1rem;
 }
 
+.nozzle-modal__panel .reg-doc-modal__actions {
+  margin-top: 0.25rem;
+}
+
 .nozzle-vol-suggest {
   position: relative;
 }

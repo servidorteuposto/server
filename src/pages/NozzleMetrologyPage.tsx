@@ -28,14 +28,20 @@ import {
   type MetrologyStatus,
   type NozzleFuelKey,
 } from '../config/nozzle-metrology'
+import { getMyPostoProfile } from '../lib/fuel-analyses'
 import {
-  getMyPostoId,
   getNozzleMetrologyPhotoUrl,
   getNozzleMetrologySignatureUrl,
   listNozzleMetrologyVerifications,
   saveNozzleMetrologyVerification,
   type NozzleMetrologyVerification,
 } from '../lib/nozzle-metrology'
+import {
+  buildMetrologyPdfFileName,
+  generateMetrologyPrintPdf,
+  type MetrologyExportPosto,
+} from '../lib/nozzle-metrology-export'
+import { downloadRaqPdf, openRaqPdfForPrint } from '../lib/raq-print-report'
 import {
   clearLocalFormDraft,
   deletePostoFormDraft,
@@ -154,9 +160,12 @@ function createEmptyNozzle(nozzleNumber: number): NozzleDraft {
 
 export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageProps) {
   const [postoId, setPostoId] = useState<string | null>(null)
+  const [postoInfo, setPostoInfo] = useState<MetrologyExportPosto | null>(null)
   const [history, setHistory] = useState<NozzleMetrologyVerification[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [exportingId, setExportingId] = useState<string | null>(null)
+  const [exportingMode, setExportingMode] = useState<'print' | 'download' | null>(null)
   const [pageError, setPageError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -183,9 +192,14 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
     setLoading(true)
     setPageError(null)
     try {
-      const id = await getMyPostoId()
-      setPostoId(id)
-      const rows = await listNozzleMetrologyVerifications(id)
+      const profile = await getMyPostoProfile()
+      setPostoId(profile.id)
+      setPostoInfo({
+        nome: profile.nome,
+        cnpj: profile.cnpj,
+        endereco: profile.endereco,
+      })
+      const rows = await listNozzleMetrologyVerifications(profile.id)
       setHistory(rows)
     } catch {
       setPageError('Não foi possível carregar as verificações metrológicas.')
@@ -340,6 +354,34 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
   }, [nozzleEvaluations])
 
   const hasDraft = isMeaningfulDraft({ employeeName, sheetReady, nozzles })
+
+  const handleVerificationPdf = useCallback(
+    async (verification: NozzleMetrologyVerification, mode: 'print' | 'download') => {
+      if (!postoInfo) return
+      setExportingId(verification.id)
+      setExportingMode(mode)
+      setPageError(null)
+      try {
+        const bytes = await generateMetrologyPrintPdf(postoInfo, verification)
+        const fileName = buildMetrologyPdfFileName(postoInfo, verification)
+        if (mode === 'print') {
+          await openRaqPdfForPrint(bytes, fileName)
+        } else {
+          downloadRaqPdf(bytes, fileName)
+        }
+      } catch {
+        setPageError(
+          mode === 'print'
+            ? 'Não foi possível abrir a impressão desta verificação. Tente novamente.'
+            : 'Não foi possível gerar o PDF desta verificação. Tente novamente.',
+        )
+      } finally {
+        setExportingId(null)
+        setExportingMode(null)
+      }
+    },
+    [postoInfo],
+  )
 
   function persistDraftNow() {
     if (!postoId || isReadOnly) return
@@ -984,41 +1026,31 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
         {history.length === 0 ? (
           <p className="fuel-panel__hint">Nenhuma verificação lançada ainda.</p>
         ) : (
-          <div className="reg-docs-table-wrap">
-            <table className="reg-docs-table">
-              <thead>
-                <tr>
-                  <th>Data/hora</th>
-                  <th>Funcionário</th>
-                  <th>Bicos</th>
-                  <th>Resultado</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((row) => (
-                  <tr key={row.id}>
-                    <td>{formatDateTimePtBr(row.verified_at)}</td>
-                    <td>{row.employee_full_name}</td>
-                    <td>{row.nozzle_count}</td>
-                    <td>
-                      <span className={`nozzle-badge nozzle-badge--${row.overall_status}`}>
-                        {statusLabel(row.overall_status)}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn--secondary"
-                        onClick={() => setViewRow(row)}
-                      >
-                        Ver
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="fuel-history">
+            {history.map((row) => (
+              <article key={row.id} className="fuel-history__card">
+                <div>
+                  <h3>{formatDateTimePtBr(row.verified_at)}</h3>
+                  <p>{row.employee_full_name}</p>
+                  <p>
+                    {row.nozzle_count} bico{row.nozzle_count === 1 ? '' : 's'}
+                  </p>
+                  <p>
+                    <span className={`nozzle-badge nozzle-badge--${row.overall_status}`}>
+                      {statusLabel(row.overall_status)}
+                    </span>
+                  </p>
+                </div>
+                <VerificationCardActions
+                  verification={row}
+                  exportingId={exportingId}
+                  exportingMode={exportingMode}
+                  onView={() => setViewRow(row)}
+                  onPrint={() => void handleVerificationPdf(row, 'print')}
+                  onExport={() => void handleVerificationPdf(row, 'download')}
+                />
+              </article>
+            ))}
           </div>
         )}
       </section>
@@ -1026,22 +1058,70 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
       {viewRow && (
         <VerificationDetailModal
           verification={viewRow}
+          exportingId={exportingId}
+          exportingMode={exportingMode}
           onClose={() => setViewRow(null)}
+          onPrint={() => void handleVerificationPdf(viewRow, 'print')}
+          onExport={() => void handleVerificationPdf(viewRow, 'download')}
         />
       )}
     </div>
   )
 }
 
-function VerificationDetailModal({
+function VerificationCardActions({
   verification,
-  onClose,
+  exportingId,
+  exportingMode,
+  onView,
+  onPrint,
+  onExport,
 }: {
   verification: NozzleMetrologyVerification
+  exportingId: string | null
+  exportingMode: 'print' | 'download' | null
+  onView: () => void
+  onPrint: () => void
+  onExport: () => void
+}) {
+  const busy = exportingId === verification.id
+  const printing = busy && exportingMode === 'print'
+  const downloading = busy && exportingMode === 'download'
+  return (
+    <div className="reg-doc-card__actions fuel-history__actions">
+      <button type="button" className="btn btn--secondary" onClick={onView} disabled={busy}>
+        Ver detalhes
+      </button>
+      <button type="button" className="btn btn--secondary" onClick={onPrint} disabled={busy}>
+        {printing ? 'Abrindo...' : 'Imprimir'}
+      </button>
+      <button type="button" className="btn btn--secondary" onClick={onExport} disabled={busy}>
+        {downloading ? 'Gerando...' : 'Exportar PDF'}
+      </button>
+    </div>
+  )
+}
+
+function VerificationDetailModal({
+  verification,
+  exportingId,
+  exportingMode,
+  onClose,
+  onPrint,
+  onExport,
+}: {
+  verification: NozzleMetrologyVerification
+  exportingId: string | null
+  exportingMode: 'print' | 'download' | null
   onClose: () => void
+  onPrint: () => void
+  onExport: () => void
 }) {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
+  const busy = exportingId === verification.id
+  const printing = busy && exportingMode === 'print'
+  const downloading = busy && exportingMode === 'download'
 
   useEffect(() => {
     let cancelled = false
@@ -1084,7 +1164,7 @@ function VerificationDetailModal({
               </strong>
             </p>
           </div>
-          <button type="button" className="btn btn--secondary" onClick={onClose}>
+          <button type="button" className="btn btn--secondary" onClick={onClose} disabled={busy}>
             Fechar
           </button>
         </header>
@@ -1163,6 +1243,18 @@ function VerificationDetailModal({
               <img className="nozzle-signature" src={signatureUrl} alt="Assinatura" />
             </div>
           )}
+        </div>
+
+        <div className="reg-doc-modal__actions">
+          <button type="button" className="btn btn--secondary" onClick={onPrint} disabled={busy}>
+            {printing ? 'Abrindo...' : 'Imprimir'}
+          </button>
+          <button type="button" className="btn btn--secondary" onClick={onExport} disabled={busy}>
+            {downloading ? 'Gerando...' : 'Exportar PDF'}
+          </button>
+          <button type="button" className="btn btn--secondary" onClick={onClose} disabled={busy}>
+            Fechar
+          </button>
         </div>
       </div>
     </div>
