@@ -108,11 +108,11 @@ Variáveis do modelo já criado: `combustivel`, `aspecto`, `cor`, `meobservada`,
 Valores enviados no bico:
 
 - **Lacres (`lacres`):** `OK` ou `FALTANDO`
-- **Vazamento (`vazamento`):** `POSSUI` ou `NÃO POSSUI`
+- **Vazamento (`vazamento`):** `POSSUI` ou `NAO POSSUI`
 - **Mangueira (`mangueiras`):** `OK` ou `DANIFICADA`
 - **Display (`display`):** `OK` ou `QUEIMADO`
 
-`combustivel` vai como `DIESEL S10 ADITIVADO (BICO Nº 01)`. Aspecto/cor/ME/temperatura vêm do último RAQ daquele combustível; se não houver, vai `-`.
+`combustivel` vai como `DIESEL S10 ADITIVADO - BICO 01`. Aspecto/cor/ME/temperatura vêm do último RAQ daquele combustível; se não houver, vai `-`.
 
 Botão URL estático: **Acesse Teu Posto** → `https://www.appteuposto.com.br`
 

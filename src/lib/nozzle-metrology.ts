@@ -187,11 +187,14 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
 
 async function notifyMetrologyFailed(verificationId: string) {
   try {
-    const { error } = await supabase.functions.invoke('send-metrology-alert', {
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData.session?.access_token
+    const { data, error } = await supabase.functions.invoke('send-metrology-alert', {
       body: { verification_id: verificationId },
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
     })
     if (error) {
-      console.warn('notifyMetrologyFailed failed', error)
+      console.warn('notifyMetrologyFailed failed', error, data)
     }
   } catch (error) {
     console.warn('notifyMetrologyFailed failed', error)

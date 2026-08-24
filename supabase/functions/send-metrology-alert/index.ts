@@ -2,14 +2,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import {
   isMetaWhatsAppConfigured,
   normalizeWaPhone,
-  sendWhatsAppTemplate,
+  sendWhatsAppTemplateDetailed,
 } from '../_shared/meta-whatsapp.ts'
 import {
   metrologiaForaTemplate,
   type MetrologyOutOfSpecItem,
   type MetrologyRaqSnapshot,
 } from '../_shared/whatsapp-templates.ts'
-import { isSaoPauloBusinessHours } from '../_shared/business-hours.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -303,7 +302,7 @@ Deno.serve(async (req) => {
 
       async function enqueueRetry(lastError: string) {
         queuedJobs += 1
-        await admin.from('whatsapp_reminder_queue').upsert(
+        const { error: queueError } = await admin.from('whatsapp_reminder_queue').upsert(
           {
             posto_id: posto.id,
             category: CATEGORY,
@@ -319,11 +318,9 @@ Deno.serve(async (req) => {
           },
           { onConflict: 'posto_id,category,reference_id,milestone' },
         )
-      }
-
-      if (!isSaoPauloBusinessHours()) {
-        await enqueueRetry('outside_business_hours')
-        continue
+        if (queueError) {
+          console.error('send-metrology-alert enqueue failed', queueError)
+        }
       }
 
       if (!metaConfigured || apiCalls >= MAX_SENDS) {
@@ -332,17 +329,19 @@ Deno.serve(async (req) => {
       }
 
       let delivered = 0
+      let lastSendError = 'whatsapp_send_failed'
       for (const [index, phone] of phones.entries()) {
         if (apiCalls >= MAX_SENDS) break
         if (apiCalls > 0 || index > 0) await sleep(SEND_DELAY_MS)
-        const sent = await sendWhatsAppTemplate({
+        const sent = await sendWhatsAppTemplateDetailed({
           to: phone,
           name: tpl.name,
           language: tpl.language,
           bodyParams: tpl.bodyParams,
         })
         apiCalls += 1
-        if (sent) delivered += 1
+        if (sent.ok) delivered += 1
+        else if (sent.error) lastSendError = sent.error
       }
 
       if (delivered > 0) {
@@ -365,7 +364,7 @@ Deno.serve(async (req) => {
           .eq('reference_id', verificationId)
           .eq('milestone', milestone)
       } else {
-        await enqueueRetry('whatsapp_send_failed')
+        await enqueueRetry(lastSendError)
       }
     }
 

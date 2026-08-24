@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import {
   isMetaWhatsAppConfigured,
   normalizeWaPhone,
-  sendWhatsAppTemplate,
+  sendWhatsAppTemplateDetailed,
   type NamedBodyParam,
 } from '../_shared/meta-whatsapp.ts'
 import {
@@ -343,8 +343,14 @@ async function hasPendingRaq(
   return Boolean(data?.id)
 }
 
+const INCIDENT_QUEUE_CATEGORIES = ['metrology_failed', 'raq_out_of_spec'] as const
+
 /** Envia pendências da fila via Meta templates; só marca enviado após sucesso. */
-async function flushReminderQueue(admin: ReturnType<typeof createClient>, todayKey: string) {
+async function flushReminderQueue(
+  admin: ReturnType<typeof createClient>,
+  todayKey: string,
+  onlyCategories?: readonly string[],
+) {
   const details: Array<Record<string, unknown>> = []
   let apiCalls = 0
   let jobsSent = 0
@@ -371,7 +377,7 @@ async function flushReminderQueue(admin: ReturnType<typeof createClient>, todayK
     }
   }
 
-  const { data: pending, error: pendingError } = await admin
+  let pendingQuery = admin
     .from('whatsapp_reminder_queue')
     .select(
       'id, posto_id, category, reference_id, milestone, message, template_name, template_params, phones, due_on, attempts',
@@ -379,6 +385,12 @@ async function flushReminderQueue(admin: ReturnType<typeof createClient>, todayK
     .order('due_on', { ascending: true })
     .order('created_at', { ascending: true })
     .limit(Math.max(MAX_SENDS_PER_RUN * 2, 40))
+
+  if (onlyCategories?.length) {
+    pendingQuery = pendingQuery.in('category', [...onlyCategories])
+  }
+
+  const { data: pending, error: pendingError } = await pendingQuery
 
   if (pendingError) throw pendingError
 
@@ -480,14 +492,14 @@ async function flushReminderQueue(admin: ReturnType<typeof createClient>, todayK
     for (const phone of phones) {
       if (apiCalls >= MAX_SENDS_PER_RUN) break
       if (apiCalls > 0) await sleep(SEND_DELAY_MS)
-      const delivered = await sendWhatsAppTemplate({
+      const delivered = await sendWhatsAppTemplateDetailed({
         to: String(phone),
         name: templateName,
         bodyParams,
       })
       apiCalls += 1
-      if (delivered) ok = true
-      else lastError = 'whatsapp_send_failed'
+      if (delivered.ok) ok = true
+      else lastError = delivered.error || 'whatsapp_send_failed'
     }
 
     if (ok) {
@@ -576,12 +588,18 @@ Deno.serve(async (req) => {
     }
 
     if (!isSaoPauloBusinessHours()) {
+      const incidentFlush = await flushReminderQueue(admin, todayKey, INCIDENT_QUEUE_CATEGORIES)
       return jsonResponse({
         ok: true,
         skipped: 'outside_business_hours',
         timezone: TIME_ZONE,
         window: '08:00-18:00',
         today: todayKey,
+        sent: incidentFlush.jobsSent,
+        deferred: incidentFlush.deferred,
+        pending_left: incidentFlush.pending_left,
+        meta_configured: incidentFlush.meta_configured,
+        details: incidentFlush.details,
       })
     }
 

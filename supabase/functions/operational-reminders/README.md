@@ -18,8 +18,8 @@ Edge Function que envia avisos WhatsApp (templates) para os números `aviso_what
 | Cursos NR-20/NR-35 | `aviso_treinamentos` | só depois de anexar o certificado; 30, 15, 7, 1 e 0 dias antes |
 | Assinatura vencida | `aviso_assinatura_vencida` | quando o admin pausa o acesso ou o plano expira |
 | Metrologia | `aviso_metrologia` | só depois da primeira verificação; 15 dias depois do último lançamento |
-| RAQ fora das especificações | `aviso_raq_fora` | no lançamento inapto (fila se fora do horário comercial) |
-| Metrologia reprovada | `aviso_metrologia_fora` | no lançamento reprovado (fila se fora do horário comercial) |
+| RAQ fora das especificações | `aviso_raq_fora` | no lançamento inapto (envia na hora; se a Meta falhar, fica na fila) |
+| Metrologia reprovada | `aviso_metrologia_fora` | no lançamento reprovado (envia na hora; se a Meta falhar, fica na fila) |
 | Drenagem diesel | `aviso_drenagem_diesel` | só depois da primeira drenagem; 7 dias depois do último lançamento |
 | RAQ | `aviso_raq1` | só depois do primeiro RAQ; 4 dias após o último lançamento (a contagem reinicia se lançar de novo) |
 
@@ -36,7 +36,7 @@ Só postos com `subscription_status = active` e pelo menos um WhatsApp cadastrad
 
 ## Horário
 
-Envios só das **08:00 às 18:00** em `America/Sao_Paulo`, qualquer dia da semana. Fora disso a function não dispara a fila; avisos imediatos (RAQ/metrologia fora) entram na fila e saem no próximo horário comercial.
+Envios periódicos só das **08:00 às 18:00** em `America/Sao_Paulo`, qualquer dia da semana. Avisos imediatos (RAQ/metrologia fora) saem na hora do lançamento; se falharem, a fila também é processada fora do horário comercial.
 
 ## Cron
 

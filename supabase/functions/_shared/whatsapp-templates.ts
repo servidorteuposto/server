@@ -395,7 +395,7 @@ function metrologySealsLabel(value: boolean | null | undefined) {
 
 function metrologyLeakageLabel(value: boolean | null | undefined) {
   if (value === true) return 'POSSUI'
-  if (value === false) return 'NÃO POSSUI'
+  if (value === false) return 'NAO POSSUI'
   return '-'
 }
 
@@ -418,7 +418,7 @@ function metrologyFuelLabel(key: string, otherLabel?: string | null) {
 }
 
 function formatNozzleWaLabel(nozzleNumber: number) {
-  return `BICO Nº ${String(nozzleNumber).padStart(2, '0')}`
+  return `BICO ${String(nozzleNumber).padStart(2, '0')}`
 }
 
 /**
@@ -440,7 +440,7 @@ export function metrologiaForaTemplate(input: {
     .toUpperCase()
     .replace(/S-10/g, 'S10')
     .replace(/S-500/g, 'S500')
-  const combustivel = `${fuel} (${formatNozzleWaLabel(input.item.nozzle_number)})`
+  const combustivel = `${fuel} - ${formatNozzleWaLabel(input.item.nozzle_number)}`
   const raq = input.raq ?? {}
   return {
     name: POSTO_TEMPLATES.metrologiaFora,
