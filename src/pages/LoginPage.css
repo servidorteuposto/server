@@ -372,6 +372,17 @@
   background: #0a3268;
 }
 
+.login-trial-btn {
+  margin-top: 0.85rem;
+  background: #25d366;
+  color: #fff;
+  text-decoration: none;
+}
+
+.login-trial-btn:hover {
+  background: #1ebe5a;
+}
+
 .login-card__footer {
   margin-top: 1.5rem;
   text-align: center;

@@ -5,6 +5,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
+import { buildSimularGratisWhatsAppUrl } from '../config/sales'
 import './MobileLockCover.css'
 
 const STORAGE_KEY = 'teuposto_mobile_cover_unlocked'
@@ -166,6 +167,18 @@ export default function MobileLockCover() {
         decoding="async"
         fetchPriority="high"
       />
+
+      <a
+        className="mobile-lock__trial"
+        href={buildSimularGratisWhatsAppUrl()}
+        target="_blank"
+        rel="noopener noreferrer"
+        onPointerDown={(event) => event.stopPropagation()}
+        onPointerUp={(event) => event.stopPropagation()}
+        aria-label="Simular grátis pelo WhatsApp"
+      >
+        Simular grátis
+      </a>
 
       <button
         type="button"
