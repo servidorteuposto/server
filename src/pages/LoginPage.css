@@ -2,31 +2,26 @@
   position: fixed;
   inset: 0;
   width: 100%;
-  height: auto;
-  max-height: none;
+  height: 100%;
+  min-height: 100dvh;
+  min-height: 100lvh;
   overflow: hidden;
-  background: #c6c4c6;
-  /* iOS: pinta além do home indicator (evita faixa cinza no rodapé) */
-  box-shadow: 0 120px 0 0 #c6c4c6;
+  background: transparent;
 }
 
-/* Fundo full-bleed — cobre a tela inteira, sem faixa branca */
+/* Fundo full-bleed: passa da safe-area (notch, home indicator, PWA) */
 .login-page__bg {
-  position: absolute;
-  inset: 0;
+  position: fixed;
   z-index: 0;
+  top: calc(-1 * env(safe-area-inset-top, 0px) - 18vh);
+  right: 0;
+  bottom: calc(-1 * env(safe-area-inset-bottom, 0px) - 18vh);
+  left: 0;
   width: 100%;
   height: auto;
-  min-height: 100%;
-  /* Estica além da safe-area inferior */
-  bottom: -120px;
   pointer-events: none;
-  background-color: #c6c4c6;
-  background-image: image-set(
-    url('/imagens/fundo_login.webp?v=5') type('image/webp'),
-    url('/imagens/fundo_login.jpg?v=5') type('image/jpeg'),
-    url('/imagens/fundo_login.png?v=5') type('image/png')
-  );
+  background-color: transparent;
+  background-image: var(--login-bg-image);
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;

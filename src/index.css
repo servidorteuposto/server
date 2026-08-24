@@ -20,6 +20,11 @@
   --white: #ffffff;
   --shadow-card: 0 25px 50px -12px rgba(12, 59, 122, 0.15);
   --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --login-bg-image: image-set(
+    url('/imagens/fundo_login.webp?v=5') type('image/webp'),
+    url('/imagens/fundo_login.jpg?v=5') type('image/jpeg'),
+    url('/imagens/fundo_login.png?v=5') type('image/png')
+  );
 }
 
 html,
@@ -47,19 +52,31 @@ body {
   background-color: #c6c4c6;
 }
 
-/* Login/capa: trava scroll e mantém cor de fundo (nunca branco/transparente) */
-html.teuposto-login-active,
+/* Login: a foto cobre html/body (status bar, PWA e overscroll), não uma cor sólida */
+html.teuposto-login-active {
+  height: 100%;
+  min-height: 100dvh;
+  min-height: 100lvh;
+  max-height: none;
+  overflow: hidden !important;
+  overscroll-behavior: none;
+  background-color: #c6c4c6;
+  background-image: var(--login-bg-image);
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+}
+
 html.teuposto-login-active body,
 html.teuposto-login-active #root {
   height: 100%;
-  height: 100dvh;
-  height: 100svh;
-  max-height: 100%;
-  max-height: 100dvh;
-  max-height: 100svh;
+  min-height: 100dvh;
+  min-height: 100lvh;
+  max-height: none;
   overflow: hidden !important;
   overscroll-behavior: none;
-  background-color: #c6c4c6 !important;
+  background-color: transparent !important;
+  background-image: none;
 }
 
 html.teuposto-lock-active,
@@ -73,6 +90,7 @@ html.teuposto-lock-active #root {
   max-height: 100svh;
   overflow: hidden !important;
   overscroll-behavior: none;
+  background-image: none !important;
   background-color: #000821 !important;
 }
 

@@ -585,7 +585,7 @@ export default function LoginPage() {
     document.body.style.overflow = 'hidden'
     const theme = document.querySelector('meta[name="theme-color"]')
     const previousTheme = theme?.getAttribute('content') ?? null
-    theme?.setAttribute('content', '#c6c4c6')
+    theme?.setAttribute('content', 'transparent')
     return () => {
       document.documentElement.classList.remove('teuposto-login-active')
       document.body.style.overflow = prevOverflow
