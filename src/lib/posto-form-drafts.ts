@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 export const POSTO_FORM_DRAFT_KINDS = {
   fuelRaq: 'fuel_raq',
   nozzleMetrology: 'nozzle_metrology',
+  dieselDrainage: 'diesel_drainage',
 } as const
 
 export type PostoFormDraftKind = (typeof POSTO_FORM_DRAFT_KINDS)[keyof typeof POSTO_FORM_DRAFT_KINDS]

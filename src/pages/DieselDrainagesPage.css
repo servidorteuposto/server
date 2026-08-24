@@ -7,6 +7,28 @@
   align-items: start;
 }
 
+.diesel-draft-banner,
+.diesel-draft-hint {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.diesel-draft-hint {
+  margin-top: 0.65rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+.diesel-panel .fuel-panel__header h2 {
+  margin-bottom: 0.2rem;
+}
+
 .diesel-export {
   position: relative;
 }

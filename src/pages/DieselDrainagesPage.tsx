@@ -33,12 +33,89 @@ import {
   type DieselTank,
 } from '../lib/diesel-drainages'
 import { getMyPostoProfile } from '../lib/fuel-analyses'
+import {
+  clearLocalFormDraft,
+  deletePostoFormDraft,
+  POSTO_FORM_DRAFT_KINDS,
+  resolvePostoFormDraft,
+  savePostoFormDraft,
+  writeLocalFormDraft,
+} from '../lib/posto-form-drafts'
 import '../pages/RegulatoryDocumentsPage.css'
 import '../pages/FuelAnalysesPage.css'
 import './DieselDrainagesPage.css'
 
 type DieselDrainagesPageProps = {
   isReadOnly: boolean
+}
+
+type DieselDrainageFormDraft = {
+  v: 1
+  savedAt: string
+  tankId: string
+  operatorName: string
+  waterPresent: boolean | null
+  impuritiesPresent: boolean | null
+  drainedVolumeLiters: string
+  measureTaken: string
+  observations: string
+  residuesConfirmed: boolean
+}
+
+const DRAFT_KIND = POSTO_FORM_DRAFT_KINDS.dieselDrainage
+const DRAFT_KEY_PREFIX = 'teuposto_diesel_drainage_draft:'
+const DRAFT_SAVE_DEBOUNCE_MS = 800
+
+function draftStorageKey(postoId: string) {
+  return `${DRAFT_KEY_PREFIX}${postoId}`
+}
+
+function isDieselDrainageFormDraft(value: unknown): value is DieselDrainageFormDraft {
+  if (!value || typeof value !== 'object') return false
+  const draft = value as DieselDrainageFormDraft
+  return (
+    draft.v === 1 &&
+    typeof draft.savedAt === 'string' &&
+    typeof draft.tankId === 'string' &&
+    typeof draft.operatorName === 'string' &&
+    (draft.waterPresent === true || draft.waterPresent === false || draft.waterPresent === null) &&
+    (draft.impuritiesPresent === true ||
+      draft.impuritiesPresent === false ||
+      draft.impuritiesPresent === null) &&
+    typeof draft.drainedVolumeLiters === 'string' &&
+    typeof draft.measureTaken === 'string' &&
+    typeof draft.observations === 'string' &&
+    typeof draft.residuesConfirmed === 'boolean'
+  )
+}
+
+function isMeaningfulDraft(input: {
+  operatorName: string
+  waterPresent: boolean | null
+  impuritiesPresent: boolean | null
+  drainedVolumeLiters: string
+  measureTaken: string
+  observations: string
+  residuesConfirmed: boolean
+}) {
+  if (input.operatorName.trim()) return true
+  if (input.waterPresent !== null) return true
+  if (input.impuritiesPresent !== null) return true
+  if (input.drainedVolumeLiters.trim()) return true
+  if (input.measureTaken.trim()) return true
+  if (input.observations.trim()) return true
+  if (input.residuesConfirmed) return true
+  return false
+}
+
+function buildDieselDrainageDraft(
+  input: Omit<DieselDrainageFormDraft, 'v' | 'savedAt'>,
+): DieselDrainageFormDraft {
+  return {
+    v: 1,
+    savedAt: new Date().toISOString(),
+    ...input,
+  }
 }
 
 function readGeolocation(): Promise<GeolocationPosition> {
@@ -91,6 +168,8 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [drainedAtPreview, setDrainedAtPreview] = useState(() => new Date().toISOString())
   const [viewReport, setViewReport] = useState<DieselDrainageReport | null>(null)
+  const [draftHydrated, setDraftHydrated] = useState(false)
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null)
 
   const selectableTanks = useMemo(
     () => tanks.filter((tank) => tank.is_active && isDieselTankTypeLabel(tank.name)),
@@ -142,12 +221,170 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
     loadPage()
   }, [loadPage])
 
+  const applyDrainageDraft = useCallback(
+    (stored: DieselDrainageFormDraft, tankRows: DieselTank[]) => {
+      const tankOk = stored.tankId && tankRows.some((tank) => tank.id === stored.tankId)
+      if (tankOk) setTankId(stored.tankId)
+      setOperatorName(stored.operatorName)
+      setWaterPresent(stored.waterPresent)
+      setImpuritiesPresent(stored.impuritiesPresent)
+      setDrainedVolumeLiters(stored.drainedVolumeLiters)
+      setMeasureTaken(stored.measureTaken)
+      setObservations(stored.observations)
+      setResiduesConfirmed(stored.residuesConfirmed)
+      setDraftSavedAt(stored.savedAt)
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (isReadOnly) {
+      setDraftHydrated(true)
+      return
+    }
+    if (loading) return
+    if (!postoId) {
+      setDraftHydrated(true)
+      return
+    }
+    if (draftHydrated) return
+
+    let cancelled = false
+    void (async () => {
+      const stored = await resolvePostoFormDraft(
+        postoId,
+        DRAFT_KIND,
+        draftStorageKey(postoId),
+        isDieselDrainageFormDraft,
+      )
+      if (cancelled) return
+      if (stored && isMeaningfulDraft(stored)) {
+        applyDrainageDraft(stored, tanks)
+      }
+      setDraftHydrated(true)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [postoId, isReadOnly, loading, draftHydrated, tanks, applyDrainageDraft])
+
+  useEffect(() => {
+    if (!draftHydrated || !postoId || isReadOnly) return
+
+    const payload = {
+      operatorName,
+      waterPresent,
+      impuritiesPresent,
+      drainedVolumeLiters,
+      measureTaken,
+      observations,
+      residuesConfirmed,
+    }
+    const timer = window.setTimeout(() => {
+      if (!isMeaningfulDraft(payload)) {
+        clearLocalFormDraft(draftStorageKey(postoId))
+        setDraftSavedAt(null)
+        void deletePostoFormDraft(postoId, DRAFT_KIND)
+        return
+      }
+      const draft = buildDieselDrainageDraft({
+        tankId,
+        operatorName,
+        waterPresent,
+        impuritiesPresent,
+        drainedVolumeLiters,
+        measureTaken,
+        observations,
+        residuesConfirmed,
+      })
+      writeLocalFormDraft(draftStorageKey(postoId), draft)
+      setDraftSavedAt(draft.savedAt)
+      void savePostoFormDraft(postoId, DRAFT_KIND, draft).catch(() => {
+        /* cache local permanece */
+      })
+    }, DRAFT_SAVE_DEBOUNCE_MS)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    draftHydrated,
+    postoId,
+    isReadOnly,
+    tankId,
+    operatorName,
+    waterPresent,
+    impuritiesPresent,
+    drainedVolumeLiters,
+    measureTaken,
+    observations,
+    residuesConfirmed,
+  ])
+
+  useEffect(() => {
+    const onLeave = () => persistDraftNow()
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') onLeave()
+    }
+    window.addEventListener('pagehide', onLeave)
+    window.addEventListener('beforeunload', onLeave)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pagehide', onLeave)
+      window.removeEventListener('beforeunload', onLeave)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  })
+
   useEffect(() => {
     const timer = window.setInterval(() => {
       setDrainedAtPreview(new Date().toISOString())
     }, 1000)
     return () => window.clearInterval(timer)
   }, [])
+
+  const hasDraft = isMeaningfulDraft({
+    operatorName,
+    waterPresent,
+    impuritiesPresent,
+    drainedVolumeLiters,
+    measureTaken,
+    observations,
+    residuesConfirmed,
+  })
+
+  function persistDraftNow() {
+    if (!postoId || isReadOnly || !draftHydrated) return
+    const payload = {
+      operatorName,
+      waterPresent,
+      impuritiesPresent,
+      drainedVolumeLiters,
+      measureTaken,
+      observations,
+      residuesConfirmed,
+    }
+    if (!isMeaningfulDraft(payload)) {
+      clearLocalFormDraft(draftStorageKey(postoId))
+      setDraftSavedAt(null)
+      void deletePostoFormDraft(postoId, DRAFT_KIND)
+      return
+    }
+    const draft = buildDieselDrainageDraft({
+      tankId,
+      operatorName,
+      waterPresent,
+      impuritiesPresent,
+      drainedVolumeLiters,
+      measureTaken,
+      observations,
+      residuesConfirmed,
+    })
+    writeLocalFormDraft(draftStorageKey(postoId), draft)
+    setDraftSavedAt(draft.savedAt)
+    void savePostoFormDraft(postoId, DRAFT_KIND, draft).catch(() => {
+      /* cache local permanece */
+    })
+  }
 
   function clearLivePhoto() {
     if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
@@ -172,6 +409,15 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
     clearLivePhoto()
     setFormError(null)
     setDrainedAtPreview(new Date().toISOString())
+  }
+
+  function discardDraft() {
+    if (postoId) {
+      clearLocalFormDraft(draftStorageKey(postoId))
+      void deletePostoFormDraft(postoId, DRAFT_KIND)
+    }
+    setDraftSavedAt(null)
+    resetDrainageForm()
   }
 
   useEffect(() => {
@@ -369,6 +615,11 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
         photoCapturedAt,
       })
       setReports((current) => [saved, ...current])
+      if (postoId) {
+        clearLocalFormDraft(draftStorageKey(postoId))
+        void deletePostoFormDraft(postoId, DRAFT_KIND)
+      }
+      setDraftSavedAt(null)
       resetDrainageForm()
     } catch {
       setFormError('Não foi possível lançar o relatório de drenagem.')
@@ -442,6 +693,13 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
       </header>
 
       {pageError && <p className="reg-doc-form__error reg-docs-page__banner">{pageError}</p>}
+      {!isReadOnly && hasDraft && (
+        <p className="diesel-draft-banner" role="status">
+          Há um rascunho salvo neste posto
+          {draftSavedAt ? ` (${formatDateTimePtBr(draftSavedAt)})` : ''}. Você pode continuar no
+          computador ou no celular — foto e assinatura precisam ser feitas de novo na hora de lançar.
+        </p>
+      )}
 
       {periodModalOpen && (
         <div
@@ -523,7 +781,30 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
 
       {!isReadOnly && (
         <form className="fuel-panel diesel-panel" onSubmit={handleSubmitDrainage}>
-          <h2>Nova drenagem</h2>
+          <div className="fuel-panel__header">
+            <div>
+              <h2>Nova drenagem</h2>
+              {hasDraft && (
+                <p className="diesel-draft-hint" role="status">
+                  Rascunho salvo neste posto
+                  {draftSavedAt ? ` às ${formatDateTimePtBr(draftSavedAt)}` : ''}. Foto e
+                  assinatura não entram no rascunho.
+                </p>
+              )}
+            </div>
+            {hasDraft && (
+              <div className="fuel-panel__header-actions">
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={discardDraft}
+                  disabled={busy}
+                >
+                  Descartar rascunho
+                </button>
+              </div>
+            )}
+          </div>
           <p className="fuel-panel__hint">
             Data e horário da drenagem: <strong>{formatDateTimePtBr(drainedAtPreview)}</strong>
           </p>
@@ -700,7 +981,7 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
                 <button
                   type="button"
                   className="btn btn--secondary"
-                  onClick={resetDrainageForm}
+                  onClick={discardDraft}
                   disabled={busy}
                 >
                   Limpar
