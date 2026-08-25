@@ -88,35 +88,95 @@ const KNOWN_TEMPLATE_SHAPES: Record<string, TemplateShape> = {
   aviso_raq_fora: {
     bodyNames: [
       'combustivel',
-      'aspecto',
-      'cor',
-      'meobservada',
-      'temperatura',
-      'meconvertida',
-      'teor',
       'data',
       'razao',
       'cnpj',
       'endereco',
+      'aspecto',
+      'cor',
+      'tempo',
+      'massa',
+      'massac',
+      'teor',
     ],
+    bodyPositional: 0,
+  },
+  aviso_treinamentos: {
+    bodyNames: ['func', 'tre', 'dia', 'razao', 'cnpj', 'endereco'],
+    bodyPositional: 0,
+  },
+  aviso_laudos_de_engenharia_e_saude_ocupacional: {
+    bodyNames: ['doc', 'x', 'razao', 'cnpj', 'endereco'],
     bodyPositional: 0,
   },
   aviso_metrologia_fora: {
     bodyNames: [
-      'combustivel',
-      'aspecto',
-      'cor',
-      'meobservada',
-      'temperatura',
-      'meconvertida',
-      'vazamento',
-      'mangueiras',
-      'lacres',
+      'number',
       'data',
       'razao',
       'cnpj',
       'endereco',
+      'volmin',
+      'vazaomin',
+      'volmax',
+      'vazaomax',
+      'lacre',
+      'vaz',
+      'mang',
+      'display',
     ],
+    bodyPositional: 0,
+  },
+  aviso_assinatura_vencida: {
+    bodyNames: ['razao', 'cnpj', 'endereco'],
+    bodyPositional: 0,
+  },
+  aviso_assinatura_2d: {
+    bodyNames: ['razao', 'cnpj', 'endereco'],
+    bodyPositional: 0,
+  },
+  aviso_assinatura_7d: {
+    bodyNames: ['razao', 'cnpj', 'endereco'],
+    bodyPositional: 0,
+  },
+  aviso_bloqueio: {
+    bodyNames: ['razao', 'cnpj', 'endereco'],
+    bodyPositional: 0,
+  },
+  aviso_raq1: {
+    bodyNames: ['razao', 'cnpj', 'endereco'],
+    bodyPositional: 0,
+  },
+  aviso_drenagem_diesel: {
+    bodyNames: ['razao', 'cnpj', 'endereco', 'tanque'],
+    bodyPositional: 0,
+  },
+  aviso_metrologia: {
+    bodyNames: ['razao', 'cnpj', 'endereco'],
+    bodyPositional: 0,
+  },
+  aviso_doc_vencido: {
+    bodyNames: ['razao', 'cnpj', 'endereco', 'documento'],
+    bodyPositional: 0,
+  },
+  aviso_doc_prazo: {
+    bodyNames: ['razao', 'cnpj', 'endereco', 'documento', 'dias'],
+    bodyPositional: 0,
+  },
+  aviso_admin_dominio: {
+    bodyNames: ['x', 'y'],
+    bodyPositional: 0,
+  },
+  aviso_admin_resend: {
+    bodyNames: ['um', 'dois', 'tres', 'quatro'],
+    bodyPositional: 0,
+  },
+  aviso_admin_db: {
+    bodyNames: ['porcentagem', 'um', 'dois'],
+    bodyPositional: 0,
+  },
+  aviso_admin_r2: {
+    bodyNames: ['porcentagem', 'um', 'dois'],
     bodyPositional: 0,
   },
 }
@@ -150,10 +210,20 @@ function placeholdersFromText(text: string) {
 function valueForTemplateName(name: string, available: Map<string, string>) {
   const direct = available.get(name)
   if (direct) return direct
-  if (name === 'x' || name === 'hora') return available.get('data') ?? '-'
+  if (name === 'x' || name === 'hora' || name === 'dia') {
+    return available.get('dia') ?? available.get('x') ?? available.get('data') ?? '-'
+  }
+  if (name === 'func') return available.get('func') ?? available.get('funcionario') ?? '-'
+  if (name === 'tre') return available.get('tre') ?? available.get('curso') ?? '-'
   if (name === 'status' || name === 'resultado') return available.get('status') ?? 'INAPTO'
   if (name === 'teor') return available.get('teor') ?? '-'
-  if (name === 'bico') return available.get('bico') ?? '-'
+  if (name === 'tempo') return available.get('tempo') ?? available.get('temperatura') ?? '-'
+  if (name === 'massa') return available.get('massa') ?? available.get('meobservada') ?? '-'
+  if (name === 'massac') return available.get('massac') ?? available.get('meconvertida') ?? '-'
+  if (name === 'bico' || name === 'number') return available.get('number') ?? available.get('bico') ?? '-'
+  if (name === 'lacre') return available.get('lacre') ?? available.get('lacres') ?? '-'
+  if (name === 'vaz') return available.get('vaz') ?? available.get('vazamento') ?? '-'
+  if (name === 'mang') return available.get('mang') ?? available.get('mangueiras') ?? '-'
   return '-'
 }
 

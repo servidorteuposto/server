@@ -4,11 +4,7 @@ import {
   normalizeWaPhone,
   sendWhatsAppTemplateDetailed,
 } from '../_shared/meta-whatsapp.ts'
-import {
-  metrologiaForaTemplate,
-  type MetrologyOutOfSpecItem,
-  type MetrologyRaqSnapshot,
-} from '../_shared/whatsapp-templates.ts'
+import { metrologiaForaTemplate, type MetrologyOutOfSpecItem } from '../_shared/whatsapp-templates.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -118,55 +114,6 @@ function milestoneFor(nozzleNumber: number) {
   return `bico:${nozzleNumber}`
 }
 
-async function loadLatestRaqByProduct(
-  admin: ReturnType<typeof createClient>,
-  postoId: string,
-  productKeys: string[],
-) {
-  const map = new Map<string, MetrologyRaqSnapshot>()
-  const keys = [...new Set(productKeys.filter((key) => key && key !== 'outro' && key !== 'manutencao'))]
-  if (!keys.length) return map
-
-  const { data: reports } = await admin
-    .from('fuel_analysis_reports')
-    .select('id, submitted_at')
-    .eq('posto_id', postoId)
-    .order('submitted_at', { ascending: false })
-    .limit(40)
-
-  const reportIds = (reports ?? []).map((row) => row.id as string)
-  if (!reportIds.length) return map
-
-  const { data: items } = await admin
-    .from('fuel_analysis_items')
-    .select(
-      'report_id, product_key, aspecto, cor, temperatura_observada, massa_especifica_observada, massa_especifica_convertida',
-    )
-    .in('report_id', reportIds)
-    .in('product_key', keys)
-
-  const reportOrder = new Map(reportIds.map((id, index) => [id, index]))
-  const rows = [...(items ?? [])].sort((a, b) => {
-    const aOrder = reportOrder.get(a.report_id as string) ?? 999
-    const bOrder = reportOrder.get(b.report_id as string) ?? 999
-    return aOrder - bOrder
-  })
-
-  for (const row of rows) {
-    const key = String(row.product_key ?? '')
-    if (!key || map.has(key)) continue
-    map.set(key, {
-      aspecto: row.aspecto,
-      cor: row.cor,
-      temperatura_observada: row.temperatura_observada,
-      massa_especifica_observada: row.massa_especifica_observada,
-      massa_especifica_convertida: row.massa_especifica_convertida,
-    })
-  }
-
-  return map
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -243,7 +190,7 @@ Deno.serve(async (req) => {
     const { data: itemRows, error: itemsError } = await admin
       .from('nozzle_metrology_items')
       .select(
-        'nozzle_number, fuel_product_key, fuel_other_label, item_status, seals_ok, leakage, hose_ok, display_burned',
+        'nozzle_number, fuel_product_key, fuel_other_label, item_status, volumetry_min, volumetry_max, flow_min_liters, flow_max_liters, seals_ok, leakage, hose_ok, display_burned',
       )
       .eq('verification_id', verificationId)
       .eq('posto_id', posto.id)
@@ -261,12 +208,6 @@ Deno.serve(async (req) => {
     if (!phones.length) {
       return jsonResponse({ ok: true, skipped: 'no_phones', template: 'aviso_metrologia_fora' })
     }
-
-    const raqByProduct = await loadLatestRaqByProduct(
-      admin,
-      posto.id,
-      failed.map((item) => item.fuel_product_key),
-    )
 
     const todayKey = saoPauloTodayKey()
     const dataVerificacao = formatSaoPauloDate(
@@ -297,7 +238,6 @@ Deno.serve(async (req) => {
         endereco,
         data: dataVerificacao,
         item,
-        raq: raqByProduct.get(item.fuel_product_key) ?? null,
       })
 
       async function enqueueRetry(lastError: string) {

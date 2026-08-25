@@ -60,24 +60,31 @@ function formatEndereco(value: string | null | undefined) {
   return sanitizeWaParam(value, 'nao informado')
 }
 
-/** aviso_admin_db / aviso_admin_r2: {{porcentagem}} {{um}} {{dois}} */
+function formatGbAmount(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes < 0) return '0'
+  const gb = bytes / (1024 * 1024 * 1024)
+  if (gb >= 10) return String(Math.round(gb))
+  if (gb >= 1) return gb.toFixed(1).replace('.', ',')
+  if (gb <= 0) return '0'
+  return gb.toFixed(2).replace('.', ',')
+}
+
+/** aviso_admin_db / aviso_admin_r2: {{porcentagem}} {{um}} {{dois}} — o modelo já traz o sufixo GB. */
 export function adminDbOrR2Template(
   kind: 'db' | 'r2',
   pct: number,
-  usedLabel: string,
-  quotaLabel: string,
+  usedBytes: number,
+  quotaBytes: number,
 ): TemplatePayload {
   const name = kind === 'db' ? ADMIN_TEMPLATES.db : ADMIN_TEMPLATES.r2
   const pctStr = String(pct)
+  const used = formatGbAmount(usedBytes)
+  const quota = formatGbAmount(quotaBytes)
   return {
     name,
     language: WA_LANG,
-    bodyParams: [
-      p('porcentagem', pctStr),
-      p('um', usedLabel),
-      p('dois', quotaLabel),
-    ],
-    summary: `${name}: ${pctStr}% · ${usedLabel} / ${quotaLabel}`,
+    bodyParams: [p('porcentagem', pctStr), p('um', used), p('dois', quota)],
+    summary: `${name}: ${pctStr}% · ${used} GB / ${quota} GB`,
   }
 }
 
@@ -225,7 +232,7 @@ export function laudosEngenhariaTemplate(input: {
 
 /**
  * aviso_treinamentos:
- * {{curso}} {{funcionario}} {{x}} {{razao}} {{cnpj}} {{endereco}}
+ * {{func}} {{tre}} {{dia}} {{razao}} {{cnpj}} {{endereco}}
  */
 export function cursosFuncionariosTemplate(input: {
   nome: string
@@ -241,9 +248,9 @@ export function cursosFuncionariosTemplate(input: {
     name: POSTO_TEMPLATES.cursosFuncionarios,
     language: WA_LANG,
     bodyParams: [
-      p('curso', input.curso),
-      p('funcionario', input.funcionario),
-      p('x', when),
+      p('func', input.funcionario),
+      p('tre', input.curso),
+      p('dia', when),
       p('razao', razao),
       p('cnpj', formatCnpj(input.cnpj)),
       p('endereco', formatEndereco(input.endereco)),
@@ -334,9 +341,9 @@ export type RaqOutOfSpecItem = {
 }
 
 /**
- * aviso_raq_fora — modelo aprovado na WABA espera 11 variáveis:
- * {{combustivel}} {{aspecto}} {{cor}} {{meobservada}} {{temperatura}}
- * {{meconvertida}} {{teor}} {{data}} {{razao}} {{cnpj}} {{endereco}}
+ * aviso_raq_fora — 11 variáveis nomeadas do modelo na WABA:
+ * {{combustivel}} {{data}} {{razao}} {{cnpj}} {{endereco}}
+ * {{aspecto}} {{cor}} {{tempo}} {{massa}} {{massac}} {{teor}}
  */
 export function raqForaTemplate(input: {
   nome: string
@@ -355,28 +362,19 @@ export function raqForaTemplate(input: {
     language: WA_LANG,
     bodyParams: [
       p('combustivel', combustivel),
-      p('aspecto', input.item.aspecto),
-      p('cor', input.item.cor),
-      p('meobservada', input.item.massa_especifica_observada),
-      p('temperatura', input.item.temperatura_observada),
-      p('meconvertida', input.item.massa_especifica_convertida),
-      p('teor', input.item.teor_alcool_gasolina),
-      p('status', 'INAPTO'),
       p('data', input.data),
       p('razao', razao),
       p('cnpj', formatCnpj(input.cnpj)),
       p('endereco', formatEndereco(input.endereco)),
+      p('aspecto', input.item.aspecto),
+      p('cor', input.item.cor),
+      p('tempo', input.item.temperatura_observada),
+      p('massa', input.item.massa_especifica_observada),
+      p('massac', input.item.massa_especifica_convertida),
+      p('teor', input.item.teor_alcool_gasolina),
     ],
     summary: `aviso_raq_fora: ${razao} · ${combustivel}`,
   }
-}
-
-export type MetrologyRaqSnapshot = {
-  aspecto?: string | null
-  cor?: string | null
-  temperatura_observada?: string | null
-  massa_especifica_observada?: string | null
-  massa_especifica_convertida?: string | null
 }
 
 export type MetrologyOutOfSpecItem = {
@@ -384,6 +382,10 @@ export type MetrologyOutOfSpecItem = {
   fuel_product_key: string
   fuel_other_label?: string | null
   item_status?: string
+  volumetry_min?: number | null
+  volumetry_max?: number | null
+  flow_min_liters?: number | null
+  flow_max_liters?: number | null
   seals_ok?: boolean | null
   leakage?: boolean | null
   hose_ok?: boolean | null
@@ -420,16 +422,28 @@ function metrologyFuelLabel(key: string, otherLabel?: string | null) {
   return raqFuelLabel(key)
 }
 
-function formatNozzleWaLabel(nozzleNumber: number) {
-  return `BICO ${String(nozzleNumber).padStart(2, '0')}`
+function formatNozzleNumberWa(nozzleNumber: number) {
+  return String(nozzleNumber).padStart(2, '0')
+}
+
+function formatVolumetryWa(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(Number(value))) return '-'
+  const n = Number(value)
+  return n > 0 ? `+${n}` : String(n)
+}
+
+function formatLitersWa(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(Number(value))) return '-'
+  const n = Number(value)
+  const formatted = Number.isInteger(n) ? String(n) : String(n).replace('.', ',')
+  return `${formatted} L`
 }
 
 /**
- * aviso_metrologia_fora — modelo aprovado na WABA espera 13 variáveis:
- * {{combustivel}} {{aspecto}} {{cor}} {{meobservada}} {{temperatura}}
- * {{meconvertida}} {{vazamento}} {{mangueiras}} {{lacres}}
- * {{data}} {{razao}} {{cnpj}} {{endereco}}
- * (`display` e `bico` seguem no payload para o alinhamento usar se o modelo tiver).
+ * aviso_metrologia_fora — 13 variáveis nomeadas do modelo na WABA:
+ * {{number}} {{data}} {{razao}} {{cnpj}} {{endereco}}
+ * {{volmin}} {{vazaomin}} {{volmax}} {{vazaomax}}
+ * {{lacre}} {{vaz}} {{mang}} {{display}}
  */
 export function metrologiaForaTemplate(input: {
   nome: string
@@ -437,36 +451,32 @@ export function metrologiaForaTemplate(input: {
   endereco?: string | null
   data: string
   item: MetrologyOutOfSpecItem
-  raq?: MetrologyRaqSnapshot | null
 }): TemplatePayload {
   const razao = input.nome.trim() || 'Posto'
   const fuel = metrologyFuelLabel(input.item.fuel_product_key, input.item.fuel_other_label)
     .toUpperCase()
     .replace(/S-10/g, 'S10')
     .replace(/S-500/g, 'S500')
-  const combustivel = `${fuel} - ${formatNozzleWaLabel(input.item.nozzle_number)}`
-  const raq = input.raq ?? {}
+  const number = formatNozzleNumberWa(input.item.nozzle_number)
   return {
     name: POSTO_TEMPLATES.metrologiaFora,
     language: WA_LANG,
     bodyParams: [
-      p('combustivel', combustivel),
-      p('bico', formatNozzleWaLabel(input.item.nozzle_number)),
-      p('aspecto', raq.aspecto),
-      p('cor', raq.cor),
-      p('meobservada', raq.massa_especifica_observada),
-      p('temperatura', raq.temperatura_observada),
-      p('meconvertida', raq.massa_especifica_convertida),
-      p('vazamento', metrologyLeakageLabel(input.item.leakage)),
-      p('mangueiras', metrologyHoseLabel(input.item.hose_ok)),
-      p('lacres', metrologySealsLabel(input.item.seals_ok)),
-      p('display', metrologyDisplayLabel(input.item.display_burned)),
+      p('number', number),
       p('data', input.data),
       p('razao', razao),
       p('cnpj', formatCnpj(input.cnpj)),
       p('endereco', formatEndereco(input.endereco)),
+      p('volmin', formatVolumetryWa(input.item.volumetry_min)),
+      p('vazaomin', formatLitersWa(input.item.flow_min_liters)),
+      p('volmax', formatVolumetryWa(input.item.volumetry_max)),
+      p('vazaomax', formatLitersWa(input.item.flow_max_liters)),
+      p('lacre', metrologySealsLabel(input.item.seals_ok)),
+      p('vaz', metrologyLeakageLabel(input.item.leakage)),
+      p('mang', metrologyHoseLabel(input.item.hose_ok)),
+      p('display', metrologyDisplayLabel(input.item.display_burned)),
     ],
-    summary: `aviso_metrologia_fora: ${razao} · ${combustivel}`,
+    summary: `aviso_metrologia_fora: ${razao} · ${fuel} · BICO ${number}`,
   }
 }
 

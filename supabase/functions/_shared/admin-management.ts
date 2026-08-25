@@ -626,8 +626,8 @@ export async function processManagementAlerts(admin: ManagementAlertClient) {
   const dbTpl = adminDbOrR2Template(
     'db',
     usagePercent(dbBytes, quotas.db_bytes),
-    formatBytes(dbBytes),
-    formatBytes(quotas.db_bytes),
+    dbBytes,
+    quotas.db_bytes,
   )
   await maybeNotify(
     'supabase_db',
@@ -640,8 +640,8 @@ export async function processManagementAlerts(admin: ManagementAlertClient) {
   const r2Tpl = adminDbOrR2Template(
     'r2',
     usagePercent(storageBytes, quotas.storage_bytes),
-    formatBytes(storageBytes),
-    formatBytes(quotas.storage_bytes),
+    storageBytes,
+    quotas.storage_bytes,
   )
   await maybeNotify(
     'supabase_storage',
