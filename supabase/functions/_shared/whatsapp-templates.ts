@@ -130,7 +130,7 @@ export function bloqueioTemplate(
   }
 }
 
-/** aviso_raq1: {{razao}} {{cnpj}} {{endereco}} — periódico a cada 4 dias */
+/** aviso_raq1: {{razao}} {{cnpj}} {{endereco}} — periódico a cada 7 dias */
 export function raqTemplate(input: {
   nome: string
   cnpj: string | null | undefined
@@ -330,12 +330,13 @@ export type RaqOutOfSpecItem = {
   temperatura_observada?: string | null
   massa_especifica_observada?: string | null
   massa_especifica_convertida?: string | null
+  teor_alcool_gasolina?: string | null
 }
 
 /**
- * aviso_raq_fora — params nomeados do modelo na WABA:
+ * aviso_raq_fora — modelo aprovado na WABA espera 11 variáveis:
  * {{combustivel}} {{aspecto}} {{cor}} {{meobservada}} {{temperatura}}
- * {{meconvertida}} {{data}} {{razao}} {{cnpj}} {{endereco}}
+ * {{meconvertida}} {{teor}} {{data}} {{razao}} {{cnpj}} {{endereco}}
  */
 export function raqForaTemplate(input: {
   nome: string
@@ -359,6 +360,8 @@ export function raqForaTemplate(input: {
       p('meobservada', input.item.massa_especifica_observada),
       p('temperatura', input.item.temperatura_observada),
       p('meconvertida', input.item.massa_especifica_convertida),
+      p('teor', input.item.teor_alcool_gasolina),
+      p('status', 'INAPTO'),
       p('data', input.data),
       p('razao', razao),
       p('cnpj', formatCnpj(input.cnpj)),
@@ -422,10 +425,11 @@ function formatNozzleWaLabel(nozzleNumber: number) {
 }
 
 /**
- * aviso_metrologia_fora — params nomeados do modelo na WABA:
+ * aviso_metrologia_fora — modelo aprovado na WABA espera 13 variáveis:
  * {{combustivel}} {{aspecto}} {{cor}} {{meobservada}} {{temperatura}}
- * {{meconvertida}} {{vazamento}} {{mangueiras}} {{lacres}} {{display}}
+ * {{meconvertida}} {{vazamento}} {{mangueiras}} {{lacres}}
  * {{data}} {{razao}} {{cnpj}} {{endereco}}
+ * (`display` e `bico` seguem no payload para o alinhamento usar se o modelo tiver).
  */
 export function metrologiaForaTemplate(input: {
   nome: string
@@ -447,6 +451,7 @@ export function metrologiaForaTemplate(input: {
     language: WA_LANG,
     bodyParams: [
       p('combustivel', combustivel),
+      p('bico', formatNozzleWaLabel(input.item.nozzle_number)),
       p('aspecto', raq.aspecto),
       p('cor', raq.cor),
       p('meobservada', raq.massa_especifica_observada),

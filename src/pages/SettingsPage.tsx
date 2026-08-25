@@ -505,7 +505,7 @@ export default function SettingsPage({ isReadOnly }: SettingsPageProps) {
           <p className="settings-section__hint">
             Cadastre até 5 números de WhatsApp para receber avisos automáticos: renovação do plano
             (7 e 2 dias antes), documentos e laudos (30/15/7/1 dia e no vencimento), metrologia
-            (a cada 15 dias), drenagem (semanal), RAQ (a cada 4 dias) e quando uma análise do RAQ
+            (a cada 15 dias), drenagem (semanal), RAQ (a cada 7 dias) e quando uma análise do RAQ
             ficar fora das especificações. Os avisos saem pela API oficial da Meta (modelos aprovados).
           </p>
           <div className="settings-grid settings-grid--whatsapp">

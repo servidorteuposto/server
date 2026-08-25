@@ -7,6 +7,7 @@ npx supabase secrets set META_WHATSAPP_TOKEN="SEU_TOKEN_PERMANENTE" META_WHATSAP
 
 # Opcional:
 # npx supabase secrets set META_GRAPH_API_VERSION="v21.0" --project-ref jilzklxnejztpphbryti
+# npx supabase secrets set META_WHATSAPP_WABA_ID="SEU_WABA_ID" --project-ref jilzklxnejztpphbryti
 
 # Remover Z-API:
 npx supabase secrets unset WHATSAPP_WEBHOOK_URL WHATSAPP_API_KEY --project-ref jilzklxnejztpphbryti
@@ -85,6 +86,7 @@ Cor: {{cor}}
 ME Observada: {{meobservada}}
 Temperatura: {{temperatura}}
 ME Convertida 20°C: {{meconvertida}}
+Teor: {{teor}}
 Data da verificação: {{data}}
 Razão Social: {{razao}}
 CNPJ: {{cnpj}}
@@ -93,17 +95,17 @@ Endereço: {{endereco}}
 Verifique os dados do seu combustível.
 ```
 
-Variáveis: `combustivel`, `aspecto`, `cor`, `meobservada`, `temperatura`, `meconvertida`, `data`, `razao`, `cnpj`, `endereco`
+Variáveis do modelo aprovado (11): `combustivel`, `aspecto`, `cor`, `meobservada`, `temperatura`, `meconvertida`, `teor`, `data`, `razao`, `cnpj`, `endereco`
 
 Botão URL estático: **Acesse Teu Posto** → `https://www.appteuposto.com.br`
 
-Enviado ao lançar análise do RAQ com status **Fora das Especificações** (um aviso por combustível inapto).
+O envio lê as variáveis reais do modelo na WABA e manda só o que o template espera (isso corrige diferença de quantidade de params). RAQ/metrologia fora saem na hora do lançamento.
 
 ## Modelo posto — Metrologia reprovada
 
 Nome na WABA: `aviso_metrologia_fora` (Utilidade / Portuguese (BR)), params **nomeados**.
 
-Variáveis do modelo já criado: `combustivel`, `aspecto`, `cor`, `meobservada`, `temperatura`, `meconvertida`, `vazamento`, `mangueiras`, `lacres`, `display`, `data`, `razao`, `cnpj`, `endereco`
+Variáveis do modelo aprovado (13): `combustivel`, `aspecto`, `cor`, `meobservada`, `temperatura`, `meconvertida`, `vazamento`, `mangueiras`, `lacres`, `data`, `razao`, `cnpj`, `endereco`
 
 Valores enviados no bico:
 

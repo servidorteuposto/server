@@ -21,7 +21,7 @@ Edge Function que envia avisos WhatsApp (templates) para os números `aviso_what
 | RAQ fora das especificações | `aviso_raq_fora` | no lançamento inapto (envia na hora; se a Meta falhar, fica na fila) |
 | Metrologia reprovada | `aviso_metrologia_fora` | no lançamento reprovado (envia na hora; se a Meta falhar, fica na fila) |
 | Drenagem diesel | `aviso_drenagem_diesel` | só depois da primeira drenagem; 7 dias depois do último lançamento |
-| RAQ | `aviso_raq1` | só depois do primeiro RAQ; 4 dias após o último lançamento (a contagem reinicia se lançar de novo) |
+| RAQ | `aviso_raq1` | só depois do primeiro RAQ; 7 dias após o último lançamento (a contagem reinicia se lançar de novo) |
 
 Só postos com `subscription_status = active` e pelo menos um WhatsApp cadastrado.
 

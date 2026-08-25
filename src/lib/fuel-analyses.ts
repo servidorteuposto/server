@@ -263,11 +263,14 @@ export async function getFuelFileUrl(path: string) {
 
 async function notifyRaqOutOfSpec(reportId: string) {
   try {
-    const { error } = await supabase.functions.invoke('send-raq-alert', {
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData.session?.access_token
+    const { data, error } = await supabase.functions.invoke('send-raq-alert', {
       body: { report_id: reportId },
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
     })
     if (error) {
-      console.warn('notifyRaqOutOfSpec failed', error)
+      console.warn('notifyRaqOutOfSpec failed', error, data)
     }
   } catch (error) {
     console.warn('notifyRaqOutOfSpec failed', error)
