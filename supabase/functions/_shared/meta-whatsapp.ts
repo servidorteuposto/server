@@ -307,6 +307,10 @@ async function loadTemplateShape(
     return shape
   }
 
+  // Modelos conferidos no texto da WABA: não deixar o Graph trocar os nomes
+  // (ex.: exemplo da Meta com 13 vars diferentes, volumetria vira "-").
+  if (known) return remember(known)
+
   const wabaId = await resolveWabaId(version, token, phoneNumberId)
   if (!wabaId) return remember(known)
 
@@ -324,19 +328,11 @@ async function loadTemplateShape(
 
   const components = Array.isArray(row.components) ? (row.components as GraphComponent[]) : []
   const body = components.find((item) => String(item.type ?? '').toUpperCase() === 'BODY')
+  const parsed = placeholdersFromText(String(body?.text ?? ''))
   const fromExample = uniqueNames(
     (body?.example?.body_text_named_params ?? []).map((item) => String(item.param_name ?? '')),
   )
-  const parsed = placeholdersFromText(String(body?.text ?? ''))
-  const graphNames = fromExample.length ? fromExample : parsed.names
-  if (known && graphNames.length !== known.bodyNames.length) {
-    console.warn('Meta template shape count mismatch, using known vars', templateName, {
-      graph: graphNames,
-      known: known.bodyNames,
-      status: row.status,
-    })
-    return remember(known)
-  }
+  const graphNames = parsed.names.length ? parsed.names : fromExample
   const shape: TemplateShape = {
     bodyNames: graphNames,
     bodyPositional: parsed.positional,

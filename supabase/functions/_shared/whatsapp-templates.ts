@@ -423,7 +423,7 @@ function metrologyFuelLabel(key: string, otherLabel?: string | null) {
 }
 
 function formatNozzleNumberWa(nozzleNumber: number) {
-  return String(nozzleNumber).padStart(2, '0')
+  return String(nozzleNumber)
 }
 
 function formatVolumetryWa(value: number | null | undefined) {
