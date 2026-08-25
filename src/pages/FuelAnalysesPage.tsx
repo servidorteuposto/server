@@ -1653,11 +1653,13 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                           </label>
                           {alcoholKind === 'gasoline' && (
                             <label className="reg-doc-form__field">
-                              <span>Teor de álcool na Gasolina * ({gasolineAlcoholLimitLabel()})</span>
+                              <span>Teor de álcool na Gasolina * ({gasolineAlcoholLimitLabel(product.key)})</span>
                               <input
                                 type="text"
                                 inputMode="decimal"
-                                placeholder="Ex.: 30"
+                                placeholder={
+                                  product.key === 'gasolina-premium' ? 'Ex.: 25' : 'Ex.: 32'
+                                }
                                 value={draft.teorAlcoolGasolina}
                                 onChange={(event) =>
                                   updateAnalysis(product.key, {
@@ -1699,7 +1701,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                             )}
                             {alcoholKind === 'gasoline' && (
                               <p className="fuel-density__limit">
-                                Teor alcoólico esperado: {gasolineAlcoholLimitLabel()}
+                                Teor alcoólico esperado: {gasolineAlcoholLimitLabel(product.key)}
                               </p>
                             )}
                             {alcoholKind === 'ethanol' && (

@@ -158,10 +158,17 @@ export type DensityLimit = {
 }
 
 /**
- * Teor alcoólico na gasolina C (% vol): somente 31 a 33 é conforme.
- * Abaixo ou acima → luz vermelha (Fora das Especificações).
+ * Teor alcoólico na gasolina C comum/aditivada (% vol): 31 a 33 é conforme.
  */
 export const GASOLINE_ALCOHOL_PERCENT = { min: 31, max: 33 }
+
+/** Gasolina Premium: 25% ± 1 (24, 25 e 26). */
+export const GASOLINE_PREMIUM_ALCOHOL_PERCENT = { min: 24, max: 26 }
+
+export function gasolineAlcoholLimits(productKey: FuelProductKey) {
+  if (productKey === 'gasolina-premium') return GASOLINE_PREMIUM_ALCOHOL_PERCENT
+  return GASOLINE_ALCOHOL_PERCENT
+}
 
 /**
  * Teor alcoólico do etanol hidratado combustível (% massa / °INPM).
@@ -371,26 +378,31 @@ export type DensityCorrectionResult = {
   alcoholFormatted: string | null
 }
 
-export function gasolineAlcoholLimitLabel() {
-  return `${GASOLINE_ALCOHOL_PERCENT.min}% a ${GASOLINE_ALCOHOL_PERCENT.max}%`
+export function gasolineAlcoholLimitLabel(productKey?: FuelProductKey) {
+  const limits = productKey ? gasolineAlcoholLimits(productKey) : GASOLINE_ALCOHOL_PERCENT
+  return `${limits.min}% a ${limits.max}%`
 }
 
 export function ethanolAlcoholLimitLabel() {
   return `${ETHANOL_ALCOHOL_PERCENT.min.toFixed(1).replace('.', ',')}% a ${ETHANOL_ALCOHOL_PERCENT.max.toFixed(1).replace('.', ',')}% (°INPM)`
 }
 
-export function evaluateGasolineAlcoholConformity(teorInput: string): {
+export function evaluateGasolineAlcoholConformity(
+  teorInput: string,
+  productKey: FuelProductKey = 'gasolina-comum',
+): {
   status: DensityConformity | null
   limitLabel: string
   reason: string | null
 } {
-  const limitLabel = gasolineAlcoholLimitLabel()
+  const limits = gasolineAlcoholLimits(productKey)
+  const limitLabel = gasolineAlcoholLimitLabel(productKey)
   const value = parseDecimalInput(teorInput)
   if (value == null) {
     return { status: null, limitLabel, reason: null }
   }
 
-  if (value + 1e-9 >= GASOLINE_ALCOHOL_PERCENT.min && value - 1e-9 <= GASOLINE_ALCOHOL_PERCENT.max) {
+  if (value + 1e-9 >= limits.min && value - 1e-9 <= limits.max) {
     return { status: 'apto', limitLabel, reason: null }
   }
 
@@ -577,7 +589,7 @@ function validateAssayInputs(
  * Etanol: γ = 0,85 kg/m³/°C + tabela alcoométrica (°INPM / % v/v / FCV).
  *
  * Temperatura/Dt fora da faixa do ensaio → sempre Inapto (nunca Apto).
- * Gasolina: teor manual 31–33%. Etanol: teor °INPM calculado da densidade.
+ * Gasolina comum/aditivada: teor 31–33%. Premium: 24–26%. Etanol: teor °INPM da densidade.
  */
 export function correctDensityTo20C(
   productKey: FuelProductKey,
@@ -632,7 +644,7 @@ export function correctDensityTo20C(
   if (isEthanol && alcoholFormatted) {
     alcohol = evaluateEthanolAlcoholConformity(alcoholFormatted)
   } else if (isGasoline && alcoholInput != null && alcoholInput.trim() !== '') {
-    alcohol = evaluateGasolineAlcoholConformity(alcoholInput)
+    alcohol = evaluateGasolineAlcoholConformity(alcoholInput, productKey)
   }
 
   const assayError = validateAssayInputs(productKey, dtKgM3, temperatureC)
