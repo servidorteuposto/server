@@ -7,10 +7,12 @@ import {
   formatCnpj,
   formatCoords,
   formatDateTimePtBr,
+  formatFuelAspecto,
   formatRaqVolumeLabel,
   FUEL_PRODUCT_LABELS,
   isFuelProductKey,
   isRaqVolumePreset,
+  normalizeFuelAspectoForStorage,
   parseLitersInput,
   productAlcoholKind,
   productHasAlcoholContent,
@@ -30,6 +32,10 @@ import {
   type DensityConformity,
   type DensityCorrectionResult,
 } from '../config/fuel-density'
+import {
+  alcoholFieldLabel,
+  formatStoredAlcoholTeor,
+} from '../config/fuel-alcohol'
 import SignaturePad from '../components/fuel-analyses/SignaturePad'
 import LiveCameraCapture from '../components/fuel-analyses/LiveCameraCapture'
 import PartnerSuggestField from '../components/fuel-analyses/PartnerSuggestField'
@@ -206,6 +212,7 @@ function restoreAnalysis(productKey: FuelProductKey, stored: AnalysisDraftStored
   const merged: AnalysisDraft = {
     ...emptyAnalysis(),
     ...stored,
+    aspecto: normalizeFuelAspectoForStorage(stored.aspecto) || stored.aspecto,
     photoFile: null,
     photoPreviewUrl: null,
     photoLatitude: null,
@@ -1653,7 +1660,10 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                           </label>
                           {alcoholKind === 'gasoline' && (
                             <label className="reg-doc-form__field">
-                              <span>Teor de álcool na Gasolina * ({gasolineAlcoholLimitLabel(product.key)})</span>
+                              <span>
+                                {alcoholFieldLabel('gasoline', 'form')} * (
+                                {gasolineAlcoholLimitLabel(product.key)})
+                              </span>
                               <input
                                 type="text"
                                 inputMode="decimal"
@@ -1673,14 +1683,10 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
                           )}
                           {alcoholKind === 'ethanol' && (
                             <label className="reg-doc-form__field">
-                              <span>Teor alcoólico °INPM (calculado)</span>
+                              <span>{alcoholFieldLabel('ethanol', 'form')}</span>
                               <input
                                 type="text"
-                                value={
-                                  draft.teorAlcoolGasolina
-                                    ? `${draft.teorAlcoolGasolina} °INPM`
-                                    : ''
-                                }
+                                value={formatStoredAlcoholTeor(draft.teorAlcoolGasolina, 'ethanol')}
                                 readOnly
                                 disabled={busy}
                                 placeholder="Calculado automaticamente pela densidade a 20 °C"
@@ -2107,7 +2113,7 @@ function ReportDetailsModal({
           return (
             <div key={item.id} className="fuel-details__block">
               <strong>{FUEL_PRODUCT_LABELS[item.product_key]}</strong>
-              <p>Aspecto: {item.aspecto}</p>
+              <p>Aspecto: {formatFuelAspecto(item.aspecto)}</p>
               <p>Cor: {item.cor}</p>
               <p>Temperatura: {item.temperatura_observada}</p>
               <p>ME observada: {item.massa_especifica_observada}</p>
@@ -2122,9 +2128,11 @@ function ReportDetailsModal({
               )}
               {item.teor_alcool_gasolina && (
                 <p>
-                  {item.product_key.startsWith('etanol-')
-                    ? `Teor alcoólico: ${item.teor_alcool_gasolina} °INPM`
-                    : `Teor de álcool: ${item.teor_alcool_gasolina}%`}
+                  {alcoholFieldLabel(productAlcoholKind(item.product_key), 'display')}:{' '}
+                  {formatStoredAlcoholTeor(
+                    item.teor_alcool_gasolina,
+                    productAlcoholKind(item.product_key),
+                  )}
                 </p>
               )}
               <p>

@@ -73,6 +73,22 @@ const icons: Record<MenuId, (props: IconProps) => ReactNode> = {
       <path d="M7 16h6" />
     </IconBase>
   ),
+  'inspecao-compressor': ({ className }) => (
+    <IconBase className={className}>
+      <rect x="4" y="8" width="16" height="10" rx="2" />
+      <path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M9 13h6" />
+      <path d="M12 11v4" />
+    </IconBase>
+  ),
+  'vistoria-caixa-separadora': ({ className }) => (
+    <IconBase className={className}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M7 10h10" />
+      <path d="M7 14h6" />
+      <path d="M12 5v4" />
+    </IconBase>
+  ),
   'cadastro-direto': ({ className }) => (
     <IconBase className={className}>
       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -119,5 +135,6 @@ const icons: Record<MenuId, (props: IconProps) => ReactNode> = {
 
 export function MenuIcon({ id, className }: { id: MenuId; className?: string }) {
   const Icon = icons[id]
+  if (!Icon) return null
   return Icon({ className })
 }

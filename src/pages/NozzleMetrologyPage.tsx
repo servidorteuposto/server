@@ -575,7 +575,7 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
           <p className="nozzle-regulation" role="note">
             {NOZZLE_METROLOGY_REGULATION}
           </p>
-          <h1>Verificação Metrológica de Bicos</h1>
+          <h1>Verificação Metrológica</h1>
           <p>
             Lance a planilha por quantidade de bicos, registre volumetria/vazão e obtenha o resultado
             APROVADO ou REPROVADO automaticamente, conforme a {NOZZLE_METROLOGY_REGULATION}.

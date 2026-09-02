@@ -1,0 +1,3 @@
+export const COMPRESSOR_INSPECTION_STORAGE_BUCKET = 'compressor-inspections'
+
+export const COMPRESSOR_INSPECTION_MAX_FILE_BYTES = 10 * 1024 * 1024

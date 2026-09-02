@@ -280,12 +280,15 @@ Cor: {{cor}}
 Temperatura Observada (°C): {{tempo}}
 Massa Específica Observada (Dt): {{massa}}
 Massa Específica Convertida 20/4 °C (D20): {{massac}}
-Teor alcoólico °INPM (calculado): {{teor}}
+{{tipo}} {{teor}}
 
 Verifique no sistema os dados lançados!
 ```
 
-Variáveis (11): `combustivel`, `data`, `razao`, `cnpj`, `endereco`, `aspecto`, `cor`, `tempo`, `massa`, `massac`, `teor`
+Variáveis (12): `combustivel`, `data`, `razao`, `cnpj`, `endereco`, `aspecto`, `cor`, `tempo`, `massa`, `massac`, `tipo`, `teor`
+
+- `tipo`: etanol → `Teor Alcoólico ºINPM (calculado):`; gasolina → `Teor Alcoólico (% v/v) (calculado):`; diesel → vazio
+- `teor`: valor com 1 casa decimal + unidade (`ºINPM` ou `% v/v`); diesel → vazio
 
 Botão URL estático: **Acesse Teu Posto** → `https://www.appteuposto.com.br`
 

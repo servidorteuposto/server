@@ -1,8 +1,11 @@
 import {
   FUEL_ANALYSES_STORAGE_BUCKET,
+  normalizeFuelAspectoForStorage,
   parseLitersInput,
+  productAlcoholKind,
   type FuelProductKey,
 } from '../config/fuel-analyses'
+import { normalizeAlcoholTeorForStorage } from '../config/fuel-alcohol'
 import { cnpjDigits } from './cnpj'
 import { prepareImageUpload } from './image-webp'
 import { getSignedObjectUrl, removeObjects, uploadObject } from './object-storage'
@@ -339,12 +342,18 @@ export async function saveFuelAnalysisReport(input: SaveFuelAnalysisReportInput)
       analysisRows.push({
         report_id: reportId,
         product_key: item.productKey,
-        aspecto: item.aspecto.trim() || null,
+        aspecto: normalizeFuelAspectoForStorage(item.aspecto) || null,
         cor: item.cor.trim() || null,
         temperatura_observada: item.temperaturaObservada.trim() || null,
         massa_especifica_observada: item.massaEspecificaObservada.trim() || null,
         massa_especifica_convertida: item.massaEspecificaConvertida.trim() || null,
-        teor_alcool_gasolina: item.teorAlcoolGasolina.trim() || null,
+        teor_alcool_gasolina: (() => {
+          const raw = item.teorAlcoolGasolina.trim()
+          if (!raw) return null
+          const kind = productAlcoholKind(item.productKey)
+          if (kind === 'none') return null
+          return normalizeAlcoholTeorForStorage(raw)
+        })(),
         densidade_status: item.densidadeStatus,
         coeficiente_gamma: item.coeficienteGamma,
         densidade_formula: item.densidadeFormula,

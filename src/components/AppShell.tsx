@@ -10,6 +10,8 @@ import { formatCnpj } from '../lib/cnpj'
 import { getMyPostoProfile } from '../lib/fuel-analyses'
 import { getMyPostoSettings, getPostoPhotoUrl } from '../lib/posto-profile'
 import { MenuIcon } from './MenuIcons'
+import SeparatorBoxInspectionPage from '../pages/SeparatorBoxInspectionPage'
+import CompressorInspectionPage from '../pages/CompressorInspectionPage'
 import DieselDrainagesPage from '../pages/DieselDrainagesPage'
 import DirectRegisterPage from '../pages/DirectRegisterPage'
 import FuelAnalysesPage from '../pages/FuelAnalysesPage'
@@ -318,6 +320,12 @@ export default function AppShell({
     }
     if (activeMenuId === 'relatorios-drenagens-diesel') {
       return <DieselDrainagesPage isReadOnly={isReadOnly} />
+    }
+    if (activeMenuId === 'inspecao-compressor') {
+      return <CompressorInspectionPage isReadOnly={isReadOnly} />
+    }
+    if (activeMenuId === 'vistoria-caixa-separadora') {
+      return <SeparatorBoxInspectionPage isReadOnly={isReadOnly} />
     }
     if (activeMenuId === 'cadastro-direto') {
       return <DirectRegisterPage isReadOnly={isReadOnly} />

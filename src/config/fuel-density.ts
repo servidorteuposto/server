@@ -1,3 +1,4 @@
+import { formatAlcoholDecimal, roundAlcoholPercent } from './fuel-alcohol'
 import { productAlcoholKind, type FuelProductKey } from './fuel-analyses'
 
 /**
@@ -397,10 +398,11 @@ export function evaluateGasolineAlcoholConformity(
 } {
   const limits = gasolineAlcoholLimits(productKey)
   const limitLabel = gasolineAlcoholLimitLabel(productKey)
-  const value = parseDecimalInput(teorInput)
-  if (value == null) {
+  const parsed = parseDecimalInput(teorInput)
+  if (parsed == null) {
     return { status: null, limitLabel, reason: null }
   }
+  const value = roundAlcoholPercent(parsed)
 
   if (value + 1e-9 >= limits.min && value - 1e-9 <= limits.max) {
     return { status: 'apto', limitLabel, reason: null }
@@ -409,7 +411,7 @@ export function evaluateGasolineAlcoholConformity(
   return {
     status: 'inapto',
     limitLabel,
-    reason: `Teor alcoólico ${value.toFixed(1).replace('.', ',')}% fora da faixa (${limitLabel}).`,
+    reason: `Teor alcoólico ${formatAlcoholDecimal(value)}% fora da faixa (${limitLabel}).`,
   }
 }
 
@@ -419,10 +421,11 @@ export function evaluateEthanolAlcoholConformity(teorInput: string): {
   reason: string | null
 } {
   const limitLabel = ethanolAlcoholLimitLabel()
-  const value = parseDecimalInput(teorInput)
-  if (value == null) {
+  const parsed = parseDecimalInput(teorInput)
+  if (parsed == null) {
     return { status: null, limitLabel, reason: null }
   }
+  const value = roundAlcoholPercent(parsed)
 
   if (value + 1e-9 >= ETHANOL_ALCOHOL_PERCENT.min && value - 1e-9 <= ETHANOL_ALCOHOL_PERCENT.max) {
     return { status: 'apto', limitLabel, reason: null }
@@ -431,7 +434,7 @@ export function evaluateEthanolAlcoholConformity(teorInput: string): {
   return {
     status: 'inapto',
     limitLabel,
-    reason: `Teor alcoólico ${value.toFixed(1).replace('.', ',')} °INPM fora da faixa (${limitLabel}).`,
+    reason: `Teor alcoólico ${formatAlcoholDecimal(value)} °INPM fora da faixa (${limitLabel}).`,
   }
 }
 
@@ -623,8 +626,8 @@ export function correctDensityTo20C(
     const ethanol = convertHydratedEthanol(temperatureC, dtKgM3)
     rounded = ethanol.rho20KgM3
     d20Formatted = ethanol.rho20KgM3.toFixed(1)
-    alcoholFormatted = ethanol.massPercent.toFixed(2)
-    formulaLabel = `D20 = ${dtKgM3.toFixed(1)} + 0,85 × (${temperatureC.toFixed(1)} − 20); ${ethanol.massPercent.toFixed(2)}% m/m; ${ethanol.volumePercent.toFixed(2)}% v/v; FCV ${ethanol.fcv.toFixed(4)}`
+    alcoholFormatted = formatAlcoholDecimal(ethanol.massPercent)
+    formulaLabel = `D20 = ${dtKgM3.toFixed(1)} + 0,85 × (${temperatureC.toFixed(1)} − 20); ${formatAlcoholDecimal(ethanol.massPercent)}% m/m; ${ethanol.volumePercent.toFixed(2)}% v/v; FCV ${ethanol.fcv.toFixed(4)}`
   } else {
     const d20KgM3 = dtKgM3 + gamma * (temperatureC - 20)
     rounded = Number(d20KgM3.toFixed(1))

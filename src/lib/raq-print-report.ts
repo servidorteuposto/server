@@ -5,8 +5,14 @@ import {
   formatCnpj,
   formatCoords,
   formatDateTimePtBr,
+  formatFuelAspecto,
   type FuelProductKey,
 } from '../config/fuel-analyses'
+import {
+  alcoholKindForProduct,
+  alcoholPdfLabel,
+  formatStoredAlcoholTeor,
+} from '../config/fuel-alcohol'
 import { DENSITY_CONFORMITY_LABELS } from '../config/fuel-density'
 import { formatDatePtBr } from '../config/regulatory-documents'
 import { getSignedObjectBytes } from './object-storage'
@@ -178,23 +184,20 @@ function buildRaqRows(item: PublicPostoBoard['raq_items'][number]): FieldRow[] {
 
 function buildAnalysisRows(item: PublicPostoBoard['analysis_items'][number]): FieldRow[] {
   const rows: FieldRow[] = [
-    ['Aspecto', textOrDash(item.aspecto)],
+    ['Aspecto', textOrDash(formatFuelAspecto(item.aspecto))],
     ['Cor', textOrDash(item.cor)],
     ['Temperatura', textOrDash(item.temperatura_observada)],
     ['ME observada', textOrDash(item.massa_especifica_observada)],
     ['ME 20 C', textOrDash(item.massa_especifica_convertida)],
   ]
 
-  if (item.teor_alcool_gasolina) {
-    const label = item.product_key.startsWith('etanol-')
-      ? 'Teor alcoolico (INPM)'
-      : 'Teor de alcool'
-    const value = item.product_key.startsWith('etanol-')
-      ? item.teor_alcool_gasolina.includes('INPM')
-        ? item.teor_alcool_gasolina
-        : `${item.teor_alcool_gasolina} INPM`
-      : item.teor_alcool_gasolina
-    rows.push([label, value])
+  const alcoholKind = alcoholKindForProduct(item.product_key)
+  if (item.teor_alcool_gasolina && alcoholKind !== 'none') {
+    const label = alcoholPdfLabel(alcoholKind)
+    const value = formatStoredAlcoholTeor(item.teor_alcool_gasolina, alcoholKind)
+    if (label && value) {
+      rows.push([label, value])
+    }
   }
 
   rows.push([

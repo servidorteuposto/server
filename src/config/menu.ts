@@ -5,6 +5,8 @@ export type MenuId =
   | 'equipamentos-obrigatorios'
   | 'verificacao-metrologica-bicos'
   | 'relatorios-drenagens-diesel'
+  | 'inspecao-compressor'
+  | 'vistoria-caixa-separadora'
   | 'cadastro-direto'
   | 'suporte'
   | 'painel-suporte'
@@ -38,13 +40,23 @@ export const MENU_ITEMS: MenuItem[] = [
   },
   {
     id: 'verificacao-metrologica-bicos',
-    label: 'Verificação Metrológica de Bicos',
+    label: 'Verificação Metrológica',
     description: 'Controle conforme Portaria 227/2022 — INMETRO.',
   },
   {
     id: 'relatorios-drenagens-diesel',
-    label: 'Drenagens de Tanques de Diesel',
+    label: 'Drenagens dos Tanques',
     description: 'Relatórios e registros de drenagens dos tanques de óleo diesel.',
+  },
+  {
+    id: 'inspecao-compressor',
+    label: 'Inspeção do Compressor',
+    description: 'Registro fotográfico com GPS e dados do compressor do posto.',
+  },
+  {
+    id: 'vistoria-caixa-separadora',
+    label: 'Vistoria da Caixa Separadora',
+    description: 'Duas fotos em tempo real com data, hora e coordenadas GPS.',
   },
   {
     id: 'seguranca-trabalho',

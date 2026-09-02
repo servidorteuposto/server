@@ -636,7 +636,7 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
     <div className="diesel-page">
       <header className="reg-docs-page__header">
         <div className="reg-docs-page__header-text">
-          <h1>Relatórios de Drenagens de Tanques de Óleo Diesel</h1>
+          <h1>Drenagens dos Tanques</h1>
           <p>
             Selecione o tipo de tanque (S10 ou S500), registre a drenagem com foto do local
             (data/hora e coordenadas), operador e assinatura. O ciclo é semanal: há aviso 1 dia

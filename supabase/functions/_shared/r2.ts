@@ -6,6 +6,8 @@ export const LOGICAL_BUCKETS = [
   'work-safety-employee-files',
   'fuel-analyses',
   'diesel-drainages',
+  'compressor-inspections',
+  'separator-box-inspections',
   'nozzle-metrology',
   'mandatory-equipments',
   'posto-assets',

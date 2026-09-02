@@ -1,4 +1,5 @@
 import {
+  getDocumentExpiryStatus,
   REGULATORY_STORAGE_BUCKET,
   type RegulatoryTemplateKey,
 } from '../config/regulatory-documents'
@@ -79,6 +80,22 @@ export function getDocumentOriginalPath(document: RegulatoryDocument) {
   return document.storage_path
 }
 
+async function notifyRegulatoryDocExpired(documentId: string) {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData.session?.access_token
+    const { data, error } = await supabase.functions.invoke('send-doc-expired-alert', {
+      body: { document_id: documentId },
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+    })
+    if (error) {
+      console.warn('notifyRegulatoryDocExpired failed', error, data)
+    }
+  } catch (error) {
+    console.warn('notifyRegulatoryDocExpired failed', error)
+  }
+}
+
 export async function saveRegulatoryDocument(input: SaveRegulatoryDocumentInput) {
   const { preparePdfUpload } = await import('./pdf-compress')
   const documentId = input.existingId ?? crypto.randomUUID()
@@ -148,7 +165,11 @@ export async function saveRegulatoryDocument(input: SaveRegulatoryDocumentInput)
       throw error
     }
 
-    return data as RegulatoryDocument
+    const saved = data as RegulatoryDocument
+    if (saved.expires_at && getDocumentExpiryStatus(saved.expires_at) === 'expired') {
+      void notifyRegulatoryDocExpired(saved.id)
+    }
+    return saved
   }
 
   const { data, error } = await supabase.from('regulatory_documents').insert(row).select('*').single()
@@ -158,7 +179,11 @@ export async function saveRegulatoryDocument(input: SaveRegulatoryDocumentInput)
     throw error
   }
 
-  return data as RegulatoryDocument
+  const saved = data as RegulatoryDocument
+  if (saved.expires_at && getDocumentExpiryStatus(saved.expires_at) === 'expired') {
+    void notifyRegulatoryDocExpired(saved.id)
+  }
+  return saved
 }
 
 export async function deleteCustomRegulatoryDocument(document: RegulatoryDocument) {

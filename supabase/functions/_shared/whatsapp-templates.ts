@@ -4,6 +4,12 @@
  */
 
 import { sanitizeWaParam, type NamedBodyParam } from './meta-whatsapp.ts'
+import {
+  alcoholKindForProductKey,
+  alcoholWhatsAppTeorValue,
+  alcoholWhatsAppTipoLabel,
+} from './fuel-alcohol.ts'
+import { formatFuelAspecto } from './fuel-aspecto.ts'
 
 export const WA_LANG = 'pt_BR'
 
@@ -341,9 +347,9 @@ export type RaqOutOfSpecItem = {
 }
 
 /**
- * aviso_raq_fora — 11 variáveis nomeadas do modelo na WABA:
+ * aviso_raq_fora — 12 variáveis nomeadas do modelo na WABA:
  * {{combustivel}} {{data}} {{razao}} {{cnpj}} {{endereco}}
- * {{aspecto}} {{cor}} {{tempo}} {{massa}} {{massac}} {{teor}}
+ * {{aspecto}} {{cor}} {{tempo}} {{massa}} {{massac}} {{tipo}} {{teor}}
  */
 export function raqForaTemplate(input: {
   nome: string
@@ -357,6 +363,7 @@ export function raqForaTemplate(input: {
     .toUpperCase()
     .replace(/S-10/g, 'S10')
     .replace(/S-500/g, 'S500')
+  const alcoholKind = alcoholKindForProductKey(input.item.product_key)
   return {
     name: POSTO_TEMPLATES.raqFora,
     language: WA_LANG,
@@ -366,12 +373,13 @@ export function raqForaTemplate(input: {
       p('razao', razao),
       p('cnpj', formatCnpj(input.cnpj)),
       p('endereco', formatEndereco(input.endereco)),
-      p('aspecto', input.item.aspecto),
+      p('aspecto', formatFuelAspecto(input.item.aspecto)),
       p('cor', input.item.cor),
       p('tempo', input.item.temperatura_observada),
       p('massa', input.item.massa_especifica_observada),
       p('massac', input.item.massa_especifica_convertida),
-      p('teor', input.item.teor_alcool_gasolina),
+      p('tipo', alcoholWhatsAppTipoLabel(alcoholKind)),
+      p('teor', alcoholWhatsAppTeorValue(input.item.teor_alcool_gasolina, alcoholKind)),
     ],
     summary: `aviso_raq_fora: ${razao} · ${combustivel}`,
   }

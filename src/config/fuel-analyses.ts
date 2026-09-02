@@ -40,12 +40,37 @@ export const FUEL_PRODUCT_LABELS: Record<FuelProductKey, string> = {
 } as Record<FuelProductKey, string>
 
 /** Opções de aspecto no ensaio do combustível (RAQ). */
+export const FUEL_ASPECTO_HLIMP_LABEL = 'Homogênea Límpida e Isenta de Impurezas'
+export const FUEL_ASPECTO_TURVA_LABEL = 'Turva com Impurezas'
+
 export const FUEL_ASPECTO_OPTIONS = [
-  'HLIMP - Homogênea, Límpida de Impurezas',
-  'Turva com Impurezas',
+  FUEL_ASPECTO_HLIMP_LABEL,
+  FUEL_ASPECTO_TURVA_LABEL,
 ] as const
 
 export type FuelAspectoOption = (typeof FUEL_ASPECTO_OPTIONS)[number]
+
+function canonicalAspectoLabel(value: string): string | null {
+  const normalized = value.trim()
+  if (!normalized) return null
+  const upper = normalized.toUpperCase()
+  if (upper === 'HLIMP' || upper.startsWith('HLIMP ')) return FUEL_ASPECTO_HLIMP_LABEL
+  if (upper === 'TURVA' || /turva/i.test(normalized)) return FUEL_ASPECTO_TURVA_LABEL
+  return null
+}
+
+/** Exibe o aspecto por extenso (HLIMP → Homogênea Límpida e Isenta de Impurezas). */
+export function formatFuelAspecto(value: string | null | undefined): string {
+  if (!value?.trim()) return '—'
+  return canonicalAspectoLabel(value) ?? value.trim()
+}
+
+/** Normaliza valor legado (HLIMP, etc.) para o texto canônico ao salvar. */
+export function normalizeFuelAspectoForStorage(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  return canonicalAspectoLabel(trimmed) ?? trimmed
+}
 
 /** Opções de cor no ensaio do combustível (RAQ). */
 export const FUEL_COR_OPTIONS = ['Verde', 'Vermelho', 'Amarelo', 'Incolor'] as const

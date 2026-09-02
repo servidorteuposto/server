@@ -97,6 +97,7 @@ const KNOWN_TEMPLATE_SHAPES: Record<string, TemplateShape> = {
       'tempo',
       'massa',
       'massac',
+      'tipo',
       'teor',
     ],
     bodyPositional: 0,

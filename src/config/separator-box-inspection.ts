@@ -1,0 +1,3 @@
+export const SEPARATOR_BOX_INSPECTION_STORAGE_BUCKET = 'separator-box-inspections'
+
+export const SEPARATOR_BOX_INSPECTION_MAX_FILE_BYTES = 10 * 1024 * 1024

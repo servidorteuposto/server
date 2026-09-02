@@ -4,8 +4,14 @@ import {
   formatCnpj,
   formatCoords,
   formatDateTimePtBr,
+  formatFuelAspecto,
   type FuelProductKey,
 } from '../config/fuel-analyses'
+import {
+  alcoholFieldLabel,
+  alcoholKindForProduct,
+  formatStoredAlcoholTeor,
+} from '../config/fuel-alcohol'
 import { DENSITY_CONFORMITY_LABELS } from '../config/fuel-density'
 import { formatDatePtBr } from '../config/regulatory-documents'
 import {
@@ -363,7 +369,7 @@ function FuelPublicCard({
             <dl>
               <div>
                 <dt>Aspecto</dt>
-                <dd>{analysis.aspecto ?? '—'}</dd>
+                <dd>{formatFuelAspecto(analysis.aspecto)}</dd>
               </div>
               <div>
                 <dt>Cor</dt>
@@ -381,19 +387,15 @@ function FuelPublicCard({
                 <dt>ME 20 °C</dt>
                 <dd>{analysis.massa_especifica_convertida ?? '—'}</dd>
               </div>
-              {analysis.teor_alcool_gasolina && (
+              {analysis.teor_alcool_gasolina &&
+                alcoholKindForProduct(productKey) !== 'none' && (
                 <div>
-                  <dt>
-                    {productKey.startsWith('etanol-')
-                      ? 'Teor alcoólico (°INPM)'
-                      : 'Teor de álcool'}
-                  </dt>
+                  <dt>{alcoholFieldLabel(alcoholKindForProduct(productKey), 'display')}</dt>
                   <dd>
-                    {analysis.teor_alcool_gasolina}
-                    {productKey.startsWith('etanol-') &&
-                    !analysis.teor_alcool_gasolina.includes('INPM')
-                      ? ' °INPM'
-                      : ''}
+                    {formatStoredAlcoholTeor(
+                      analysis.teor_alcool_gasolina,
+                      alcoholKindForProduct(productKey),
+                    )}
                   </dd>
                 </div>
               )}

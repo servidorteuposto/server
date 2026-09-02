@@ -1,0 +1,135 @@
+.compressor-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.compressor-page__form-card {
+  padding: 1.25rem;
+  border: 1px solid var(--border-subtle, #dbe3ef);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.compressor-page__section-title {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+}
+
+.compressor-page__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.compressor-page__photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.compressor-page__photos h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+}
+
+.compressor-page__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.compressor-page__history {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.compressor-page__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.compressor-page__list-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border-subtle, #dbe3ef);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.compressor-page__modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.compressor-page__list-item p {
+  margin: 0.25rem 0 0;
+}
+
+.compressor-page__meta {
+  color: #5b6777;
+  font-size: 0.9rem;
+}
+
+.compressor-page__empty {
+  margin: 0;
+  color: #5b6777;
+}
+
+.compressor-page__modal {
+  max-width: 920px;
+}
+
+.compressor-page__detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem 1rem;
+  margin: 0 0 1.25rem;
+}
+
+.compressor-page__detail-grid dt {
+  font-size: 0.8rem;
+  color: #5b6777;
+}
+
+.compressor-page__detail-grid dd {
+  margin: 0.15rem 0 0;
+}
+
+.compressor-page__modal-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.compressor-page__modal-photo h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.compressor-page__photo-preview {
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle, #dbe3ef);
+  background: #f8fafc;
+}
+
+@media (max-width: 720px) {
+  .compressor-page__list-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
