@@ -35,6 +35,10 @@
   font-size: 0.95rem;
 }
 
+.compressor-page__signature {
+  margin: 0 0 1rem;
+}
+
 .compressor-page__actions {
   display: flex;
   justify-content: flex-end;
@@ -111,6 +115,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .compressor-page__modal-photo h3 {

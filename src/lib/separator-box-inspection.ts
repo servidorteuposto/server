@@ -8,6 +8,8 @@ export type SeparatorBoxInspection = {
   id: string
   posto_id: string
   inspected_at: string
+  operator_full_name: string | null
+  signature_storage_path: string | null
   cleaning_done: boolean | null
   photo1_storage_path: string
   photo1_file_name: string | null
@@ -32,6 +34,8 @@ export type LivePhotoCapture = {
 export type SaveSeparatorBoxInspectionInput = {
   postoId: string
   inspectedAt: string
+  operatorFullName: string
+  signatureBlob: Blob
   cleaningDone: boolean
   photo1: LivePhotoCapture
   photo2: LivePhotoCapture
@@ -54,15 +58,29 @@ export async function getSeparatorBoxInspectionPhotoUrl(path: string) {
   return getSignedObjectUrl(SEPARATOR_BOX_INSPECTION_STORAGE_BUCKET, path, 60 * 60)
 }
 
+export async function getSeparatorBoxInspectionSignatureUrl(path: string) {
+  return getSignedObjectUrl(SEPARATOR_BOX_INSPECTION_STORAGE_BUCKET, path, 60 * 60)
+}
+
 export async function saveSeparatorBoxInspection(input: SaveSeparatorBoxInspectionInput) {
   const inspectionId = crypto.randomUUID()
+  const signaturePrepared = await prepareImageUpload(input.signatureBlob, 'signature.png')
   const photo1Prepared = await prepareImageUpload(input.photo1.file, input.photo1.file.name || 'photo1.jpg')
   const photo2Prepared = await prepareImageUpload(input.photo2.file, input.photo2.file.name || 'photo2.jpg')
+  const signaturePath = `${input.postoId}/${inspectionId}/signature.${signaturePrepared.extension}`
   const photo1Path = `${input.postoId}/${inspectionId}/photo1.${photo1Prepared.extension}`
   const photo2Path = `${input.postoId}/${inspectionId}/photo2.${photo2Prepared.extension}`
   const uploadedPaths: string[] = []
 
   try {
+    await uploadObject(
+      SEPARATOR_BOX_INSPECTION_STORAGE_BUCKET,
+      signaturePath,
+      signaturePrepared.file,
+      signaturePrepared.contentType,
+    )
+    uploadedPaths.push(signaturePath)
+
     await uploadObject(
       SEPARATOR_BOX_INSPECTION_STORAGE_BUCKET,
       photo1Path,
@@ -85,6 +103,8 @@ export async function saveSeparatorBoxInspection(input: SaveSeparatorBoxInspecti
         id: inspectionId,
         posto_id: input.postoId,
         inspected_at: input.inspectedAt,
+        operator_full_name: input.operatorFullName.trim(),
+        signature_storage_path: signaturePath,
         cleaning_done: input.cleaningDone,
         photo1_storage_path: photo1Path,
         photo1_file_name: photo1Prepared.file.name,

@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 import LiveCameraCapture from '../components/fuel-analyses/LiveCameraCapture'
+import SignaturePad from '../components/fuel-analyses/SignaturePad'
 import { COMPRESSOR_INSPECTION_MAX_FILE_BYTES } from '../config/compressor-inspection'
 import {
   FUEL_ANALYSES_MAX_FILE_BYTES,
@@ -9,6 +10,7 @@ import {
 } from '../config/fuel-analyses'
 import {
   getCompressorInspectionPhotoUrl,
+  getCompressorInspectionSignatureUrl,
   listCompressorInspections,
   saveCompressorInspection,
   type CompressorInspection,
@@ -140,6 +142,9 @@ export default function CompressorInspectionPage({ isReadOnly }: CompressorInspe
   const [safetyValveOk, setSafetyValveOk] = useState<boolean | null>(null)
   const [oilChanged, setOilChanged] = useState<boolean | null>(null)
   const [compressorDrained, setCompressorDrained] = useState<boolean | null>(null)
+  const [operatorName, setOperatorName] = useState('')
+  const [signatureBlob, setSignatureBlob] = useState<Blob | null>(null)
+  const [signatureKey, setSignatureKey] = useState(0)
   const [photo1, setPhoto1] = useState<LivePhotoState>(emptyLivePhoto())
   const [photo2, setPhoto2] = useState<LivePhotoState>(emptyLivePhoto())
   const [viewInspection, setViewInspection] = useState<CompressorInspection | null>(null)
@@ -260,6 +265,9 @@ export default function CompressorInspectionPage({ isReadOnly }: CompressorInspe
     setSafetyValveOk(null)
     setOilChanged(null)
     setCompressorDrained(null)
+    setOperatorName('')
+    setSignatureBlob(null)
+    setSignatureKey((current) => current + 1)
     setPhoto1(emptyLivePhoto())
     setPhoto2(emptyLivePhoto())
     setFormError(null)
@@ -311,6 +319,14 @@ export default function CompressorInspectionPage({ isReadOnly }: CompressorInspe
       setFormError('Informe se o compressor foi drenado.')
       return
     }
+    if (!operatorName.trim()) {
+      setFormError('Informe o nome de quem executou a inspeção.')
+      return
+    }
+    if (!signatureBlob) {
+      setFormError('Assine no campo em branco antes de lançar a inspeção.')
+      return
+    }
 
     const photo1Error = validatePhoto(photo1, 'foto do compressor')
     if (photo1Error) {
@@ -330,6 +346,8 @@ export default function CompressorInspectionPage({ isReadOnly }: CompressorInspe
       const saved = await saveCompressorInspection({
         postoId,
         inspectedAt: new Date().toISOString(),
+        operatorFullName: operatorName,
+        signatureBlob,
         brand,
         model,
         serialNumber,
@@ -438,7 +456,7 @@ export default function CompressorInspectionPage({ isReadOnly }: CompressorInspe
           <p>
             Registre marca, modelo, número de série, capacidade e o checklist do compressor. Anexe a
             foto do compressor e a foto do manômetro — cada uma registra data, hora e coordenadas GPS
-            automaticamente.
+            automaticamente. Informe o nome e a assinatura de quem executou.
           </p>
         </div>
         {inspections.length > 0 && (
@@ -500,6 +518,16 @@ export default function CompressorInspectionPage({ isReadOnly }: CompressorInspe
                   placeholder="Ex.: 270"
                   value={capacityLiters}
                   onChange={(event) => setCapacityLiters(event.target.value)}
+                  disabled={busy}
+                  required
+                />
+              </label>
+              <label className="reg-doc-form__field">
+                <span>Nome de quem executou *</span>
+                <input
+                  type="text"
+                  value={operatorName}
+                  onChange={(event) => setOperatorName(event.target.value)}
                   disabled={busy}
                   required
                 />
@@ -571,6 +599,13 @@ export default function CompressorInspectionPage({ isReadOnly }: CompressorInspe
               </div>
             </div>
 
+            <div className="compressor-page__signature">
+              <label className="reg-doc-form__field">
+                <span>Assinatura de quem executou *</span>
+              </label>
+              <SignaturePad key={signatureKey} disabled={busy} onChange={setSignatureBlob} />
+            </div>
+
             {formError && <p className="reg-doc-form__error">{formError}</p>}
 
             <div className="compressor-page__actions">
@@ -599,6 +634,7 @@ export default function CompressorInspectionPage({ isReadOnly }: CompressorInspe
                   </p>
                   <p className="compressor-page__meta">
                     {formatDateTimePtBr(inspection.inspected_at)}
+                    {inspection.operator_full_name ? ` · ${inspection.operator_full_name}` : ''}
                   </p>
                 </div>
                 <div className="diesel-history__actions">
@@ -669,9 +705,28 @@ function CompressorDetailsModal({
   onPrint: () => void
   onExport: () => void
 }) {
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
   const busy = exportingId === inspection.id
   const printing = busy && exportingMode === 'print'
   const downloading = busy && exportingMode === 'download'
+
+  useEffect(() => {
+    let active = true
+    if (!inspection.signature_storage_path) {
+      setSignatureUrl(null)
+      return
+    }
+    getCompressorInspectionSignatureUrl(inspection.signature_storage_path)
+      .then((url) => {
+        if (active) setSignatureUrl(url)
+      })
+      .catch(() => {
+        if (active) setSignatureUrl(null)
+      })
+    return () => {
+      active = false
+    }
+  }, [inspection.signature_storage_path])
 
   return (
     <div className="reg-doc-modal" role="presentation" onClick={onClose}>
@@ -728,6 +783,10 @@ function CompressorDetailsModal({
             <dd>{formatYesNo(inspection.compressor_drained)}</dd>
           </div>
           <div>
+            <dt>Executado por</dt>
+            <dd>{inspection.operator_full_name || '—'}</dd>
+          </div>
+          <div>
             <dt>Lançado em</dt>
             <dd>{formatDateTimePtBr(inspection.inspected_at)}</dd>
           </div>
@@ -770,6 +829,13 @@ function CompressorDetailsModal({
             </div>
           ))}
         </div>
+
+        {signatureUrl && (
+          <div className="diesel-details__signature">
+            <h3>Assinatura</h3>
+            <img src={signatureUrl} alt="Assinatura de quem executou" />
+          </div>
+        )}
 
         <footer className="reg-doc-modal__footer compressor-page__modal-footer">
           <button type="button" className="btn btn--secondary" onClick={onPrint} disabled={busy}>

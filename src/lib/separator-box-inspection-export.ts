@@ -299,12 +299,14 @@ export async function generateSeparatorBoxInspectionPrintPdf(
     drawKeyValue(ctx, 'CNPJ', formatCnpj(posto.cnpj))
     drawKeyValue(ctx, 'Endereco', posto.endereco || '-')
     drawKeyValue(ctx, 'Lancado em', formatDateTimePtBr(inspection.inspected_at))
+    drawKeyValue(ctx, 'Executado por', inspection.operator_full_name || '-')
     drawKeyValue(ctx, 'Foi feita limpeza?', formatYesNo(inspection.cleaning_done))
     ctx.y -= 4
 
-    const [photo1, photo2] = await Promise.all([
+    const [photo1, photo2, signature] = await Promise.all([
       embedRasterImage(doc, await fetchImageBytes(inspection.photo1_storage_path)),
       embedRasterImage(doc, await fetchImageBytes(inspection.photo2_storage_path)),
+      embedRasterImage(doc, await fetchImageBytes(inspection.signature_storage_path)),
     ])
 
     const photoSections = [
@@ -344,6 +346,16 @@ export async function generateSeparatorBoxInspectionPrintPdf(
         drawEmbeddedImage(ctx, section.image, CONTENT_WIDTH, 180)
       } else {
         drawKeyValue(ctx, 'Foto', 'Nao disponivel')
+      }
+      ctx.y -= 4
+    }
+
+    if (signature || inspection.operator_full_name) {
+      drawHeading(ctx, '3. Assinatura')
+      drawKeyValue(ctx, 'Assinado por', inspection.operator_full_name || '-')
+      if (signature) {
+        ctx.y -= 2
+        drawEmbeddedImage(ctx, signature, Math.min(CONTENT_WIDTH, 240), 72)
       }
       ctx.y -= 4
     }

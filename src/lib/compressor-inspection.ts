@@ -8,6 +8,8 @@ export type CompressorInspection = {
   id: string
   posto_id: string
   inspected_at: string
+  operator_full_name: string | null
+  signature_storage_path: string | null
   brand: string
   model: string
   serial_number: string
@@ -39,6 +41,8 @@ export type LivePhotoCapture = {
 export type SaveCompressorInspectionInput = {
   postoId: string
   inspectedAt: string
+  operatorFullName: string
+  signatureBlob: Blob
   brand: string
   model: string
   serialNumber: string
@@ -68,15 +72,29 @@ export async function getCompressorInspectionPhotoUrl(path: string) {
   return getSignedObjectUrl(COMPRESSOR_INSPECTION_STORAGE_BUCKET, path, 60 * 60)
 }
 
+export async function getCompressorInspectionSignatureUrl(path: string) {
+  return getSignedObjectUrl(COMPRESSOR_INSPECTION_STORAGE_BUCKET, path, 60 * 60)
+}
+
 export async function saveCompressorInspection(input: SaveCompressorInspectionInput) {
   const inspectionId = crypto.randomUUID()
+  const signaturePrepared = await prepareImageUpload(input.signatureBlob, 'signature.png')
   const photo1Prepared = await prepareImageUpload(input.photo1.file, input.photo1.file.name || 'photo1.jpg')
   const photo2Prepared = await prepareImageUpload(input.photo2.file, input.photo2.file.name || 'photo2.jpg')
+  const signaturePath = `${input.postoId}/${inspectionId}/signature.${signaturePrepared.extension}`
   const photo1Path = `${input.postoId}/${inspectionId}/photo1.${photo1Prepared.extension}`
   const photo2Path = `${input.postoId}/${inspectionId}/photo2.${photo2Prepared.extension}`
   const uploadedPaths: string[] = []
 
   try {
+    await uploadObject(
+      COMPRESSOR_INSPECTION_STORAGE_BUCKET,
+      signaturePath,
+      signaturePrepared.file,
+      signaturePrepared.contentType,
+    )
+    uploadedPaths.push(signaturePath)
+
     await uploadObject(
       COMPRESSOR_INSPECTION_STORAGE_BUCKET,
       photo1Path,
@@ -99,6 +117,8 @@ export async function saveCompressorInspection(input: SaveCompressorInspectionIn
         id: inspectionId,
         posto_id: input.postoId,
         inspected_at: input.inspectedAt,
+        operator_full_name: input.operatorFullName.trim(),
+        signature_storage_path: signaturePath,
         brand: input.brand.trim(),
         model: input.model.trim(),
         serial_number: input.serialNumber.trim(),
