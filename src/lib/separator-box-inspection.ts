@@ -8,6 +8,7 @@ export type SeparatorBoxInspection = {
   id: string
   posto_id: string
   inspected_at: string
+  cleaning_done: boolean | null
   photo1_storage_path: string
   photo1_file_name: string | null
   photo1_latitude: number
@@ -31,6 +32,7 @@ export type LivePhotoCapture = {
 export type SaveSeparatorBoxInspectionInput = {
   postoId: string
   inspectedAt: string
+  cleaningDone: boolean
   photo1: LivePhotoCapture
   photo2: LivePhotoCapture
 }
@@ -83,6 +85,7 @@ export async function saveSeparatorBoxInspection(input: SaveSeparatorBoxInspecti
         id: inspectionId,
         posto_id: input.postoId,
         inspected_at: input.inspectedAt,
+        cleaning_done: input.cleaningDone,
         photo1_storage_path: photo1Path,
         photo1_file_name: photo1Prepared.file.name,
         photo1_latitude: input.photo1.latitude,

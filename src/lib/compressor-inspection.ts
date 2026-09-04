@@ -12,6 +12,10 @@ export type CompressorInspection = {
   model: string
   serial_number: string
   capacity_liters: number
+  manometer_ok: boolean | null
+  safety_valve_ok: boolean | null
+  oil_changed: boolean | null
+  compressor_drained: boolean | null
   photo1_storage_path: string
   photo1_file_name: string | null
   photo1_latitude: number
@@ -39,6 +43,10 @@ export type SaveCompressorInspectionInput = {
   model: string
   serialNumber: string
   capacityLiters: number
+  manometerOk: boolean
+  safetyValveOk: boolean
+  oilChanged: boolean
+  compressorDrained: boolean
   photo1: LivePhotoCapture
   photo2: LivePhotoCapture
 }
@@ -95,6 +103,10 @@ export async function saveCompressorInspection(input: SaveCompressorInspectionIn
         model: input.model.trim(),
         serial_number: input.serialNumber.trim(),
         capacity_liters: input.capacityLiters,
+        manometer_ok: input.manometerOk,
+        safety_valve_ok: input.safetyValveOk,
+        oil_changed: input.oilChanged,
+        compressor_drained: input.compressorDrained,
         photo1_storage_path: photo1Path,
         photo1_file_name: photo1Prepared.file.name,
         photo1_latitude: input.photo1.latitude,

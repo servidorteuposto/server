@@ -75,6 +75,51 @@ function formatCapacityLiters(value: number) {
   }).format(value)
 }
 
+function formatYesNo(value: boolean | null | undefined) {
+  if (value == null) return '—'
+  return value ? 'Sim' : 'Não'
+}
+
+function YesNoField({
+  legend,
+  name,
+  value,
+  onChange,
+  disabled,
+}: {
+  legend: string
+  name: string
+  value: boolean | null
+  onChange: (next: boolean) => void
+  disabled?: boolean
+}) {
+  return (
+    <fieldset className="diesel-yesno">
+      <legend>{legend} *</legend>
+      <label className="diesel-yesno__option">
+        <input
+          type="radio"
+          name={name}
+          checked={value === true}
+          onChange={() => onChange(true)}
+          disabled={disabled}
+        />
+        <span>Sim</span>
+      </label>
+      <label className="diesel-yesno__option">
+        <input
+          type="radio"
+          name={name}
+          checked={value === false}
+          onChange={() => onChange(false)}
+          disabled={disabled}
+        />
+        <span>Não</span>
+      </label>
+    </fieldset>
+  )
+}
+
 export default function CompressorInspectionPage({ isReadOnly }: CompressorInspectionPageProps) {
   const [postoId, setPostoId] = useState<string | null>(null)
   const [postoInfo, setPostoInfo] = useState<CompressorExportPosto | null>(null)
@@ -91,6 +136,10 @@ export default function CompressorInspectionPage({ isReadOnly }: CompressorInspe
   const [model, setModel] = useState('')
   const [serialNumber, setSerialNumber] = useState('')
   const [capacityLiters, setCapacityLiters] = useState('')
+  const [manometerOk, setManometerOk] = useState<boolean | null>(null)
+  const [safetyValveOk, setSafetyValveOk] = useState<boolean | null>(null)
+  const [oilChanged, setOilChanged] = useState<boolean | null>(null)
+  const [compressorDrained, setCompressorDrained] = useState<boolean | null>(null)
   const [photo1, setPhoto1] = useState<LivePhotoState>(emptyLivePhoto())
   const [photo2, setPhoto2] = useState<LivePhotoState>(emptyLivePhoto())
   const [viewInspection, setViewInspection] = useState<CompressorInspection | null>(null)
@@ -207,6 +256,10 @@ export default function CompressorInspectionPage({ isReadOnly }: CompressorInspe
     setModel('')
     setSerialNumber('')
     setCapacityLiters('')
+    setManometerOk(null)
+    setSafetyValveOk(null)
+    setOilChanged(null)
+    setCompressorDrained(null)
     setPhoto1(emptyLivePhoto())
     setPhoto2(emptyLivePhoto())
     setFormError(null)
@@ -242,13 +295,29 @@ export default function CompressorInspectionPage({ isReadOnly }: CompressorInspe
       setFormError('Informe a capacidade em litros (número válido).')
       return
     }
+    if (manometerOk == null) {
+      setFormError('Informe se o manômetro está OK.')
+      return
+    }
+    if (safetyValveOk == null) {
+      setFormError('Informe se a válvula de segurança está OK.')
+      return
+    }
+    if (oilChanged == null) {
+      setFormError('Informe se o óleo foi trocado.')
+      return
+    }
+    if (compressorDrained == null) {
+      setFormError('Informe se o compressor foi drenado.')
+      return
+    }
 
-    const photo1Error = validatePhoto(photo1, 'foto 1')
+    const photo1Error = validatePhoto(photo1, 'foto do compressor')
     if (photo1Error) {
       setFormError(photo1Error)
       return
     }
-    const photo2Error = validatePhoto(photo2, 'foto 2')
+    const photo2Error = validatePhoto(photo2, 'foto do manômetro')
     if (photo2Error) {
       setFormError(photo2Error)
       return
@@ -265,6 +334,10 @@ export default function CompressorInspectionPage({ isReadOnly }: CompressorInspe
         model,
         serialNumber,
         capacityLiters: capacity,
+        manometerOk,
+        safetyValveOk,
+        oilChanged,
+        compressorDrained,
         photo1: {
           file: photo1.file!,
           latitude: photo1.latitude!,
@@ -363,8 +436,9 @@ export default function CompressorInspectionPage({ isReadOnly }: CompressorInspe
         <div className="reg-docs-page__header-text">
           <h1>Inspeção do Compressor</h1>
           <p>
-            Registre marca, modelo, número de série e capacidade do compressor. Anexe duas fotos em
-            tempo real — cada uma registra data, hora e coordenadas GPS automaticamente.
+            Registre marca, modelo, número de série, capacidade e o checklist do compressor. Anexe a
+            foto do compressor e a foto do manômetro — cada uma registra data, hora e coordenadas GPS
+            automaticamente.
           </p>
         </div>
         {inspections.length > 0 && (
@@ -432,9 +506,40 @@ export default function CompressorInspectionPage({ isReadOnly }: CompressorInspe
               </label>
             </div>
 
+            <div className="compressor-page__fields">
+              <YesNoField
+                legend="Manômetro OK"
+                name="manometer-ok"
+                value={manometerOk}
+                onChange={setManometerOk}
+                disabled={busy}
+              />
+              <YesNoField
+                legend="Válvula de segurança OK"
+                name="safety-valve-ok"
+                value={safetyValveOk}
+                onChange={setSafetyValveOk}
+                disabled={busy}
+              />
+              <YesNoField
+                legend="Óleo trocado"
+                name="oil-changed"
+                value={oilChanged}
+                onChange={setOilChanged}
+                disabled={busy}
+              />
+              <YesNoField
+                legend="Compressor drenado"
+                name="compressor-drained"
+                value={compressorDrained}
+                onChange={setCompressorDrained}
+                disabled={busy}
+              />
+            </div>
+
             <div className="compressor-page__photos">
               <div className="fuel-photo">
-                <h3>Foto 1 *</h3>
+                <h3>Foto compressor *</h3>
                 <LiveCameraCapture
                   label="Câmera ao vivo"
                   disabled={busy}
@@ -450,7 +555,7 @@ export default function CompressorInspectionPage({ isReadOnly }: CompressorInspe
               </div>
 
               <div className="fuel-photo">
-                <h3>Foto 2 *</h3>
+                <h3>Foto manômetro *</h3>
                 <LiveCameraCapture
                   label="Câmera ao vivo"
                   disabled={busy}
@@ -607,6 +712,22 @@ function CompressorDetailsModal({
             <dd>{formatCapacityLiters(inspection.capacity_liters)} L</dd>
           </div>
           <div>
+            <dt>Manômetro OK</dt>
+            <dd>{formatYesNo(inspection.manometer_ok)}</dd>
+          </div>
+          <div>
+            <dt>Válvula de segurança OK</dt>
+            <dd>{formatYesNo(inspection.safety_valve_ok)}</dd>
+          </div>
+          <div>
+            <dt>Óleo trocado</dt>
+            <dd>{formatYesNo(inspection.oil_changed)}</dd>
+          </div>
+          <div>
+            <dt>Compressor drenado</dt>
+            <dd>{formatYesNo(inspection.compressor_drained)}</dd>
+          </div>
+          <div>
             <dt>Lançado em</dt>
             <dd>{formatDateTimePtBr(inspection.inspected_at)}</dd>
           </div>
@@ -615,14 +736,14 @@ function CompressorDetailsModal({
         <div className="compressor-page__modal-photos">
           {[
             {
-              label: 'Foto 1',
+              label: 'Foto compressor',
               url: photoUrls.photo1,
               capturedAt: inspection.photo1_captured_at,
               latitude: inspection.photo1_latitude,
               longitude: inspection.photo1_longitude,
             },
             {
-              label: 'Foto 2',
+              label: 'Foto manômetro',
               url: photoUrls.photo2,
               capturedAt: inspection.photo2_captured_at,
               latitude: inspection.photo2_latitude,

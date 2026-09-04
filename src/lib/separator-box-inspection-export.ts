@@ -44,6 +44,11 @@ function sanitize(value: string) {
     .replace(/—/g, '-')
 }
 
+function formatYesNo(value: boolean | null | undefined) {
+  if (value == null) return '-'
+  return value ? 'Sim' : 'Nao'
+}
+
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
   const words = sanitize(text).split(/\s+/).filter(Boolean)
   if (!words.length) return ['-']
@@ -294,6 +299,7 @@ export async function generateSeparatorBoxInspectionPrintPdf(
     drawKeyValue(ctx, 'CNPJ', formatCnpj(posto.cnpj))
     drawKeyValue(ctx, 'Endereco', posto.endereco || '-')
     drawKeyValue(ctx, 'Lancado em', formatDateTimePtBr(inspection.inspected_at))
+    drawKeyValue(ctx, 'Foi feita limpeza?', formatYesNo(inspection.cleaning_done))
     ctx.y -= 4
 
     const [photo1, photo2] = await Promise.all([

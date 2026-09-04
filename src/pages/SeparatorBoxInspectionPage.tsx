@@ -54,6 +54,51 @@ function clearLivePhotoState(state: LivePhotoState) {
   if (state.previewUrl) URL.revokeObjectURL(state.previewUrl)
 }
 
+function formatYesNo(value: boolean | null | undefined) {
+  if (value == null) return '—'
+  return value ? 'Sim' : 'Não'
+}
+
+function YesNoField({
+  legend,
+  name,
+  value,
+  onChange,
+  disabled,
+}: {
+  legend: string
+  name: string
+  value: boolean | null
+  onChange: (next: boolean) => void
+  disabled?: boolean
+}) {
+  return (
+    <fieldset className="diesel-yesno">
+      <legend>{legend} *</legend>
+      <label className="diesel-yesno__option">
+        <input
+          type="radio"
+          name={name}
+          checked={value === true}
+          onChange={() => onChange(true)}
+          disabled={disabled}
+        />
+        <span>Sim</span>
+      </label>
+      <label className="diesel-yesno__option">
+        <input
+          type="radio"
+          name={name}
+          checked={value === false}
+          onChange={() => onChange(false)}
+          disabled={disabled}
+        />
+        <span>Não</span>
+      </label>
+    </fieldset>
+  )
+}
+
 function readGeolocation(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -79,6 +124,7 @@ export default function SeparatorBoxInspectionPage({ isReadOnly }: SeparatorBoxI
   const [exportingMode, setExportingMode] = useState<'print' | 'download' | null>(null)
   const [pageError, setPageError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const [cleaningDone, setCleaningDone] = useState<boolean | null>(null)
   const [photo1, setPhoto1] = useState<LivePhotoState>(emptyLivePhoto())
   const [photo2, setPhoto2] = useState<LivePhotoState>(emptyLivePhoto())
   const [viewInspection, setViewInspection] = useState<SeparatorBoxInspection | null>(null)
@@ -191,6 +237,7 @@ export default function SeparatorBoxInspectionPage({ isReadOnly }: SeparatorBoxI
   function resetForm() {
     clearLivePhotoState(photo1)
     clearLivePhotoState(photo2)
+    setCleaningDone(null)
     setPhoto1(emptyLivePhoto())
     setPhoto2(emptyLivePhoto())
     setFormError(null)
@@ -208,6 +255,11 @@ export default function SeparatorBoxInspectionPage({ isReadOnly }: SeparatorBoxI
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (!postoId || isReadOnly) return
+
+    if (cleaningDone == null) {
+      setFormError('Informe se foi feita a limpeza.')
+      return
+    }
 
     const photo1Error = validatePhoto(photo1, 'foto 1')
     if (photo1Error) {
@@ -227,6 +279,7 @@ export default function SeparatorBoxInspectionPage({ isReadOnly }: SeparatorBoxI
       const saved = await saveSeparatorBoxInspection({
         postoId,
         inspectedAt: new Date().toISOString(),
+        cleaningDone,
         photo1: {
           file: photo1.file!,
           latitude: photo1.latitude!,
@@ -328,8 +381,8 @@ export default function SeparatorBoxInspectionPage({ isReadOnly }: SeparatorBoxI
         <div className="reg-docs-page__header-text">
           <h1>Vistoria da Caixa Separadora</h1>
           <p>
-            Registre duas fotos em tempo real da caixa separadora. Cada foto registra data, hora e
-            coordenadas GPS automaticamente.
+            Informe se foi feita a limpeza e registre duas fotos em tempo real da caixa separadora.
+            Cada foto registra data, hora e coordenadas GPS automaticamente.
           </p>
         </div>
         {inspections.length > 0 && (
@@ -352,6 +405,16 @@ export default function SeparatorBoxInspectionPage({ isReadOnly }: SeparatorBoxI
         <section className="compressor-page__form-card reg-doc-form">
           <h2 className="compressor-page__section-title">Novo lançamento</h2>
           <form onSubmit={(event) => void handleSubmit(event)}>
+            <div className="compressor-page__fields">
+              <YesNoField
+                legend="Foi feita limpeza?"
+                name="cleaning-done"
+                value={cleaningDone}
+                onChange={setCleaningDone}
+                disabled={busy}
+              />
+            </div>
+
             <div className="compressor-page__photos">
               <div className="fuel-photo">
                 <h3>Foto 1 *</h3>
@@ -407,6 +470,7 @@ export default function SeparatorBoxInspectionPage({ isReadOnly }: SeparatorBoxI
               <li key={inspection.id} className="compressor-page__list-item">
                 <div>
                   <strong>Vistoria da caixa separadora</strong>
+                  <p>Limpeza: {formatYesNo(inspection.cleaning_done)}</p>
                   <p className="compressor-page__meta">
                     {formatDateTimePtBr(inspection.inspected_at)}
                   </p>
@@ -504,9 +568,16 @@ function SeparatorBoxDetailsModal({
           </button>
         </header>
 
-        <p className="compressor-page__meta">
-          Lançado em {formatDateTimePtBr(inspection.inspected_at)}
-        </p>
+        <dl className="compressor-page__detail-grid">
+          <div>
+            <dt>Foi feita limpeza?</dt>
+            <dd>{formatYesNo(inspection.cleaning_done)}</dd>
+          </div>
+          <div>
+            <dt>Lançado em</dt>
+            <dd>{formatDateTimePtBr(inspection.inspected_at)}</dd>
+          </div>
+        </dl>
 
         <div className="compressor-page__modal-photos">
           {[

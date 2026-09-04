@@ -38,6 +38,11 @@ type EquipmentCardProps = {
   }) => Promise<void>
 }
 
+type PhotoLightboxState = {
+  url: string
+  alt: string
+}
+
 function readGeolocation(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -95,6 +100,7 @@ export default function EquipmentCard({
   ])
   const [serialPhoto, setSerialPhoto] = useState<LivePhotoState>(emptyLivePhoto())
   const [certificateFile, setCertificateFile] = useState<File | null>(null)
+  const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null)
   const [existingUrls, setExistingUrls] = useState<{
     equipment?: string | null
     certificate?: string | null
@@ -103,6 +109,15 @@ export default function EquipmentCard({
   }>({})
 
   const status = evaluateEquipmentCompliance(equipment, template.key)
+
+  useEffect(() => {
+    if (!lightbox) return
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setLightbox(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [lightbox])
 
   useEffect(() => {
     setSerialNumber(equipment?.serial_number ?? '')
@@ -355,7 +370,16 @@ export default function EquipmentCard({
           )}
           {template.kind === 'standard' && existingUrls.equipment && (
             <div className="equip-card__media">
-              <img src={existingUrls.equipment} alt="Foto do equipamento" />
+              <button
+                type="button"
+                className="equip-card__photo-btn"
+                onClick={() =>
+                  setLightbox({ url: existingUrls.equipment!, alt: 'Foto do equipamento' })
+                }
+                aria-label="Ampliar foto do equipamento"
+              >
+                <img src={existingUrls.equipment} alt="Foto do equipamento" />
+              </button>
               <span>
                 {equipment.equipment_photo_captured_at
                   ? formatDateTimePtBr(equipment.equipment_photo_captured_at)
@@ -371,14 +395,33 @@ export default function EquipmentCard({
             <div className="equip-card__thumbs">
               {(existingUrls.bucket ?? []).map((url, index) =>
                 url ? (
-                  <img key={index} src={url} alt={`Foto ${index + 1} do balde`} />
+                  <button
+                    key={index}
+                    type="button"
+                    className="equip-card__photo-btn equip-card__photo-btn--thumb"
+                    onClick={() =>
+                      setLightbox({ url, alt: `Foto ${index + 1} do balde` })
+                    }
+                    aria-label={`Ampliar foto ${index + 1} do balde`}
+                  >
+                    <img src={url} alt={`Foto ${index + 1} do balde`} />
+                  </button>
                 ) : null,
               )}
             </div>
           )}
           {template.kind === 'cylinder' && existingUrls.serial && (
             <div className="equip-card__media">
-              <img src={existingUrls.serial} alt="Foto do número de série" />
+              <button
+                type="button"
+                className="equip-card__photo-btn"
+                onClick={() =>
+                  setLightbox({ url: existingUrls.serial!, alt: 'Foto do número de série' })
+                }
+                aria-label="Ampliar foto do número de série"
+              >
+                <img src={existingUrls.serial} alt="Foto do número de série" />
+              </button>
               <span>
                 {equipment.serial_photo_captured_at
                   ? formatDateTimePtBr(equipment.serial_photo_captured_at)
@@ -580,6 +623,32 @@ export default function EquipmentCard({
             </div>
           )}
         </form>
+      )}
+
+      {lightbox && (
+        <div
+          className="equip-photo-lightbox"
+          role="presentation"
+          onClick={() => setLightbox(null)}
+        >
+          <div
+            className="equip-photo-lightbox__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={lightbox.alt}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="equip-photo-lightbox__close"
+              onClick={() => setLightbox(null)}
+              aria-label="Fechar foto"
+            >
+              ×
+            </button>
+            <img src={lightbox.url} alt={lightbox.alt} className="equip-photo-lightbox__img" />
+          </div>
+        </div>
       )}
     </article>
   )

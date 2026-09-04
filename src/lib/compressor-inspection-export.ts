@@ -49,6 +49,11 @@ function textOrDash(value: string | number | null | undefined) {
   return sanitize(String(value))
 }
 
+function formatYesNo(value: boolean | null | undefined) {
+  if (value == null) return '-'
+  return value ? 'Sim' : 'Nao'
+}
+
 function formatLiters(value: number | null | undefined) {
   if (value == null || Number.isNaN(value)) return '-'
   return `${new Intl.NumberFormat('pt-BR', {
@@ -315,6 +320,10 @@ export async function generateCompressorInspectionPrintPdf(
     drawKeyValue(ctx, 'Modelo', textOrDash(inspection.model))
     drawKeyValue(ctx, 'Numero de serie', textOrDash(inspection.serial_number))
     drawKeyValue(ctx, 'Capacidade', formatLiters(inspection.capacity_liters))
+    drawKeyValue(ctx, 'Manometro OK', formatYesNo(inspection.manometer_ok))
+    drawKeyValue(ctx, 'Valvula de seguranca OK', formatYesNo(inspection.safety_valve_ok))
+    drawKeyValue(ctx, 'Oleo trocado', formatYesNo(inspection.oil_changed))
+    drawKeyValue(ctx, 'Compressor drenado', formatYesNo(inspection.compressor_drained))
     ctx.y -= 4
 
     const [photo1, photo2] = await Promise.all([
@@ -324,14 +333,14 @@ export async function generateCompressorInspectionPrintPdf(
 
     const photoSections = [
       {
-        title: '2. Foto 1',
+        title: '2. Foto compressor',
         capturedAt: inspection.photo1_captured_at,
         latitude: inspection.photo1_latitude,
         longitude: inspection.photo1_longitude,
         image: photo1,
       },
       {
-        title: '3. Foto 2',
+        title: '3. Foto manometro',
         capturedAt: inspection.photo2_captured_at,
         latitude: inspection.photo2_latitude,
         longitude: inspection.photo2_longitude,
