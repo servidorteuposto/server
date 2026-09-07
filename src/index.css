@@ -25,6 +25,11 @@
     url('/imagens/fundo_login.jpg?v=9') type('image/jpeg'),
     url('/imagens/fundo_login.png?v=9') type('image/png')
   );
+  --login-bg-image-mobile: image-set(
+    url('/imagens/fundo_login_mobile.webp?v=2') type('image/webp'),
+    url('/imagens/fundo_login_mobile.jpg?v=2') type('image/jpeg'),
+    url('/imagens/fundo_login_mobile.png?v=2') type('image/png')
+  );
 }
 
 html,
