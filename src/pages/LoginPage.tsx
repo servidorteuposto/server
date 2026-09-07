@@ -601,7 +601,7 @@ export default function LoginPage() {
       <div
         className={`login-page__layout${view !== 'login' ? ' login-page__layout--focused' : ''}`}
       >
-        <aside className="login-branding">
+        <aside className="login-branding" aria-label="Marca Teu Posto">
           <div className="login-branding__header">
             <div className="login-branding__logo-wrap">
               <img
@@ -622,6 +622,15 @@ export default function LoginPage() {
                 : ''
             }`}
           >
+            <div className="login-card__mobile-brand">
+              <img
+                src="/imagens/logo_teuposto_clear.png"
+                alt=""
+                className="login-card__mobile-brand-logo"
+              />
+              <p className="login-card__mobile-brand-tagline">MENOS PAPEL, MAIS EFICIÊNCIA</p>
+            </div>
+
             {view === 'login' ? (
               <>
                 <header className="login-card__header">

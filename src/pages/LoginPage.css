@@ -282,6 +282,10 @@
   margin-bottom: 1.75rem;
 }
 
+.login-card__mobile-brand {
+  display: none;
+}
+
 .login-card__header h1 {
   font-size: 1.65rem;
   font-weight: 700;
@@ -794,23 +798,22 @@
   html.teuposto-login-active {
     background-image: var(--login-bg-image-mobile);
     background-size: cover;
-    background-position: center 45%;
+    background-position: center 42%;
   }
 
   .login-page__bg {
     background-image: var(--login-bg-image-mobile);
     background-size: cover;
-    background-position: center 45%;
+    background-position: center 42%;
   }
 
   .login-page__bg::after {
     background: linear-gradient(
       to bottom,
-      rgba(3, 10, 24, 0.35) 0%,
-      rgba(3, 10, 24, 0.12) 22%,
-      rgba(3, 10, 24, 0.08) 48%,
-      rgba(3, 10, 24, 0.2) 72%,
-      rgba(255, 255, 255, 0.18) 100%
+      rgba(3, 10, 24, 0.22) 0%,
+      rgba(3, 10, 24, 0.08) 28%,
+      rgba(3, 10, 24, 0.1) 55%,
+      rgba(3, 10, 24, 0.28) 100%
     );
   }
 
@@ -844,48 +847,9 @@
     font-size: 0.68rem;
   }
 
+  /* Desktop branding some fora: a marca fica dentro do card no mobile */
   .login-branding {
-    order: 1;
-    flex-shrink: 0;
-    min-height: auto;
-    padding: 0.85rem 1rem 0.35rem;
-    align-items: center;
-  }
-
-  .login-branding__header {
-    margin-top: 0;
-    margin-left: 0;
-    align-items: center;
-    width: auto;
-    max-width: min(280px, 86vw);
-    gap: 0;
-    padding: 0.55rem 0.85rem 0.65rem;
-    border-radius: 18px;
-    background: rgba(4, 12, 28, 0.72);
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-  }
-
-  .login-branding__logo-wrap {
-    width: min(188px, 54vw);
-    margin: 0 auto;
-  }
-
-  .login-branding__logo {
-    width: 100%;
-    margin: 0;
-  }
-
-  .login-branding__tagline {
-    margin-top: -0.55rem;
-    margin-left: 0;
-    text-align: center;
-    letter-spacing: 0.1em;
-    font-size: 0.58rem;
-    line-height: 1.35;
-    color: #ffffff;
-    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+    display: none;
   }
 
   .login-form-section {
@@ -896,9 +860,9 @@
     width: 100%;
     max-width: 100%;
     min-height: 0;
-    padding: 1.25rem 1rem 1rem;
+    padding: 1.15rem 1rem 0.85rem;
     align-items: stretch;
-    justify-content: flex-start;
+    justify-content: center;
     overflow: hidden;
     box-sizing: border-box;
   }
@@ -908,9 +872,36 @@
     width: 100%;
     max-width: 100%;
     margin: 0 auto;
-    padding: 1.35rem 1.15rem;
+    padding: 1.2rem 1.1rem 1.25rem;
     flex-shrink: 1;
     min-height: 0;
+  }
+
+  .login-card__mobile-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin: 0 auto 1rem;
+    text-align: center;
+  }
+
+  .login-card__mobile-brand-logo {
+    display: block;
+    width: min(168px, 48vw);
+    height: auto;
+    object-fit: contain;
+  }
+
+  .login-card__mobile-brand-tagline {
+    margin: -0.55rem 0 0;
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--blue-dark);
+    line-height: 1.3;
   }
 
   .login-card--register {
@@ -927,19 +918,6 @@
     display: none;
   }
 
-  .login-page__layout--focused .login-branding {
-    padding-top: 1.25rem;
-    padding-bottom: 0;
-  }
-
-  .login-page__layout--focused .login-branding__logo-wrap {
-    width: min(180px, 52vw);
-  }
-
-  .login-page__layout--focused .login-branding__tagline {
-    margin-top: -1.2rem;
-  }
-
   .login-page--focused .login-legal-links {
     padding-bottom: 0.35rem;
   }
@@ -948,30 +926,29 @@
 @media (max-width: 480px) {
   .login-card,
   .login-card--register {
-    padding: 1.25rem 1rem;
+    padding: 1.15rem 0.95rem 1.2rem;
     border-radius: 16px;
   }
 
   .login-form-section {
-    padding: 1.65rem 0.85rem 1.35rem;
+    padding: 0.95rem 0.85rem 0.85rem;
   }
 
-  .login-branding {
-    padding-top: 1.35rem;
+  .login-card__mobile-brand {
+    margin-bottom: 0.85rem;
   }
 
-  .login-branding__logo-wrap {
-    width: min(180px, 54vw);
+  .login-card__mobile-brand-logo {
+    width: min(150px, 46vw);
   }
 
-  .login-branding__tagline {
-    margin-top: -0.7rem;
-    font-size: 0.58rem;
+  .login-card__mobile-brand-tagline {
+    font-size: 0.54rem;
     letter-spacing: 0.08em;
   }
 }
 
-/* PWA / app instalado: centraliza o card e desce a logo */
+/* PWA / app instalado: centraliza o card */
 @media (max-width: 960px) and (display-mode: standalone),
   (max-width: 960px) and (display-mode: fullscreen),
   (max-width: 960px) and (display-mode: minimal-ui) {
@@ -988,11 +965,6 @@
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
   }
 
-  .login-branding {
-    padding-top: 2.75rem;
-    padding-bottom: 0.25rem;
-  }
-
   .login-form-section {
     flex: 1 1 auto;
     display: flex;
@@ -1001,19 +973,11 @@
     padding-top: 0.85rem;
     padding-bottom: 1.75rem;
   }
-
-  .login-page__layout--focused .login-branding {
-    padding-top: 2rem;
-  }
 }
 
 @media (max-width: 480px) and (display-mode: standalone),
   (max-width: 480px) and (display-mode: fullscreen),
   (max-width: 480px) and (display-mode: minimal-ui) {
-  .login-branding {
-    padding-top: 3.25rem;
-  }
-
   .login-form-section {
     padding-top: 1rem;
     padding-bottom: 2rem;
