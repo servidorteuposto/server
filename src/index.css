@@ -21,9 +21,9 @@
   --shadow-card: 0 25px 50px -12px rgba(12, 59, 122, 0.15);
   --font-family: 'Inter', system-ui, -apple-system, sans-serif;
   --login-bg-image: image-set(
-    url('/imagens/fundo_login.webp?v=5') type('image/webp'),
-    url('/imagens/fundo_login.jpg?v=5') type('image/jpeg'),
-    url('/imagens/fundo_login.png?v=5') type('image/png')
+    url('/imagens/fundo_login.webp?v=9') type('image/webp'),
+    url('/imagens/fundo_login.jpg?v=9') type('image/jpeg'),
+    url('/imagens/fundo_login.png?v=9') type('image/png')
   );
 }
 
@@ -40,8 +40,8 @@ body,
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  /* Tom do asfalto do fundo_login — evita faixa branca no iOS */
-  background-color: #c6c4c6;
+  /* Tom do asfalto escuro do fundo_login — evita faixa clara no iOS */
+  background-color: #07111f;
 }
 
 body {
@@ -49,7 +49,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
-  background-color: #c6c4c6;
+  background-color: #07111f;
 }
 
 /* Login: a foto cobre html/body (status bar, PWA e overscroll), não uma cor sólida */
@@ -60,10 +60,10 @@ html.teuposto-login-active {
   max-height: none;
   overflow: hidden !important;
   overscroll-behavior: none;
-  background-color: #c6c4c6;
+  background-color: #07111f;
   background-image: var(--login-bg-image);
   background-size: cover;
-  background-position: center center;
+  background-position: center 42%;
   background-repeat: no-repeat;
 }
 

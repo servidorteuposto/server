@@ -27,7 +27,6 @@ import { getMpSubscriptionStatus } from '../lib/mercadopago'
 import { getRememberedIdentifier, setRememberedIdentifier } from '../lib/session'
 import { secureLogin, secureRegister } from '../lib/secure-auth'
 import SupportContactForm from '../components/SupportContactForm'
-import MobileLockCover from '../components/MobileLockCover'
 import './LoginPage.css'
 
 function FeatureIcon({ color, children }: { color: string; children: ReactNode }) {
@@ -597,7 +596,6 @@ export default function LoginPage() {
 
   return (
     <div className={`login-page${view !== 'login' ? ' login-page--focused' : ''}`}>
-      <MobileLockCover />
       <div className="login-page__bg" aria-hidden="true" />
 
       <div
@@ -605,11 +603,13 @@ export default function LoginPage() {
       >
         <aside className="login-branding">
           <div className="login-branding__header">
-            <img
-              src="/imagens/logo_teuposto.png"
-              alt="teu posto"
-              className="login-branding__logo"
-            />
+            <div className="login-branding__logo-wrap">
+              <img
+                src="/imagens/logo_teuposto_clear.png"
+                alt="teu posto"
+                className="login-branding__logo"
+              />
+            </div>
             <p className="login-branding__tagline">MENOS PAPEL, MAIS EFICIÊNCIA</p>
           </div>
         </aside>
