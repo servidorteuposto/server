@@ -4,7 +4,11 @@ import {
   normalizeWaPhone,
   sendWhatsAppTemplateDetailed,
 } from '../_shared/meta-whatsapp.ts'
-import { metrologiaForaTemplate, type MetrologyOutOfSpecItem } from '../_shared/whatsapp-templates.ts'
+import {
+  avisoTecnicoTemplate,
+  metrologiaForaTemplate,
+  type MetrologyOutOfSpecItem,
+} from '../_shared/whatsapp-templates.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,9 +16,11 @@ const corsHeaders = {
 }
 
 const TIME_ZONE = 'America/Sao_Paulo'
-const CATEGORY = 'metrology_failed'
+const CATEGORY_FAILED = 'metrology_failed'
+const CATEGORY_TECNICO = 'metrology_tecnico_warning'
 const SEND_DELAY_MS = 800
 const MAX_SENDS = 12
+const VOLUMETRY_WARN_ABS = 80
 
 type PostoRow = {
   id: string
@@ -183,9 +189,6 @@ Deno.serve(async (req) => {
     if (!verification) {
       return jsonResponse({ ok: false, message: 'Verificação não encontrada.' }, 404)
     }
-    if (verification.overall_status !== 'reprovado') {
-      return jsonResponse({ ok: true, skipped: 'not_failed' })
-    }
 
     const { data: itemRows, error: itemsError } = await admin
       .from('nozzle_metrology_items')
@@ -194,19 +197,36 @@ Deno.serve(async (req) => {
       )
       .eq('verification_id', verificationId)
       .eq('posto_id', posto.id)
-      .eq('item_status', 'reprovado')
       .order('nozzle_number', { ascending: true })
 
     if (itemsError) throw itemsError
 
-    const failed = (itemRows ?? []) as MetrologyOutOfSpecItem[]
-    if (!failed.length) {
-      return jsonResponse({ ok: true, skipped: 'no_failed_items' })
+    const allItems = (itemRows ?? []) as MetrologyOutOfSpecItem[]
+    const failed = allItems.filter((it) => it.item_status === 'reprovado')
+    const tecnicoWarning = allItems.filter((it) => {
+      const vmin = Number(it.volumetry_min)
+      const vmax = Number(it.volumetry_max)
+      const minHit = Number.isFinite(vmin) && (vmin >= VOLUMETRY_WARN_ABS || vmin <= -VOLUMETRY_WARN_ABS)
+      const maxHit = Number.isFinite(vmax) && (vmax >= VOLUMETRY_WARN_ABS || vmax <= -VOLUMETRY_WARN_ABS)
+      return minHit || maxHit
+    })
+
+    if (!failed.length && !tecnicoWarning.length) {
+      return jsonResponse({
+        ok: true,
+        skipped: 'no_items',
+        failed_nozzles: 0,
+        tecnico_nozzles: 0,
+      })
     }
 
     const phones = collectAvisoPhones(posto)
     if (!phones.length) {
-      return jsonResponse({ ok: true, skipped: 'no_phones', template: 'aviso_metrologia_fora' })
+      return jsonResponse({
+        ok: true,
+        skipped: 'no_phones',
+        templates: ['aviso_metrologia_fora', 'aviso_tecnico'],
+      })
     }
 
     const todayKey = saoPauloTodayKey()
@@ -219,19 +239,15 @@ Deno.serve(async (req) => {
     let deliveredJobs = 0
     let queuedJobs = 0
 
+    type SendJob = {
+      category: string
+      milestone: string
+      tpl: ReturnType<typeof metrologiaForaTemplate> | ReturnType<typeof avisoTecnicoTemplate>
+    }
+
+    const jobs: SendJob[] = []
+
     for (const item of failed) {
-      const milestone = milestoneFor(item.nozzle_number)
-      const { data: already } = await admin
-        .from('whatsapp_reminder_sends')
-        .select('id')
-        .eq('posto_id', posto.id)
-        .eq('category', CATEGORY)
-        .eq('reference_id', verificationId)
-        .eq('milestone', milestone)
-        .maybeSingle()
-
-      if (already?.id) continue
-
       const tpl = metrologiaForaTemplate({
         nome: posto.nome,
         cnpj: posto.cnpj,
@@ -239,13 +255,51 @@ Deno.serve(async (req) => {
         data: dataVerificacao,
         item,
       })
+      jobs.push({
+        category: CATEGORY_FAILED,
+        milestone: milestoneFor(item.nozzle_number),
+        tpl,
+      })
+    }
+
+    for (const item of tecnicoWarning) {
+      const tpl = avisoTecnicoTemplate({
+        nome: posto.nome,
+        cnpj: posto.cnpj,
+        endereco,
+        item: {
+          nozzle_number: item.nozzle_number,
+          volumetry_min: item.volumetry_min,
+          volumetry_max: item.volumetry_max,
+        },
+      })
+      jobs.push({
+        category: CATEGORY_TECNICO,
+        milestone: milestoneFor(item.nozzle_number),
+        tpl,
+      })
+    }
+
+    for (const job of jobs) {
+      const { category, milestone, tpl } = job
+
+      const { data: already } = await admin
+        .from('whatsapp_reminder_sends')
+        .select('id')
+        .eq('posto_id', posto.id)
+        .eq('category', category)
+        .eq('reference_id', verificationId)
+        .eq('milestone', milestone)
+        .maybeSingle()
+
+      if (already?.id) continue
 
       async function enqueueRetry(lastError: string) {
         queuedJobs += 1
         const { error: queueError } = await admin.from('whatsapp_reminder_queue').upsert(
           {
             posto_id: posto.id,
-            category: CATEGORY,
+            category,
             reference_id: verificationId,
             milestone,
             message: tpl.summary,
@@ -288,7 +342,7 @@ Deno.serve(async (req) => {
         deliveredJobs += 1
         const { error: markError } = await admin.from('whatsapp_reminder_sends').insert({
           posto_id: posto.id,
-          category: CATEGORY,
+          category,
           reference_id: verificationId,
           milestone,
           sent_on: todayKey,
@@ -300,7 +354,7 @@ Deno.serve(async (req) => {
           .from('whatsapp_reminder_queue')
           .delete()
           .eq('posto_id', posto.id)
-          .eq('category', CATEGORY)
+          .eq('category', category)
           .eq('reference_id', verificationId)
           .eq('milestone', milestone)
       } else {
@@ -310,8 +364,9 @@ Deno.serve(async (req) => {
 
     return jsonResponse({
       ok: true,
-      template: 'aviso_metrologia_fora',
+      templates: ['aviso_metrologia_fora', 'aviso_tecnico'],
       failed_nozzles: failed.length,
+      tecnico_nozzles: tecnicoWarning.length,
       targets: phones.length,
       delivered_jobs: deliveredJobs,
       queued_jobs: queuedJobs,

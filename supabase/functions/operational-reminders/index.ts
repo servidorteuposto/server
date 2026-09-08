@@ -343,7 +343,7 @@ async function hasPendingRaq(
   return Boolean(data?.id)
 }
 
-const INCIDENT_QUEUE_CATEGORIES = ['metrology_failed', 'raq_out_of_spec'] as const
+const INCIDENT_QUEUE_CATEGORIES = ['metrology_failed', 'metrology_tecnico_warning', 'raq_out_of_spec'] as const
 
 /** Envia pendências da fila via Meta templates; só marca enviado após sucesso. */
 async function flushReminderQueue(
