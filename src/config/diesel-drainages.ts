@@ -1,3 +1,5 @@
+import { FUEL_PRODUCTS, type FuelProductKey } from './fuel-analyses'
+
 export const DIESEL_DRAINAGES_STORAGE_BUCKET = 'diesel-drainages'
 
 export const RESIDUES_CONFIRMATION_LABEL =
@@ -8,31 +10,46 @@ export const DIESEL_DRAINAGE_INTERVAL_DAYS = 7
 
 export const DRAINAGE_TIME_ZONE = 'America/Sao_Paulo'
 
-export type DieselTankTypeKey =
-  | 'diesel-s10-comum'
-  | 'diesel-s10-aditivado'
-  | 'diesel-s500-comum'
-  | 'diesel-s500-aditivado'
+export type DieselTankTypeKey = Exclude<FuelProductKey, 'gnv'>
 
 export type DieselTankType = {
   key: DieselTankTypeKey
   label: string
+  aliases?: string[]
 }
 
-export const DIESEL_TANK_TYPES: DieselTankType[] = [
-  { key: 'diesel-s10-comum', label: 'S10 Comum' },
-  { key: 'diesel-s10-aditivado', label: 'S10 Aditivado' },
-  { key: 'diesel-s500-comum', label: 'S500 Comum' },
-  { key: 'diesel-s500-aditivado', label: 'S500 Aditivado' },
-]
+/** Nomes antigos dos tanques de diesel, antes de alinhar com o RAQ. */
+const DRAINAGE_TANK_ALIASES: Partial<Record<DieselTankTypeKey, string[]>> = {
+  'diesel-s10-comum': ['S10 Comum'],
+  'diesel-s10-aditivado': ['S10 Aditivado'],
+  'diesel-s500-comum': ['S500 Comum'],
+  'diesel-s500-aditivado': ['S500 Aditivado'],
+}
+
+export const DIESEL_TANK_TYPES: DieselTankType[] = FUEL_PRODUCTS.map((product) => ({
+  key: product.key,
+  label: product.label,
+  aliases: DRAINAGE_TANK_ALIASES[product.key],
+}))
 
 export const DIESEL_TANK_TYPE_LABELS: Record<DieselTankTypeKey, string> = Object.fromEntries(
   DIESEL_TANK_TYPES.map((type) => [type.key, type.label]),
 ) as Record<DieselTankTypeKey, string>
 
-export function isDieselTankTypeLabel(name: string) {
+export function drainageTankTypeNames(type: DieselTankType) {
+  return [type.label, ...(type.aliases ?? [])]
+}
+
+export function drainageTankTypeOrderIndex(name: string) {
   const normalized = name.trim().toLowerCase()
-  return DIESEL_TANK_TYPES.some((type) => type.label.toLowerCase() === normalized)
+  const index = DIESEL_TANK_TYPES.findIndex((type) =>
+    drainageTankTypeNames(type).some((label) => label.toLowerCase() === normalized),
+  )
+  return index >= 0 ? index : null
+}
+
+export function isDieselTankTypeLabel(name: string) {
+  return drainageTankTypeOrderIndex(name) != null
 }
 
 export type DrainageReminderKind = 'day_before' | 'due_day'

@@ -1,4 +1,5 @@
 import {
+  hitsVolumetryTechWarn,
   NOZZLE_METROLOGY_STORAGE_BUCKET,
   type MetrologyItemStatus,
   type MetrologyStatus,
@@ -179,13 +180,20 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
   }
 
   if (!saved) throw new Error('verification_not_found')
-  if (input.overallStatus === 'reprovado') {
-    await notifyMetrologyFailed(saved.id)
+  if (shouldNotifyMetrologyAlert(input)) {
+    await notifyMetrologyAlert(saved.id)
   }
   return saved
 }
 
-async function notifyMetrologyFailed(verificationId: string) {
+function shouldNotifyMetrologyAlert(input: SaveNozzleMetrologyInput) {
+  if (input.overallStatus === 'reprovado') return true
+  return input.items.some(
+    (item) => hitsVolumetryTechWarn(item.volumetryMin) || hitsVolumetryTechWarn(item.volumetryMax),
+  )
+}
+
+async function notifyMetrologyAlert(verificationId: string) {
   try {
     const { data: sessionData } = await supabase.auth.getSession()
     const token = sessionData.session?.access_token
@@ -194,9 +202,9 @@ async function notifyMetrologyFailed(verificationId: string) {
       ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
     })
     if (error) {
-      console.warn('notifyMetrologyFailed failed', error, data)
+      console.warn('notifyMetrologyAlert failed', error, data)
     }
   } catch (error) {
-    console.warn('notifyMetrologyFailed failed', error)
+    console.warn('notifyMetrologyAlert failed', error)
   }
 }

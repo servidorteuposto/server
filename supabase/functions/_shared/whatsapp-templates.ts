@@ -32,6 +32,7 @@ export const POSTO_TEMPLATES = {
   metrologia: 'aviso_metrologia',
   raqFora: 'aviso_raq_fora',
   metrologiaFora: 'aviso_metrologia_fora',
+  tecnico: 'aviso_tecnico',
   docPrazo: 'aviso_doc_prazo',
   docVencido: 'aviso_doc_vencido',
   laudosEngenharia: 'aviso_laudos_de_engenharia_e_saude_ocupacional',
@@ -485,6 +486,39 @@ export function metrologiaForaTemplate(input: {
       p('display', metrologyDisplayLabel(input.item.display_burned)),
     ],
     summary: `aviso_metrologia_fora: ${razao} · ${fuel} · BICO ${number}`,
+  }
+}
+
+/**
+ * aviso_tecnico — 6 variáveis nomeadas do modelo na WABA:
+ * {{bico}} {{volmin}} {{volmax}} {{razao}} {{cnpj}} {{end}}
+ */
+export function avisoTecnicoTemplate(input: {
+  nome: string
+  cnpj?: string | null
+  endereco?: string | null
+  item: {
+    nozzle_number: number
+    volumetry_min?: number | null
+    volumetry_max?: number | null
+  }
+}): TemplatePayload {
+  const razao = input.nome.trim() || 'Posto'
+  const bico = formatNozzleNumberWa(input.item.nozzle_number)
+  const volmin = formatVolumetryWa(input.item.volumetry_min)
+  const volmax = formatVolumetryWa(input.item.volumetry_max)
+  return {
+    name: POSTO_TEMPLATES.tecnico,
+    language: WA_LANG,
+    bodyParams: [
+      p('bico', bico),
+      p('volmin', volmin),
+      p('volmax', volmax),
+      p('razao', razao),
+      p('cnpj', formatCnpj(input.cnpj)),
+      p('end', formatEndereco(input.endereco)),
+    ],
+    summary: `aviso_tecnico: ${razao} · BICO ${bico} · ${volmin}/${volmax}`,
   }
 }
 

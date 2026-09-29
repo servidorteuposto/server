@@ -1,6 +1,8 @@
 import {
   DIESEL_DRAINAGES_STORAGE_BUCKET,
   DIESEL_TANK_TYPES,
+  drainageTankTypeNames,
+  drainageTankTypeOrderIndex,
 } from '../config/diesel-drainages'
 import { prepareImageUpload } from './image-webp'
 import { getSignedObjectUrl, removeObjects, uploadObject } from './object-storage'
@@ -71,7 +73,15 @@ export async function listDieselTanks(postoId: string) {
   return (data ?? []) as DieselTank[]
 }
 
-/** Garante os 4 tipos padrão de tanque diesel para o posto. */
+function findTankForType(byName: Map<string, DieselTank>, type: (typeof DIESEL_TANK_TYPES)[number]) {
+  for (const name of drainageTankTypeNames(type)) {
+    const found = byName.get(name.trim().toLowerCase())
+    if (found) return found
+  }
+  return undefined
+}
+
+/** Garante um tanque para cada combustível do RAQ (exceto GNV). */
 export async function ensureStandardDieselTanks(postoId: string) {
   const existing = await listDieselTanks(postoId)
   const byName = new Map(existing.map((tank) => [tank.name.trim().toLowerCase(), tank]))
@@ -79,15 +89,18 @@ export async function ensureStandardDieselTanks(postoId: string) {
   const ensured: DieselTank[] = []
 
   for (const type of DIESEL_TANK_TYPES) {
-    const found = byName.get(type.label.toLowerCase())
+    const found = findTankForType(byName, type)
     if (found) {
-      if (!found.is_active) {
-        const reactivated = await updateDieselTank(found.id, {
+      const needsRename = found.name.trim() !== type.label
+      if (!found.is_active || needsRename) {
+        const updated = await updateDieselTank(found.id, {
           name: type.label,
-          description: found.description ?? '',
+          description: found.description ?? `Tanque de ${type.label}`,
           isActive: true,
         })
-        ensured.push(reactivated)
+        byName.delete(found.name.trim().toLowerCase())
+        byName.set(updated.name.trim().toLowerCase(), updated)
+        ensured.push(updated)
       } else {
         ensured.push(found)
       }
@@ -97,8 +110,9 @@ export async function ensureStandardDieselTanks(postoId: string) {
     const created = await createDieselTank({
       postoId,
       name: type.label,
-      description: `Tanque de diesel ${type.label}`,
+      description: `Tanque de ${type.label}`,
     })
+    byName.set(created.name.trim().toLowerCase(), created)
     ensured.push(created)
   }
 
@@ -106,10 +120,9 @@ export async function ensureStandardDieselTanks(postoId: string) {
 }
 
 export function sortTanksByStandardOrder(tanks: DieselTank[]) {
-  const order = new Map(DIESEL_TANK_TYPES.map((type, index) => [type.label.toLowerCase(), index]))
   return [...tanks].sort((a, b) => {
-    const aOrder = order.get(a.name.trim().toLowerCase())
-    const bOrder = order.get(b.name.trim().toLowerCase())
+    const aOrder = drainageTankTypeOrderIndex(a.name)
+    const bOrder = drainageTankTypeOrderIndex(b.name)
     if (aOrder != null && bOrder != null) return aOrder - bOrder
     if (aOrder != null) return -1
     if (bOrder != null) return 1

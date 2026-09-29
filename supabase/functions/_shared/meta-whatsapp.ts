@@ -128,6 +128,10 @@ const KNOWN_TEMPLATE_SHAPES: Record<string, TemplateShape> = {
     ],
     bodyPositional: 0,
   },
+  aviso_tecnico: {
+    bodyNames: ['bico', 'volmin', 'volmax', 'razao', 'cnpj', 'end'],
+    bodyPositional: 0,
+  },
   aviso_assinatura_vencida: {
     bodyNames: ['razao', 'cnpj', 'endereco'],
     bodyPositional: 0,
@@ -221,7 +225,8 @@ function valueForTemplateName(name: string, available: Map<string, string>) {
   if (name === 'tempo') return available.get('tempo') ?? available.get('temperatura') ?? '-'
   if (name === 'massa') return available.get('massa') ?? available.get('meobservada') ?? '-'
   if (name === 'massac') return available.get('massac') ?? available.get('meconvertida') ?? '-'
-  if (name === 'bico' || name === 'number') return available.get('number') ?? available.get('bico') ?? '-'
+  if (name === 'bico' || name === 'number') return available.get('bico') ?? available.get('number') ?? '-'
+  if (name === 'end' || name === 'endereco') return available.get('end') ?? available.get('endereco') ?? '-'
   if (name === 'lacre') return available.get('lacre') ?? available.get('lacres') ?? '-'
   if (name === 'vaz') return available.get('vaz') ?? available.get('vazamento') ?? '-'
   if (name === 'mang') return available.get('mang') ?? available.get('mangueiras') ?? '-'

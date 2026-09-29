@@ -93,7 +93,7 @@ function drawFooter(ctx: PdfContext) {
     font: ctx.font,
     color: COLOR.muted,
   })
-  ctx.page.drawText('Teu Posto - Relatorio de drenagens de diesel', {
+  ctx.page.drawText('Teu Posto - Relatorio de drenagens de tanques', {
     x: MARGIN_X,
     y: 24,
     size: 8,

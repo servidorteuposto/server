@@ -204,6 +204,7 @@ Deno.serve(async (req) => {
     const allItems = (itemRows ?? []) as MetrologyOutOfSpecItem[]
     const failed = allItems.filter((it) => it.item_status === 'reprovado')
     const tecnicoWarning = allItems.filter((it) => {
+      if (it.item_status === 'manutencao') return false
       const vmin = Number(it.volumetry_min)
       const vmax = Number(it.volumetry_max)
       const minHit = Number.isFinite(vmin) && (vmin >= VOLUMETRY_WARN_ABS || vmin <= -VOLUMETRY_WARN_ABS)

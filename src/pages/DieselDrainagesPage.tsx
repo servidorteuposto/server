@@ -638,9 +638,9 @@ export default function DieselDrainagesPage({ isReadOnly }: DieselDrainagesPageP
         <div className="reg-docs-page__header-text">
           <h1>Drenagens dos Tanques</h1>
           <p>
-            Selecione o tipo de tanque (S10 ou S500), registre a drenagem com foto do local
-            (data/hora e coordenadas), operador e assinatura. O ciclo é semanal: há aviso 1 dia
-            antes e no dia do vencimento.
+            Selecione o tanque (os mesmos combustíveis do RAQ, salvo GNV), registre a drenagem com
+            foto do local (data/hora e coordenadas), operador e assinatura. O ciclo é semanal: há
+            aviso 1 dia antes e no dia do vencimento.
           </p>
         </div>
         {reports.length > 0 && (

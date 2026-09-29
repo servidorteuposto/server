@@ -46,7 +46,7 @@ export const MENU_ITEMS: MenuItem[] = [
   {
     id: 'relatorios-drenagens-diesel',
     label: 'Drenagens dos Tanques',
-    description: 'Relatórios e registros de drenagens dos tanques de óleo diesel.',
+    description: 'Relatórios e registros de drenagens dos tanques de combustível.',
   },
   {
     id: 'inspecao-compressor',

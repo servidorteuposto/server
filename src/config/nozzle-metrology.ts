@@ -13,6 +13,14 @@ export const VOLUMETRY_STEP = 20
 export const VOLUMETRY_TOLERANCE_MIN = -100
 export const VOLUMETRY_TOLERANCE_MAX = 100
 
+/** Aviso técnico/manutenção: volumetria ±80 ou mais extrema (ainda pode estar aprovada). */
+export const VOLUMETRY_TECH_WARN_ABS = 80
+
+export function hitsVolumetryTechWarn(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return false
+  return value >= VOLUMETRY_TECH_WARN_ABS || value <= -VOLUMETRY_TECH_WARN_ABS
+}
+
 /**
  * Diferença máxima permitida entre volumetria mínima e máxima do mesmo bico.
  * Cada passo de 20 = 0,1%; acima de 0,5% reprova.

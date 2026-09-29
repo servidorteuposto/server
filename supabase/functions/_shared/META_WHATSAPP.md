@@ -395,3 +395,33 @@ Valores enviados no bico:
 Botão URL estático: **Acesse Teu Posto** → `https://www.appteuposto.com.br`
 
 Enviado ao **salvar** a verificação metrológica com resultado **REPROVADO** (um aviso por bico reprovado). Rascunho não dispara.
+
+## Modelo posto — Manutenção preventiva (volumetria ±80)
+
+Nome na WABA: `aviso_tecnico` (Utilidade / Portuguese (BR)), params **nomeados**.
+
+Corpo:
+
+```
+Sua Verificação Metrológica merece atenção!
+
+A Verificação Metrológica realizada hoje do {{bico}} está com volumetria mínima de {{volmin}} e volumetria máxima de {{volmax}}.
+Esse aviso é para instrução de manutenção, devido os limites permitidos pela Portaria Nº 227/2022 que são de (-100) ou (+100).
+
+Razão Social: {{razao}}
+CNPJ: {{cnpj}}
+Endereço: {{end}}
+
+Verifique com o responsável da manutenção!
+```
+
+Variáveis (6): `bico`, `volmin`, `volmax`, `razao`, `cnpj`, `end`
+
+Valores enviados:
+
+- **Bico (`bico`):** `1`
+- **Volumetria (`volmin` / `volmax`):** `+80`, `-80`
+
+Enviado ao salvar a metrologia quando a volumetria mínima ou máxima for **+80, −80 ou mais extrema** (mesmo se o bico ainda estiver aprovado). Um aviso por bico.
+
+

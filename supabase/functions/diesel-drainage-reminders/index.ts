@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
       const emailHtml = `
         <p>Olá, <strong>${posto.nome}</strong>,</p>
         <p>${bodyText}</p>
-        <p>A drenagem de tanques de óleo diesel deve ser registrada semanalmente.</p>
+        <p>A drenagem dos tanques de combustível deve ser registrada semanalmente.</p>
       `
 
       const [emailSent] = await Promise.all([
