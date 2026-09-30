@@ -7,6 +7,8 @@ export type MenuId =
   | 'relatorios-drenagens-diesel'
   | 'inspecao-compressor'
   | 'vistoria-caixa-separadora'
+  | 'placas-obrigatorias'
+  | 'manutencao-bombas'
   | 'cadastro-direto'
   | 'suporte'
   | 'painel-suporte'
@@ -57,6 +59,16 @@ export const MENU_ITEMS: MenuItem[] = [
     id: 'vistoria-caixa-separadora',
     label: 'Vistoria da Caixa Separadora',
     description: 'Duas fotos em tempo real com data, hora e coordenadas GPS.',
+  },
+  {
+    id: 'placas-obrigatorias',
+    label: 'Placas Obrigatórias',
+    description: 'Fotos ao vivo da placa ambiental, da ANP e de outras placas do posto.',
+  },
+  {
+    id: 'manutencao-bombas',
+    label: 'Manutenção de Bombas',
+    description: 'Foto da manutenção e recolhimento de resíduos, com data, hora e localização.',
   },
   {
     id: 'seguranca-trabalho',

@@ -1,0 +1,3 @@
+export const PUMP_MAINTENANCE_STORAGE_BUCKET = 'pump-maintenances'
+export const PUMP_MAINTENANCE_MAX_FILE_BYTES = 10 * 1024 * 1024
+export const PUMP_MAINTENANCE_NOTES_MAX_LENGTH = 500

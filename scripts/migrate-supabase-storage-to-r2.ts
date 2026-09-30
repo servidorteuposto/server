@@ -21,6 +21,8 @@ const LOGICAL_BUCKETS = [
   'diesel-drainages',
   'nozzle-metrology',
   'mandatory-equipments',
+  'mandatory-plates',
+  'pump-maintenances',
   'posto-assets',
   'support-attachments',
   'admin-secure-files',

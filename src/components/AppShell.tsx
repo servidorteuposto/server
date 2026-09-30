@@ -16,6 +16,8 @@ import DieselDrainagesPage from '../pages/DieselDrainagesPage'
 import DirectRegisterPage from '../pages/DirectRegisterPage'
 import FuelAnalysesPage from '../pages/FuelAnalysesPage'
 import MandatoryEquipmentsPage from '../pages/MandatoryEquipmentsPage'
+import MandatoryPlatesPage from '../pages/MandatoryPlatesPage'
+import PumpMaintenancePage from '../pages/PumpMaintenancePage'
 import NozzleMetrologyPage from '../pages/NozzleMetrologyPage'
 import ModulePage from '../pages/ModulePage'
 import RegulatoryDocumentsPage from '../pages/RegulatoryDocumentsPage'
@@ -326,6 +328,12 @@ export default function AppShell({
     }
     if (activeMenuId === 'vistoria-caixa-separadora') {
       return <SeparatorBoxInspectionPage isReadOnly={isReadOnly} />
+    }
+    if (activeMenuId === 'placas-obrigatorias') {
+      return <MandatoryPlatesPage isReadOnly={isReadOnly} />
+    }
+    if (activeMenuId === 'manutencao-bombas') {
+      return <PumpMaintenancePage isReadOnly={isReadOnly} />
     }
     if (activeMenuId === 'cadastro-direto') {
       return <DirectRegisterPage isReadOnly={isReadOnly} />

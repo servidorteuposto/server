@@ -1,0 +1,9 @@
+.pump-page__notes {
+  display: block;
+  margin-bottom: 1.25rem;
+}
+
+.pump-page__notes textarea {
+  min-height: 5.5rem;
+  resize: vertical;
+}

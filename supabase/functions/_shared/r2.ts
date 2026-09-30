@@ -10,6 +10,8 @@ export const LOGICAL_BUCKETS = [
   'separator-box-inspections',
   'nozzle-metrology',
   'mandatory-equipments',
+  'mandatory-plates',
+  'pump-maintenances',
   'posto-assets',
   'support-attachments',
   'admin-secure-files',
