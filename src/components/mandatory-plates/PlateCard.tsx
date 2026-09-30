@@ -12,6 +12,7 @@ import {
   type LivePhotoCapture,
   type MandatoryPlate,
 } from '../../lib/mandatory-plates'
+import { describeOperationalSaveError } from '../../lib/storage-errors'
 
 type PlateCardProps = {
   title: string
@@ -189,8 +190,8 @@ export default function PlateCard({
     try {
       await onSave({ photo: capture })
       setReplacing(false)
-    } catch {
-      setError('Não foi possível salvar a placa. Tente novamente.')
+    } catch (err) {
+      setError(describeOperationalSaveError(err, 'mandatory_plates'))
     }
   }
 

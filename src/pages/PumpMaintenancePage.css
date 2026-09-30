@@ -1,3 +1,7 @@
+.pump-page .compressor-page__photos {
+  grid-template-columns: minmax(260px, 520px);
+}
+
 .pump-page__notes {
   display: block;
   margin-bottom: 1rem;

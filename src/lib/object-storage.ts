@@ -12,12 +12,14 @@ type PresignResponse = {
 
 async function invokeR2Json<T extends PresignResponse>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke('r2-storage', { body })
-  if (error) throw error
-  const payload = data as T
-  if (!payload?.ok) {
-    throw new Error(payload?.message || 'r2_storage_failed')
-  }
-  return payload
+  const payload = data as T | null | undefined
+  if (payload?.ok) return payload
+
+  const message =
+    payload?.message ||
+    (error instanceof Error ? error.message : '') ||
+    'r2_storage_failed'
+  throw new Error(message)
 }
 
 async function authHeaders() {

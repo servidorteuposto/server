@@ -9,6 +9,7 @@ export type MenuId =
   | 'vistoria-caixa-separadora'
   | 'placas-obrigatorias'
   | 'manutencao-bombas'
+  | 'recolhimento-residuos'
   | 'cadastro-direto'
   | 'suporte'
   | 'painel-suporte'
@@ -68,7 +69,12 @@ export const MENU_ITEMS: MenuItem[] = [
   {
     id: 'manutencao-bombas',
     label: 'Manutenção de Bombas',
-    description: 'Foto da manutenção e recolhimento de resíduos, com data, hora e localização.',
+    description: 'Foto da manutenção com data, hora, localização, nome e assinatura.',
+  },
+  {
+    id: 'recolhimento-residuos',
+    label: 'Recolhimento de Resíduos',
+    description: 'Foto ao vivo do recolhimento, com data, hora, localização e assinatura.',
   },
   {
     id: 'seguranca-trabalho',

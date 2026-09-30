@@ -14,6 +14,7 @@ import {
   saveMandatoryPlate,
   type MandatoryPlate,
 } from '../lib/mandatory-plates'
+import { describeOperationalSaveError } from '../lib/storage-errors'
 import '../pages/RegulatoryDocumentsPage.css'
 import './MandatoryEquipmentsPage.css'
 import './MandatoryPlatesPage.css'
@@ -97,8 +98,8 @@ export default function MandatoryPlatesPage({ isReadOnly }: MandatoryPlatesPageP
       })
       upsertPlate(saved)
       setNewTitle('')
-    } catch {
-      setPageError('Não foi possível adicionar a placa. Tente novamente.')
+    } catch (error) {
+      setPageError(describeOperationalSaveError(error, 'mandatory_plates'))
     } finally {
       setAdding(false)
     }

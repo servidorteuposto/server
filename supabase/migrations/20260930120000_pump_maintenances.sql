@@ -1,4 +1,4 @@
--- Manutenção de bombas (foto da manutenção + recolhimento de resíduos)
+-- Manutenção de bombas (foto ao vivo com GPS)
 
 CREATE TABLE public.pump_maintenances (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -12,11 +12,6 @@ CREATE TABLE public.pump_maintenances (
   maintenance_photo_latitude double precision NOT NULL,
   maintenance_photo_longitude double precision NOT NULL,
   maintenance_photo_captured_at timestamptz NOT NULL,
-  residue_photo_path text NOT NULL,
-  residue_photo_name text,
-  residue_photo_latitude double precision NOT NULL,
-  residue_photo_longitude double precision NOT NULL,
-  residue_photo_captured_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT pump_maintenances_notes_check
     CHECK (notes IS NULL OR (length(trim(notes)) > 0 AND length(trim(notes)) <= 500)),
@@ -27,10 +22,6 @@ CREATE TABLE public.pump_maintenances (
   CONSTRAINT pump_maintenances_maintenance_coords_check CHECK (
     maintenance_photo_latitude BETWEEN -90 AND 90
     AND maintenance_photo_longitude BETWEEN -180 AND 180
-  ),
-  CONSTRAINT pump_maintenances_residue_coords_check CHECK (
-    residue_photo_latitude BETWEEN -90 AND 90
-    AND residue_photo_longitude BETWEEN -180 AND 180
   )
 );
 

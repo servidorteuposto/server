@@ -2,9 +2,9 @@ import { FormEvent, useCallback, useEffect, useState } from 'react'
 import LiveCameraCapture from '../components/fuel-analyses/LiveCameraCapture'
 import SignaturePad from '../components/fuel-analyses/SignaturePad'
 import {
-  PUMP_MAINTENANCE_MAX_FILE_BYTES,
-  PUMP_MAINTENANCE_NOTES_MAX_LENGTH,
-} from '../config/pump-maintenance'
+  RESIDUE_COLLECTION_MAX_FILE_BYTES,
+  RESIDUE_COLLECTION_NOTES_MAX_LENGTH,
+} from '../config/residue-collection'
 import {
   FUEL_ANALYSES_MAX_FILE_BYTES,
   formatCoords,
@@ -12,19 +12,19 @@ import {
 } from '../config/fuel-analyses'
 import {
   getMyPostoId,
-  getPumpMaintenancePhotoUrl,
-  getPumpMaintenanceSignatureUrl,
-  listPumpMaintenances,
-  savePumpMaintenance,
-  type PumpMaintenance,
-} from '../lib/pump-maintenance'
+  getResidueCollectionPhotoUrl,
+  getResidueCollectionSignatureUrl,
+  listResidueCollections,
+  saveResidueCollection,
+  type ResidueCollection,
+} from '../lib/residue-collection'
 import { describeOperationalSaveError } from '../lib/storage-errors'
 import '../pages/RegulatoryDocumentsPage.css'
 import '../pages/FuelAnalysesPage.css'
 import './CompressorInspectionPage.css'
 import './PumpMaintenancePage.css'
 
-type PumpMaintenancePageProps = {
+type ResidueCollectionPageProps = {
   isReadOnly: boolean
 }
 
@@ -66,9 +66,9 @@ function readGeolocation(): Promise<GeolocationPosition> {
   })
 }
 
-export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageProps) {
+export default function ResidueCollectionPage({ isReadOnly }: ResidueCollectionPageProps) {
   const [postoId, setPostoId] = useState<string | null>(null)
-  const [records, setRecords] = useState<PumpMaintenance[]>([])
+  const [records, setRecords] = useState<ResidueCollection[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [pageError, setPageError] = useState<string | null>(null)
@@ -77,8 +77,8 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
   const [operatorName, setOperatorName] = useState('')
   const [signatureBlob, setSignatureBlob] = useState<Blob | null>(null)
   const [signatureKey, setSignatureKey] = useState(0)
-  const [maintenancePhoto, setMaintenancePhoto] = useState<LivePhotoState>(emptyLivePhoto())
-  const [viewRecord, setViewRecord] = useState<PumpMaintenance | null>(null)
+  const [photo, setPhoto] = useState<LivePhotoState>(emptyLivePhoto())
+  const [viewRecord, setViewRecord] = useState<ResidueCollection | null>(null)
   const [viewPhotoUrl, setViewPhotoUrl] = useState<string | null>(null)
 
   const loadPage = useCallback(async () => {
@@ -87,10 +87,10 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
     try {
       const id = await getMyPostoId()
       setPostoId(id)
-      const rows = await listPumpMaintenances(id)
+      const rows = await listResidueCollections(id)
       setRecords(rows)
     } catch {
-      setPageError('Não foi possível carregar as manutenções de bombas.')
+      setPageError('Não foi possível carregar os recolhimentos de resíduos.')
     } finally {
       setLoading(false)
     }
@@ -102,9 +102,9 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
 
   useEffect(() => {
     return () => {
-      clearLivePhotoState(maintenancePhoto)
+      clearLivePhotoState(photo)
     }
-  }, [maintenancePhoto])
+  }, [photo])
 
   useEffect(() => {
     let cancelled = false
@@ -114,7 +114,7 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
         return
       }
       try {
-        const url = await getPumpMaintenancePhotoUrl(viewRecord.maintenance_photo_path)
+        const url = await getResidueCollectionPhotoUrl(viewRecord.photo_path)
         if (!cancelled) setViewPhotoUrl(url)
       } catch {
         if (!cancelled) setViewPhotoUrl(null)
@@ -126,23 +126,20 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
     }
   }, [viewRecord])
 
-  async function capturePhoto(
-    setter: (updater: (current: LivePhotoState) => LivePhotoState) => void,
-    file: File,
-  ) {
+  async function capturePhoto(file: File) {
     if (!file.type.startsWith('image/')) {
-      setter((current) => ({ ...current, error: 'Use uma foto (JPG, PNG ou WEBP).' }))
+      setPhoto((current) => ({ ...current, error: 'Use uma foto (JPG, PNG ou WEBP).' }))
       return
     }
-    if (file.size > PUMP_MAINTENANCE_MAX_FILE_BYTES) {
-      setter((current) => ({
+    if (file.size > RESIDUE_COLLECTION_MAX_FILE_BYTES) {
+      setPhoto((current) => ({
         ...current,
         error: `A foto deve ter no máximo ${FUEL_ANALYSES_MAX_FILE_BYTES / (1024 * 1024)} MB.`,
       }))
       return
     }
 
-    setter((current) => {
+    setPhoto((current) => {
       clearLivePhotoState(current)
       return {
         file,
@@ -156,7 +153,7 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
 
     try {
       const position = await readGeolocation()
-      setter((current) => ({
+      setPhoto((current) => ({
         ...current,
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
@@ -164,7 +161,7 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
         error: null,
       }))
     } catch {
-      setter((current) => ({
+      setPhoto((current) => ({
         ...current,
         latitude: null,
         longitude: null,
@@ -174,44 +171,41 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
   }
 
   function resetForm() {
-    clearLivePhotoState(maintenancePhoto)
+    clearLivePhotoState(photo)
     setNotes('')
     setOperatorName('')
     setSignatureBlob(null)
     setSignatureKey((current) => current + 1)
-    setMaintenancePhoto(emptyLivePhoto())
+    setPhoto(emptyLivePhoto())
     setFormError(null)
-  }
-
-  function validatePhoto(state: LivePhotoState, label: string): string | null {
-    if (!state.file) return `Tire a ${label}.`
-    if (state.latitude == null || state.longitude == null || !state.capturedAt) {
-      return `Aguarde as coordenadas GPS da ${label} antes de lançar.`
-    }
-    if (state.error) return state.error
-    return null
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (!postoId || isReadOnly) return
 
-    if (notes.trim().length > PUMP_MAINTENANCE_NOTES_MAX_LENGTH) {
-      setFormError(`A observação deve ter no máximo ${PUMP_MAINTENANCE_NOTES_MAX_LENGTH} caracteres.`)
+    if (notes.trim().length > RESIDUE_COLLECTION_NOTES_MAX_LENGTH) {
+      setFormError(`A observação deve ter no máximo ${RESIDUE_COLLECTION_NOTES_MAX_LENGTH} caracteres.`)
       return
     }
     if (!operatorName.trim()) {
-      setFormError('Informe o nome de quem fez a manutenção.')
+      setFormError('Informe o nome de quem fez o recolhimento.')
       return
     }
     if (!signatureBlob) {
-      setFormError('Assine no campo em branco antes de lançar a manutenção.')
+      setFormError('Assine no campo em branco antes de lançar o recolhimento.')
       return
     }
-
-    const maintenanceError = validatePhoto(maintenancePhoto, 'foto da manutenção')
-    if (maintenanceError) {
-      setFormError(maintenanceError)
+    if (!photo.file) {
+      setFormError('Tire a foto do recolhimento de resíduos.')
+      return
+    }
+    if (photo.latitude == null || photo.longitude == null || !photo.capturedAt) {
+      setFormError('Aguarde as coordenadas GPS da foto antes de lançar.')
+      return
+    }
+    if (photo.error) {
+      setFormError(photo.error)
       return
     }
 
@@ -219,60 +213,40 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
     setFormError(null)
 
     try {
-      const saved = await savePumpMaintenance({
+      const saved = await saveResidueCollection({
         postoId,
-        maintainedAt: new Date().toISOString(),
+        collectedAt: new Date().toISOString(),
         notes,
         operatorFullName: operatorName,
         signatureBlob,
-        maintenancePhoto: {
-          file: maintenancePhoto.file!,
-          latitude: maintenancePhoto.latitude!,
-          longitude: maintenancePhoto.longitude!,
-          capturedAt: maintenancePhoto.capturedAt!,
+        photo: {
+          file: photo.file,
+          latitude: photo.latitude,
+          longitude: photo.longitude,
+          capturedAt: photo.capturedAt,
         },
       })
       setRecords((current) => [saved, ...current])
       resetForm()
     } catch (error) {
-      setFormError(describeOperationalSaveError(error, 'pump_maintenances'))
+      setFormError(describeOperationalSaveError(error, 'residue_collections'))
     } finally {
       setBusy(false)
     }
   }
 
-  function renderPhotoMeta(state: LivePhotoState) {
-    return (
-      <dl className="fuel-photo__meta">
-        <div>
-          <dt>Data e hora da foto</dt>
-          <dd>{state.capturedAt ? formatDateTimePtBr(state.capturedAt) : '—'}</dd>
-        </div>
-        <div>
-          <dt>Coordenadas</dt>
-          <dd>
-            {state.latitude != null && state.longitude != null
-              ? formatCoords(state.latitude, state.longitude)
-              : '—'}
-          </dd>
-        </div>
-      </dl>
-    )
-  }
-
   if (loading) {
-    return <p className="reg-docs-page__loading">Carregando manutenções de bombas...</p>
+    return <p className="reg-docs-page__loading">Carregando recolhimentos de resíduos...</p>
   }
 
   return (
     <div className="compressor-page pump-page">
       <header className="reg-docs-page__header">
         <div className="reg-docs-page__header-text">
-          <h1>Manutenção de Bombas</h1>
+          <h1>Recolhimento de Resíduos</h1>
           <p>
-            Lance a foto da manutenção ao vivo, com data, hora e localização. Informe o nome e a
-            assinatura de quem fez. Se quiser identificar a bomba, escreva na observação. Depois é
-            só lançar as outras.
+            Lance a foto ao vivo do recolhimento, com data, hora e localização. Informe o nome e a
+            assinatura de quem fez. Depois é só lançar os próximos.
           </p>
         </div>
       </header>
@@ -287,8 +261,8 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
               <span>Observação (opcional)</span>
               <textarea
                 value={notes}
-                maxLength={PUMP_MAINTENANCE_NOTES_MAX_LENGTH}
-                placeholder="Ex.: Bomba 3, ilha 2"
+                maxLength={RESIDUE_COLLECTION_NOTES_MAX_LENGTH}
+                placeholder="Ex.: Resíduo da bomba 3"
                 onChange={(event) => setNotes(event.target.value)}
                 disabled={busy}
                 rows={3}
@@ -308,20 +282,33 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
 
             <div className="compressor-page__photos">
               <div className="fuel-photo">
-                <h3>Foto da manutenção *</h3>
+                <h3>Foto do recolhimento *</h3>
                 <LiveCameraCapture
                   label="Câmera ao vivo"
                   hint="A foto precisa ser tirada agora, com horário e localização."
                   disabled={busy}
-                  previewUrl={maintenancePhoto.previewUrl}
-                  onCapture={(file) => void capturePhoto((updater) => setMaintenancePhoto(updater), file)}
+                  previewUrl={photo.previewUrl}
+                  onCapture={(file) => void capturePhoto(file)}
                   onClear={() => {
-                    clearLivePhotoState(maintenancePhoto)
-                    setMaintenancePhoto(emptyLivePhoto())
+                    clearLivePhotoState(photo)
+                    setPhoto(emptyLivePhoto())
                   }}
                 />
-                {maintenancePhoto.error && <p className="reg-doc-form__error">{maintenancePhoto.error}</p>}
-                {renderPhotoMeta(maintenancePhoto)}
+                {photo.error && <p className="reg-doc-form__error">{photo.error}</p>}
+                <dl className="fuel-photo__meta">
+                  <div>
+                    <dt>Data e hora da foto</dt>
+                    <dd>{photo.capturedAt ? formatDateTimePtBr(photo.capturedAt) : '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Coordenadas</dt>
+                    <dd>
+                      {photo.latitude != null && photo.longitude != null
+                        ? formatCoords(photo.latitude, photo.longitude)
+                        : '—'}
+                    </dd>
+                  </div>
+                </dl>
               </div>
             </div>
 
@@ -336,7 +323,7 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
 
             <div className="compressor-page__actions">
               <button type="submit" className="reg-docs-page__add-btn" disabled={busy}>
-                {busy ? 'Salvando...' : 'Lançar manutenção'}
+                {busy ? 'Salvando...' : 'Lançar recolhimento'}
               </button>
             </div>
           </form>
@@ -346,15 +333,15 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
       <section className="compressor-page__history">
         <h2 className="compressor-page__section-title">Histórico</h2>
         {records.length === 0 ? (
-          <p className="compressor-page__empty">Nenhuma manutenção registrada ainda.</p>
+          <p className="compressor-page__empty">Nenhum recolhimento registrado ainda.</p>
         ) : (
           <ul className="compressor-page__list">
             {records.map((record) => (
               <li key={record.id} className="compressor-page__list-item">
                 <div>
-                  <strong>{record.notes?.trim() || 'Manutenção de bomba'}</strong>
+                  <strong>{record.notes?.trim() || 'Recolhimento de resíduos'}</strong>
                   <p className="compressor-page__meta">
-                    {formatDateTimePtBr(record.maintained_at)}
+                    {formatDateTimePtBr(record.collected_at)}
                     {record.operator_full_name ? ` · ${record.operator_full_name}` : ''}
                   </p>
                 </div>
@@ -374,7 +361,7 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
       </section>
 
       {viewRecord && (
-        <PumpMaintenanceDetailsModal
+        <ResidueCollectionDetailsModal
           record={viewRecord}
           photoUrl={viewPhotoUrl}
           onClose={() => setViewRecord(null)}
@@ -384,12 +371,12 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
   )
 }
 
-function PumpMaintenanceDetailsModal({
+function ResidueCollectionDetailsModal({
   record,
   photoUrl,
   onClose,
 }: {
-  record: PumpMaintenance
+  record: ResidueCollection
   photoUrl: string | null
   onClose: () => void
 }) {
@@ -401,7 +388,7 @@ function PumpMaintenanceDetailsModal({
       setSignatureUrl(null)
       return
     }
-    getPumpMaintenanceSignatureUrl(record.signature_storage_path)
+    getResidueCollectionSignatureUrl(record.signature_storage_path)
       .then((url) => {
         if (active) setSignatureUrl(url)
       })
@@ -419,11 +406,11 @@ function PumpMaintenanceDetailsModal({
         className="reg-doc-modal__dialog compressor-page__modal"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="pump-maintenance-detail-title"
+        aria-labelledby="residue-collection-detail-title"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="reg-doc-modal__header">
-          <h2 id="pump-maintenance-detail-title">Manutenção da bomba</h2>
+          <h2 id="residue-collection-detail-title">Recolhimento de resíduos</h2>
           <button type="button" className="reg-doc-modal__close" onClick={onClose} aria-label="Fechar">
             ×
           </button>
@@ -432,7 +419,7 @@ function PumpMaintenanceDetailsModal({
         <dl className="compressor-page__detail-grid">
           <div>
             <dt>Lançado em</dt>
-            <dd>{formatDateTimePtBr(record.maintained_at)}</dd>
+            <dd>{formatDateTimePtBr(record.collected_at)}</dd>
           </div>
           <div>
             <dt>Observação</dt>
@@ -446,22 +433,20 @@ function PumpMaintenanceDetailsModal({
 
         <div className="compressor-page__modal-photos">
           <div className="compressor-page__modal-photo">
-            <h3>Foto da manutenção</h3>
+            <h3>Foto do recolhimento</h3>
             {photoUrl ? (
-              <img src={photoUrl} alt="Foto da manutenção" className="compressor-page__photo-preview" />
+              <img src={photoUrl} alt="Foto do recolhimento" className="compressor-page__photo-preview" />
             ) : (
               <p className="compressor-page__empty">Foto indisponível.</p>
             )}
             <dl className="fuel-photo__meta">
               <div>
                 <dt>Data e hora da foto</dt>
-                <dd>{formatDateTimePtBr(record.maintenance_photo_captured_at)}</dd>
+                <dd>{formatDateTimePtBr(record.photo_captured_at)}</dd>
               </div>
               <div>
                 <dt>Coordenadas</dt>
-                <dd>
-                  {formatCoords(record.maintenance_photo_latitude, record.maintenance_photo_longitude)}
-                </dd>
+                <dd>{formatCoords(record.photo_latitude, record.photo_longitude)}</dd>
               </div>
             </dl>
           </div>
@@ -470,7 +455,7 @@ function PumpMaintenanceDetailsModal({
         {signatureUrl && (
           <div className="pump-page__signature-preview">
             <h3>Assinatura</h3>
-            <img src={signatureUrl} alt="Assinatura de quem fez a manutenção" />
+            <img src={signatureUrl} alt="Assinatura de quem fez o recolhimento" />
           </div>
         )}
       </div>

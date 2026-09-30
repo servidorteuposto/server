@@ -12,6 +12,7 @@ export const LOGICAL_BUCKETS = [
   'mandatory-equipments',
   'mandatory-plates',
   'pump-maintenances',
+  'residue-collections',
   'posto-assets',
   'support-attachments',
   'admin-secure-files',

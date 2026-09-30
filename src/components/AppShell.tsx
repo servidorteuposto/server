@@ -18,6 +18,7 @@ import FuelAnalysesPage from '../pages/FuelAnalysesPage'
 import MandatoryEquipmentsPage from '../pages/MandatoryEquipmentsPage'
 import MandatoryPlatesPage from '../pages/MandatoryPlatesPage'
 import PumpMaintenancePage from '../pages/PumpMaintenancePage'
+import ResidueCollectionPage from '../pages/ResidueCollectionPage'
 import NozzleMetrologyPage from '../pages/NozzleMetrologyPage'
 import ModulePage from '../pages/ModulePage'
 import RegulatoryDocumentsPage from '../pages/RegulatoryDocumentsPage'
@@ -334,6 +335,9 @@ export default function AppShell({
     }
     if (activeMenuId === 'manutencao-bombas') {
       return <PumpMaintenancePage isReadOnly={isReadOnly} />
+    }
+    if (activeMenuId === 'recolhimento-residuos') {
+      return <ResidueCollectionPage isReadOnly={isReadOnly} />
     }
     if (activeMenuId === 'cadastro-direto') {
       return <DirectRegisterPage isReadOnly={isReadOnly} />

@@ -16,11 +16,6 @@ export type PumpMaintenance = {
   maintenance_photo_latitude: number
   maintenance_photo_longitude: number
   maintenance_photo_captured_at: string
-  residue_photo_path: string
-  residue_photo_name: string | null
-  residue_photo_latitude: number
-  residue_photo_longitude: number
-  residue_photo_captured_at: string
   created_at: string
 }
 
@@ -38,7 +33,6 @@ export type SavePumpMaintenanceInput = {
   operatorFullName: string
   signatureBlob: Blob
   maintenancePhoto: LivePhotoCapture
-  residuePhoto: LivePhotoCapture
 }
 
 export { getMyPostoId }
@@ -69,13 +63,8 @@ export async function savePumpMaintenance(input: SavePumpMaintenanceInput) {
     input.maintenancePhoto.file,
     input.maintenancePhoto.file.name || 'manutencao.jpg',
   )
-  const residuePrepared = await prepareImageUpload(
-    input.residuePhoto.file,
-    input.residuePhoto.file.name || 'residuos.jpg',
-  )
   const signaturePath = `${input.postoId}/${maintenanceId}/signature.${signaturePrepared.extension}`
   const maintenancePath = `${input.postoId}/${maintenanceId}/manutencao.${maintenancePrepared.extension}`
-  const residuePath = `${input.postoId}/${maintenanceId}/residuos.${residuePrepared.extension}`
   const uploadedPaths: string[] = []
 
   try {
@@ -95,14 +84,6 @@ export async function savePumpMaintenance(input: SavePumpMaintenanceInput) {
     )
     uploadedPaths.push(maintenancePath)
 
-    await uploadObject(
-      PUMP_MAINTENANCE_STORAGE_BUCKET,
-      residuePath,
-      residuePrepared.file,
-      residuePrepared.contentType,
-    )
-    uploadedPaths.push(residuePath)
-
     const notes = input.notes.trim() || null
 
     const { data, error } = await supabase
@@ -119,11 +100,6 @@ export async function savePumpMaintenance(input: SavePumpMaintenanceInput) {
         maintenance_photo_latitude: input.maintenancePhoto.latitude,
         maintenance_photo_longitude: input.maintenancePhoto.longitude,
         maintenance_photo_captured_at: input.maintenancePhoto.capturedAt,
-        residue_photo_path: residuePath,
-        residue_photo_name: residuePrepared.file.name,
-        residue_photo_latitude: input.residuePhoto.latitude,
-        residue_photo_longitude: input.residuePhoto.longitude,
-        residue_photo_captured_at: input.residuePhoto.capturedAt,
       })
       .select('*')
       .single()
