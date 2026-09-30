@@ -10,16 +10,47 @@ type PresignResponse = {
   contentType?: string
 }
 
+async function messageFromInvokeFailure(data: unknown, error: unknown) {
+  if (data && typeof data === 'object' && data !== null && 'message' in data) {
+    const message = (data as { message?: unknown }).message
+    if (typeof message === 'string' && message.trim()) return message
+  }
+
+  const context =
+    error && typeof error === 'object' && error !== null && 'context' in error
+      ? (error as { context?: unknown }).context
+      : undefined
+
+  if (typeof Response !== 'undefined' && context instanceof Response) {
+    try {
+      const payload = (await context.clone().json()) as { message?: string; msg?: string }
+      if (payload?.message?.trim()) return payload.message
+      if (payload?.msg?.trim()) return payload.msg
+    } catch {
+      try {
+        const text = await context.clone().text()
+        if (text.trim()) return text.slice(0, 240)
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  if (context && typeof context === 'object' && context !== null && 'message' in context) {
+    const message = (context as { message?: unknown }).message
+    if (typeof message === 'string' && message.trim()) return message
+  }
+
+  if (error instanceof Error && error.message.trim()) return error.message
+  return 'r2_storage_failed'
+}
+
 async function invokeR2Json<T extends PresignResponse>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke('r2-storage', { body })
   const payload = data as T | null | undefined
   if (payload?.ok) return payload
 
-  const message =
-    payload?.message ||
-    (error instanceof Error ? error.message : '') ||
-    'r2_storage_failed'
-  throw new Error(message)
+  throw new Error(await messageFromInvokeFailure(payload, error))
 }
 
 async function authHeaders() {

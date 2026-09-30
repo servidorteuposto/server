@@ -30,6 +30,11 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
+/** invoke() do supabase-js trata 4xx como erro genérico e some com o JSON. */
+function invokeJsonResponse(body: unknown) {
+  return jsonResponse(body, 200)
+}
+
 function cleanPath(path: string) {
   return path.replace(/^\/+/, '').replace(/\\/g, '/')
 }
@@ -174,9 +179,9 @@ Deno.serve(async (req) => {
     const bucket = body.bucket?.trim() ?? ''
     const expiresIn = Number(body.expiresIn) > 0 ? Number(body.expiresIn) : 3600
 
-    if (!action) return jsonResponse({ ok: false, message: 'Ação inválida.' }, 400)
+    if (!action) return invokeJsonResponse({ ok: false, message: 'Ação inválida.' })
     if (!isLogicalBucket(bucket)) {
-      return jsonResponse({ ok: false, message: 'Bucket inválido.' }, 400)
+      return invokeJsonResponse({ ok: false, message: 'Bucket inválido. Publique de novo a função r2-storage.' })
     }
 
     const user = await resolveUser(req)
@@ -187,10 +192,10 @@ Deno.serve(async (req) => {
         typeof body.contentType === 'string' && body.contentType.trim()
           ? body.contentType.trim()
           : 'application/octet-stream'
-      if (!path) return jsonResponse({ ok: false, message: 'Path inválido.' }, 400)
+      if (!path) return invokeJsonResponse({ ok: false, message: 'Path inválido.' })
 
       const allowed = await authorize(action, bucket, path, user, body.publicSlug)
-      if (!allowed) return jsonResponse({ ok: false, message: 'Não autorizado.' }, 403)
+      if (!allowed) return invokeJsonResponse({ ok: false, message: 'Não autorizado.' })
 
       const key = objectKey(bucket, path)
       const url = await presignR2Url('PUT', key, expiresIn, contentType)
@@ -199,10 +204,10 @@ Deno.serve(async (req) => {
 
     if (action === 'presign-download') {
       const path = typeof body.path === 'string' ? cleanPath(body.path) : ''
-      if (!path) return jsonResponse({ ok: false, message: 'Path inválido.' }, 400)
+      if (!path) return invokeJsonResponse({ ok: false, message: 'Path inválido.' })
 
       const allowed = await authorize(action, bucket, path, user, body.publicSlug)
-      if (!allowed) return jsonResponse({ ok: false, message: 'Não autorizado.' }, 403)
+      if (!allowed) return invokeJsonResponse({ ok: false, message: 'Não autorizado.' })
 
       const key = objectKey(bucket, path)
       const url = await presignR2Url('GET', key, expiresIn)
@@ -237,11 +242,11 @@ Deno.serve(async (req) => {
           ? [body.path]
           : []
       const cleaned = [...new Set(paths.map(cleanPath).filter(Boolean))]
-      if (!cleaned.length) return jsonResponse({ ok: false, message: 'Nenhum path para remover.' }, 400)
+      if (!cleaned.length) return invokeJsonResponse({ ok: false, message: 'Nenhum path para remover.' })
 
       for (const path of cleaned) {
         const allowed = await authorize(action, bucket, path, user, body.publicSlug)
-        if (!allowed) return jsonResponse({ ok: false, message: 'Não autorizado.' }, 403)
+        if (!allowed) return invokeJsonResponse({ ok: false, message: 'Não autorizado.' })
       }
 
       for (const path of cleaned) {
@@ -250,11 +255,11 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, deleted: cleaned.length })
     }
 
-    return jsonResponse({ ok: false, message: 'Ação inválida.' }, 400)
+    return invokeJsonResponse({ ok: false, message: 'Ação inválida.' })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro interno'
     if (message === 'r2_not_configured') {
-      return jsonResponse({ ok: false, message: 'R2 não configurado nas secrets.' }, 503)
+      return invokeJsonResponse({ ok: false, message: 'R2 não configurado nas secrets.' })
     }
     if (message.startsWith('r2_get_failed:404')) {
       return jsonResponse({ ok: false, message: 'Arquivo não encontrado no storage.' }, 404)
