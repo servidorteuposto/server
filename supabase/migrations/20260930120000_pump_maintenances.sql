@@ -5,6 +5,8 @@ CREATE TABLE public.pump_maintenances (
   posto_id uuid NOT NULL REFERENCES public.postos(id) ON DELETE CASCADE,
   maintained_at timestamptz NOT NULL DEFAULT now(),
   notes text,
+  operator_full_name text NOT NULL,
+  signature_storage_path text NOT NULL,
   maintenance_photo_path text NOT NULL,
   maintenance_photo_name text,
   maintenance_photo_latitude double precision NOT NULL,
@@ -18,6 +20,10 @@ CREATE TABLE public.pump_maintenances (
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT pump_maintenances_notes_check
     CHECK (notes IS NULL OR (length(trim(notes)) > 0 AND length(trim(notes)) <= 500)),
+  CONSTRAINT pump_maintenances_operator_name_check
+    CHECK (length(trim(operator_full_name)) > 0),
+  CONSTRAINT pump_maintenances_signature_path_check
+    CHECK (length(trim(signature_storage_path)) > 0),
   CONSTRAINT pump_maintenances_maintenance_coords_check CHECK (
     maintenance_photo_latitude BETWEEN -90 AND 90
     AND maintenance_photo_longitude BETWEEN -180 AND 180

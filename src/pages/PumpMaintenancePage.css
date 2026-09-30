@@ -1,9 +1,33 @@
 .pump-page__notes {
   display: block;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
 }
 
 .pump-page__notes textarea {
   min-height: 5.5rem;
   resize: vertical;
+}
+
+.pump-page__operator {
+  display: block;
+  margin-bottom: 1.25rem;
+}
+
+.pump-page__signature-preview {
+  margin-bottom: 0.85rem;
+}
+
+.pump-page__signature-preview h3 {
+  font-size: 0.95rem;
+  margin: 0 0 0.5rem;
+}
+
+.pump-page__signature-preview img {
+  display: block;
+  width: min(100%, 320px);
+  max-height: min(42vh, 360px);
+  object-fit: contain;
+  border: 1px solid var(--border-subtle, #dbe3ef);
+  border-radius: 8px;
+  background: #fff;
 }

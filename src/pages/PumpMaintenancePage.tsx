@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 import LiveCameraCapture from '../components/fuel-analyses/LiveCameraCapture'
+import SignaturePad from '../components/fuel-analyses/SignaturePad'
 import {
   PUMP_MAINTENANCE_MAX_FILE_BYTES,
   PUMP_MAINTENANCE_NOTES_MAX_LENGTH,
@@ -12,6 +13,7 @@ import {
 import {
   getMyPostoId,
   getPumpMaintenancePhotoUrl,
+  getPumpMaintenanceSignatureUrl,
   listPumpMaintenances,
   savePumpMaintenance,
   type PumpMaintenance,
@@ -71,6 +73,9 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
   const [pageError, setPageError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
+  const [operatorName, setOperatorName] = useState('')
+  const [signatureBlob, setSignatureBlob] = useState<Blob | null>(null)
+  const [signatureKey, setSignatureKey] = useState(0)
   const [maintenancePhoto, setMaintenancePhoto] = useState<LivePhotoState>(emptyLivePhoto())
   const [residuePhoto, setResiduePhoto] = useState<LivePhotoState>(emptyLivePhoto())
   const [viewRecord, setViewRecord] = useState<PumpMaintenance | null>(null)
@@ -179,6 +184,9 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
     clearLivePhotoState(maintenancePhoto)
     clearLivePhotoState(residuePhoto)
     setNotes('')
+    setOperatorName('')
+    setSignatureBlob(null)
+    setSignatureKey((current) => current + 1)
     setMaintenancePhoto(emptyLivePhoto())
     setResiduePhoto(emptyLivePhoto())
     setFormError(null)
@@ -201,6 +209,14 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
       setFormError(`A observação deve ter no máximo ${PUMP_MAINTENANCE_NOTES_MAX_LENGTH} caracteres.`)
       return
     }
+    if (!operatorName.trim()) {
+      setFormError('Informe o nome de quem fez a manutenção.')
+      return
+    }
+    if (!signatureBlob) {
+      setFormError('Assine no campo em branco antes de lançar a manutenção.')
+      return
+    }
 
     const maintenanceError = validatePhoto(maintenancePhoto, 'foto da manutenção')
     if (maintenanceError) {
@@ -221,6 +237,8 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
         postoId,
         maintainedAt: new Date().toISOString(),
         notes,
+        operatorFullName: operatorName,
+        signatureBlob,
         maintenancePhoto: {
           file: maintenancePhoto.file!,
           latitude: maintenancePhoto.latitude!,
@@ -244,8 +262,8 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
       setFormError(
         message.includes('Bucket inválido') || message.includes('r2_storage_failed')
           ? 'Storage ainda não atualizado no servidor. Avise o suporte ou tente novamente em instantes.'
-          : message.includes('pump_maintenances')
-            ? 'Tabela de manutenções não encontrada. A migration precisa ser aplicada no banco.'
+          : message.includes('pump_maintenances') || message.includes('operator_full_name')
+            ? 'Tabela de manutenções desatualizada. Aplique o SQL de nome e assinatura no banco.'
             : message,
       )
     } finally {
@@ -283,8 +301,8 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
           <h1>Manutenção de Bombas</h1>
           <p>
             Lance a foto da manutenção e a foto do recolhimento de resíduos juntas, com data, hora e
-            localização. Se quiser identificar a bomba, escreva na observação. Depois é só lançar as
-            outras.
+            localização. Informe o nome e a assinatura de quem fez. Se quiser identificar a bomba,
+            escreva na observação. Depois é só lançar as outras.
           </p>
         </div>
       </header>
@@ -304,6 +322,17 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
                 onChange={(event) => setNotes(event.target.value)}
                 disabled={busy}
                 rows={3}
+              />
+            </label>
+
+            <label className="reg-doc-form__field pump-page__operator">
+              <span>Nome de quem fez *</span>
+              <input
+                type="text"
+                value={operatorName}
+                onChange={(event) => setOperatorName(event.target.value)}
+                disabled={busy}
+                required
               />
             </label>
 
@@ -343,6 +372,13 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
               </div>
             </div>
 
+            <div className="compressor-page__signature">
+              <label className="reg-doc-form__field">
+                <span>Assinatura de quem fez *</span>
+              </label>
+              <SignaturePad key={signatureKey} disabled={busy} onChange={setSignatureBlob} />
+            </div>
+
             {formError && <p className="reg-doc-form__error">{formError}</p>}
 
             <div className="compressor-page__actions">
@@ -364,7 +400,10 @@ export default function PumpMaintenancePage({ isReadOnly }: PumpMaintenancePageP
               <li key={record.id} className="compressor-page__list-item">
                 <div>
                   <strong>{record.notes?.trim() || 'Manutenção de bomba'}</strong>
-                  <p className="compressor-page__meta">{formatDateTimePtBr(record.maintained_at)}</p>
+                  <p className="compressor-page__meta">
+                    {formatDateTimePtBr(record.maintained_at)}
+                    {record.operator_full_name ? ` · ${record.operator_full_name}` : ''}
+                  </p>
                 </div>
                 <div className="diesel-history__actions">
                   <button
@@ -401,6 +440,26 @@ function PumpMaintenanceDetailsModal({
   photoUrls: { maintenance: string | null; residue: string | null }
   onClose: () => void
 }) {
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    if (!record.signature_storage_path) {
+      setSignatureUrl(null)
+      return
+    }
+    getPumpMaintenanceSignatureUrl(record.signature_storage_path)
+      .then((url) => {
+        if (active) setSignatureUrl(url)
+      })
+      .catch(() => {
+        if (active) setSignatureUrl(null)
+      })
+    return () => {
+      active = false
+    }
+  }, [record.signature_storage_path])
+
   return (
     <div className="reg-doc-modal" role="presentation" onClick={onClose}>
       <div
@@ -425,6 +484,10 @@ function PumpMaintenanceDetailsModal({
           <div>
             <dt>Observação</dt>
             <dd>{record.notes?.trim() || '—'}</dd>
+          </div>
+          <div>
+            <dt>Executado por</dt>
+            <dd>{record.operator_full_name || '—'}</dd>
           </div>
         </dl>
 
@@ -465,6 +528,13 @@ function PumpMaintenanceDetailsModal({
             </div>
           ))}
         </div>
+
+        {signatureUrl && (
+          <div className="pump-page__signature-preview">
+            <h3>Assinatura</h3>
+            <img src={signatureUrl} alt="Assinatura de quem fez a manutenção" />
+          </div>
+        )}
       </div>
     </div>
   )

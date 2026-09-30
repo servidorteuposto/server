@@ -9,6 +9,8 @@ export type PumpMaintenance = {
   posto_id: string
   maintained_at: string
   notes: string | null
+  operator_full_name: string | null
+  signature_storage_path: string | null
   maintenance_photo_path: string
   maintenance_photo_name: string | null
   maintenance_photo_latitude: number
@@ -33,6 +35,8 @@ export type SavePumpMaintenanceInput = {
   postoId: string
   maintainedAt: string
   notes: string
+  operatorFullName: string
+  signatureBlob: Blob
   maintenancePhoto: LivePhotoCapture
   residuePhoto: LivePhotoCapture
 }
@@ -54,8 +58,13 @@ export async function getPumpMaintenancePhotoUrl(path: string) {
   return getSignedObjectUrl(PUMP_MAINTENANCE_STORAGE_BUCKET, path, 60 * 60)
 }
 
+export async function getPumpMaintenanceSignatureUrl(path: string) {
+  return getSignedObjectUrl(PUMP_MAINTENANCE_STORAGE_BUCKET, path, 60 * 60)
+}
+
 export async function savePumpMaintenance(input: SavePumpMaintenanceInput) {
   const maintenanceId = crypto.randomUUID()
+  const signaturePrepared = await prepareImageUpload(input.signatureBlob, 'signature.png')
   const maintenancePrepared = await prepareImageUpload(
     input.maintenancePhoto.file,
     input.maintenancePhoto.file.name || 'manutencao.jpg',
@@ -64,11 +73,20 @@ export async function savePumpMaintenance(input: SavePumpMaintenanceInput) {
     input.residuePhoto.file,
     input.residuePhoto.file.name || 'residuos.jpg',
   )
+  const signaturePath = `${input.postoId}/${maintenanceId}/signature.${signaturePrepared.extension}`
   const maintenancePath = `${input.postoId}/${maintenanceId}/manutencao.${maintenancePrepared.extension}`
   const residuePath = `${input.postoId}/${maintenanceId}/residuos.${residuePrepared.extension}`
   const uploadedPaths: string[] = []
 
   try {
+    await uploadObject(
+      PUMP_MAINTENANCE_STORAGE_BUCKET,
+      signaturePath,
+      signaturePrepared.file,
+      signaturePrepared.contentType,
+    )
+    uploadedPaths.push(signaturePath)
+
     await uploadObject(
       PUMP_MAINTENANCE_STORAGE_BUCKET,
       maintenancePath,
@@ -94,6 +112,8 @@ export async function savePumpMaintenance(input: SavePumpMaintenanceInput) {
         posto_id: input.postoId,
         maintained_at: input.maintainedAt,
         notes,
+        operator_full_name: input.operatorFullName.trim(),
+        signature_storage_path: signaturePath,
         maintenance_photo_path: maintenancePath,
         maintenance_photo_name: maintenancePrepared.file.name,
         maintenance_photo_latitude: input.maintenancePhoto.latitude,
