@@ -48,19 +48,35 @@ export default function LiveCameraCapture({
         audio: false,
         video: {
           facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
         },
       })
+
+      const [track] = stream.getVideoTracks()
+      const capabilities = typeof track?.getCapabilities === 'function' ? track.getCapabilities() : undefined
+      if (track && capabilities?.width?.max && capabilities?.height?.max) {
+        await track
+          .applyConstraints({
+            width: { ideal: Math.min(2560, capabilities.width.max) },
+            height: { ideal: Math.min(1440, capabilities.height.max) },
+          })
+          .catch(() => undefined)
+      }
 
       streamRef.current = stream
       const video = videoRef.current
       if (!video) {
-        stream.getTracks().forEach((track) => track.stop())
+        stream.getTracks().forEach((entry) => entry.stop())
         throw new Error('Não foi possível iniciar a prévia da câmera.')
       }
 
       video.srcObject = stream
+      if (video.readyState < 2) {
+        await new Promise<void>((resolve) => {
+          video.onloadedmetadata = () => resolve()
+        })
+      }
       await video.play()
       setActive(true)
     } catch (err) {
@@ -81,8 +97,8 @@ export default function LiveCameraCapture({
     const video = videoRef.current
     if (!video || !active || disabled) return
 
-    const width = video.videoWidth || 1280
-    const height = video.videoHeight || 720
+    const width = video.videoWidth || 1920
+    const height = video.videoHeight || 1080
     if (!width || !height) {
       setError('Aguarde a câmera carregar e tente novamente.')
       return

@@ -116,7 +116,7 @@
 
 .equip-card__media img {
   width: 100%;
-  max-height: 110px;
+  max-height: 220px;
   object-fit: cover;
   border-radius: 8px;
   border: 1px solid rgba(61, 143, 212, 0.22);
@@ -141,18 +141,18 @@
 .equip-photo-lightbox {
   position: fixed;
   inset: 0;
-  z-index: 1200;
+  z-index: 1400;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  background: rgba(15, 23, 42, 0.78);
+  padding: 0.6rem;
+  background: rgba(15, 23, 42, 0.88);
 }
 
 .equip-photo-lightbox__dialog {
   position: relative;
-  max-width: min(960px, 100%);
-  max-height: min(90vh, 100%);
+  width: min(96vw, 1400px);
+  max-height: 96vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -160,10 +160,9 @@
 
 .equip-photo-lightbox__img {
   display: block;
-  max-width: 100%;
-  max-height: min(86vh, 900px);
-  width: auto;
+  width: 100%;
   height: auto;
+  max-height: 92vh;
   object-fit: contain;
   border-radius: 10px;
   background: #0f172a;
@@ -256,8 +255,8 @@
 
 .equip-card .fuel-photo__preview {
   width: 100%;
-  max-height: 140px;
-  object-fit: cover;
+  max-height: min(52vh, 420px);
+  object-fit: contain;
   border-radius: 8px;
 }
 

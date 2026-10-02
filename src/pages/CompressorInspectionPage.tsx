@@ -23,6 +23,7 @@ import {
   type CompressorExportPosto,
 } from '../lib/compressor-inspection-export'
 import { getMyPostoProfile } from '../lib/fuel-analyses'
+import PhotoLightbox from '../components/PhotoLightbox'
 import { openRaqPdfForPrint } from '../lib/raq-print-report'
 import '../pages/RegulatoryDocumentsPage.css'
 import '../pages/FuelAnalysesPage.css'
@@ -706,6 +707,7 @@ function CompressorDetailsModal({
   onExport: () => void
 }) {
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
+  const [lightbox, setLightbox] = useState<{ url: string; alt: string } | null>(null)
   const busy = exportingId === inspection.id
   const printing = busy && exportingMode === 'print'
   const downloading = busy && exportingMode === 'download'
@@ -812,7 +814,14 @@ function CompressorDetailsModal({
             <div key={photo.label} className="compressor-page__modal-photo">
               <h3>{photo.label}</h3>
               {photo.url ? (
-                <img src={photo.url} alt={photo.label} className="compressor-page__photo-preview" />
+                <button
+                  type="button"
+                  className="photo-open-btn"
+                  onClick={() => setLightbox({ url: photo.url!, alt: photo.label })}
+                  aria-label={`Ampliar ${photo.label}`}
+                >
+                  <img src={photo.url} alt={photo.label} className="compressor-page__photo-preview" />
+                </button>
               ) : (
                 <p className="compressor-page__empty">Foto indisponível.</p>
               )}
@@ -846,6 +855,9 @@ function CompressorDetailsModal({
           </button>
         </footer>
       </div>
+      {lightbox && (
+        <PhotoLightbox url={lightbox.url} alt={lightbox.alt} onClose={() => setLightbox(null)} />
+      )}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import LiveCameraCapture from '../components/fuel-analyses/LiveCameraCapture'
 import SignaturePad from '../components/fuel-analyses/SignaturePad'
+import PhotoLightbox from '../components/PhotoLightbox'
 import VolumetrySuggestField from '../components/nozzle-metrology/VolumetrySuggestField'
 import {
   FUEL_ANALYSES_MAX_FILE_BYTES,
@@ -184,6 +185,13 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
   const [photoLongitude, setPhotoLongitude] = useState<number | null>(null)
   const [photoCapturedAt, setPhotoCapturedAt] = useState<string | null>(null)
   const [photoError, setPhotoError] = useState<string | null>(null)
+  const [pumpPhotoFile, setPumpPhotoFile] = useState<File | null>(null)
+  const [pumpPhotoPreviewUrl, setPumpPhotoPreviewUrl] = useState<string | null>(null)
+  const [pumpPhotoLatitude, setPumpPhotoLatitude] = useState<number | null>(null)
+  const [pumpPhotoLongitude, setPumpPhotoLongitude] = useState<number | null>(null)
+  const [pumpPhotoCapturedAt, setPumpPhotoCapturedAt] = useState<string | null>(null)
+  const [pumpPhotoError, setPumpPhotoError] = useState<string | null>(null)
+  const [composerLightbox, setComposerLightbox] = useState<{ url: string; alt: string } | null>(null)
   const [viewRow, setViewRow] = useState<NozzleMetrologyVerification | null>(null)
   const [draftHydrated, setDraftHydrated] = useState(false)
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null)
@@ -416,6 +424,16 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
     setPhotoError(null)
   }
 
+  function clearPumpPhoto() {
+    if (pumpPhotoPreviewUrl) URL.revokeObjectURL(pumpPhotoPreviewUrl)
+    setPumpPhotoFile(null)
+    setPumpPhotoPreviewUrl(null)
+    setPumpPhotoLatitude(null)
+    setPumpPhotoLongitude(null)
+    setPumpPhotoCapturedAt(null)
+    setPumpPhotoError(null)
+  }
+
   function resetComposer() {
     setQuantityInput('1')
     setEmployeeName('')
@@ -425,6 +443,8 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
     setSignatureBlob(null)
     setSignatureKey((key) => key + 1)
     clearLivePhoto()
+    clearPumpPhoto()
+    setComposerLightbox(null)
     setFormError(null)
   }
 
@@ -493,6 +513,35 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
     }
   }
 
+  async function handlePumpPhotoCapture(file: File) {
+    if (file.size > FUEL_ANALYSES_MAX_FILE_BYTES) {
+      setPumpPhotoError('A foto deve ter no máximo 10 MB.')
+      return
+    }
+
+    if (pumpPhotoPreviewUrl) URL.revokeObjectURL(pumpPhotoPreviewUrl)
+    const previewUrl = URL.createObjectURL(file)
+    setPumpPhotoFile(file)
+    setPumpPhotoPreviewUrl(previewUrl)
+    setPumpPhotoCapturedAt(new Date().toISOString())
+    setPumpPhotoLatitude(null)
+    setPumpPhotoLongitude(null)
+    setPumpPhotoError('Obtendo coordenadas GPS...')
+    setFormError(null)
+
+    try {
+      const position = await readGeolocation()
+      setPumpPhotoLatitude(position.coords.latitude)
+      setPumpPhotoLongitude(position.coords.longitude)
+      setPumpPhotoCapturedAt(new Date().toISOString())
+      setPumpPhotoError(null)
+    } catch {
+      setPumpPhotoLatitude(null)
+      setPumpPhotoLongitude(null)
+      setPumpPhotoError('Não foi possível obter a localização. Permita o GPS e tire a foto novamente.')
+    }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (!postoId || isReadOnly || !sheetReady) return
@@ -507,6 +556,10 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
     }
     if (!photoFile || photoLatitude == null || photoLongitude == null || !photoCapturedAt) {
       setFormError('Tire a foto e aguarde as coordenadas GPS antes de salvar.')
+      return
+    }
+    if (pumpPhotoFile && (pumpPhotoLatitude == null || pumpPhotoLongitude == null || !pumpPhotoCapturedAt)) {
+      setFormError('Aguarde o GPS da foto da bomba, ou remova essa foto extra antes de salvar.')
       return
     }
     if (!signatureBlob) {
@@ -529,6 +582,10 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
         photoLatitude,
         photoLongitude,
         photoCapturedAt,
+        pumpPhotoFile,
+        pumpPhotoLatitude,
+        pumpPhotoLongitude,
+        pumpPhotoCapturedAt,
         items: nozzles.map((nozzle, index) => {
           const evaluation = nozzleEvaluations[index]
           return {
@@ -987,6 +1044,47 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
                 </div>
               </div>
 
+              <div className="reg-doc-form__field nozzle-pump-photo">
+                <span>Foto da bomba (opcional)</span>
+                <p className="fuel-panel__hint">
+                  Se a bomba tiver algum problema, tire uma foto avulsa agora. Depois dá para abrir
+                  grande.
+                </p>
+                <LiveCameraCapture
+                  label="Câmera ao vivo"
+                  hint="Opcional. A foto precisa ser tirada agora, com horário e localização."
+                  disabled={isReadOnly || busy}
+                  previewUrl={pumpPhotoPreviewUrl}
+                  onCapture={(file) => void handlePumpPhotoCapture(file)}
+                  onClear={clearPumpPhoto}
+                />
+                {pumpPhotoPreviewUrl && (
+                  <div className="nozzle-photo-preview">
+                    <button
+                      type="button"
+                      className="btn btn--secondary"
+                      onClick={() =>
+                        setComposerLightbox({
+                          url: pumpPhotoPreviewUrl,
+                          alt: 'Foto da bomba de combustível',
+                        })
+                      }
+                    >
+                      Ver foto grande
+                    </button>
+                    <p>
+                      {pumpPhotoCapturedAt
+                        ? formatDateTimePtBr(pumpPhotoCapturedAt)
+                        : 'Horário pendente'}
+                      {pumpPhotoLatitude != null && pumpPhotoLongitude != null
+                        ? ` · ${formatCoords(pumpPhotoLatitude, pumpPhotoLongitude)}`
+                        : ''}
+                    </p>
+                  </div>
+                )}
+                {pumpPhotoError && <p className="nozzle-inline-error">{pumpPhotoError}</p>}
+              </div>
+
               {formError && (
                 <p className="reg-doc-form__error" role="alert">
                   {formError}
@@ -1065,6 +1163,14 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
           onExport={() => void handleVerificationPdf(viewRow, 'download')}
         />
       )}
+
+      {composerLightbox && (
+        <PhotoLightbox
+          url={composerLightbox.url}
+          alt={composerLightbox.alt}
+          onClose={() => setComposerLightbox(null)}
+        />
+      )}
     </div>
   )
 }
@@ -1118,7 +1224,9 @@ function VerificationDetailModal({
   onExport: () => void
 }) {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const [pumpPhotoUrl, setPumpPhotoUrl] = useState<string | null>(null)
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
+  const [lightbox, setLightbox] = useState<{ url: string; alt: string } | null>(null)
   const busy = exportingId === verification.id
   const printing = busy && exportingMode === 'print'
   const downloading = busy && exportingMode === 'download'
@@ -1127,16 +1235,21 @@ function VerificationDetailModal({
     let cancelled = false
     void Promise.all([
       getNozzleMetrologyPhotoUrl(verification.photo_storage_path),
+      verification.pump_photo_storage_path
+        ? getNozzleMetrologyPhotoUrl(verification.pump_photo_storage_path)
+        : Promise.resolve(null),
       getNozzleMetrologySignatureUrl(verification.signature_storage_path),
     ])
-      .then(([photo, signature]) => {
+      .then(([photo, pumpPhoto, signature]) => {
         if (cancelled) return
         setPhotoUrl(photo)
+        setPumpPhotoUrl(pumpPhoto)
         setSignatureUrl(signature)
       })
       .catch(() => {
         if (cancelled) return
         setPhotoUrl(null)
+        setPumpPhotoUrl(null)
         setSignatureUrl(null)
       })
     return () => {
@@ -1226,11 +1339,18 @@ function VerificationDetailModal({
           ))}
         </div>
 
-        <div className="nozzle-evidence">
+        <div className="nozzle-evidence nozzle-evidence--detail">
           {photoUrl && (
             <div>
-              <h3>Foto</h3>
-              <img className="nozzle-photo-preview__img" src={photoUrl} alt="Foto da verificação" />
+              <h3>Foto do local</h3>
+              <button
+                type="button"
+                className="photo-open-btn"
+                onClick={() => setLightbox({ url: photoUrl, alt: 'Foto da verificação' })}
+                aria-label="Ampliar foto do local"
+              >
+                <img className="nozzle-photo-preview__img" src={photoUrl} alt="Foto da verificação" />
+              </button>
               <p className="fuel-panel__hint">
                 {formatDateTimePtBr(verification.photo_captured_at)} ·{' '}
                 {formatCoords(verification.photo_latitude, verification.photo_longitude)}
@@ -1245,6 +1365,34 @@ function VerificationDetailModal({
           )}
         </div>
 
+        {pumpPhotoUrl && (
+          <div className="nozzle-pump-photo nozzle-pump-photo--detail">
+            <h3>Foto da bomba</h3>
+            <button
+              type="button"
+              className="photo-open-btn"
+              onClick={() =>
+                setLightbox({ url: pumpPhotoUrl, alt: 'Foto da bomba de combustível' })
+              }
+              aria-label="Ampliar foto da bomba"
+            >
+              <img
+                className="nozzle-photo-preview__img nozzle-photo-preview__img--large"
+                src={pumpPhotoUrl}
+                alt="Foto da bomba de combustível"
+              />
+            </button>
+            {verification.pump_photo_captured_at &&
+              verification.pump_photo_latitude != null &&
+              verification.pump_photo_longitude != null && (
+                <p className="fuel-panel__hint">
+                  {formatDateTimePtBr(verification.pump_photo_captured_at)} ·{' '}
+                  {formatCoords(verification.pump_photo_latitude, verification.pump_photo_longitude)}
+                </p>
+              )}
+          </div>
+        )}
+
         <div className="reg-doc-modal__actions">
           <button type="button" className="btn btn--secondary" onClick={onPrint} disabled={busy}>
             {printing ? 'Abrindo...' : 'Imprimir'}
@@ -1257,6 +1405,9 @@ function VerificationDetailModal({
           </button>
         </div>
       </div>
+      {lightbox && (
+        <PhotoLightbox url={lightbox.url} alt={lightbox.alt} onClose={() => setLightbox(null)} />
+      )}
     </div>
   )
 }

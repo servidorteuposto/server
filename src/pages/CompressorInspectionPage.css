@@ -92,7 +92,7 @@
 }
 
 .compressor-page__modal {
-  max-width: 920px;
+  max-width: min(1100px, 96vw);
 }
 
 .compressor-page__detail-grid {
@@ -125,7 +125,7 @@
 
 .compressor-page__photo-preview {
   width: 100%;
-  max-height: 280px;
+  max-height: min(78vh, 860px);
   object-fit: contain;
   border-radius: 8px;
   border: 1px solid var(--border-subtle, #dbe3ef);

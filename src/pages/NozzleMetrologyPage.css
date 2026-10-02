@@ -330,6 +330,55 @@
   border: 1px solid rgba(61, 143, 212, 0.22);
 }
 
+.nozzle-photo-preview__img--large {
+  width: 100%;
+  max-width: none;
+  max-height: min(70vh, 520px);
+  object-fit: contain;
+  background: #0b1220;
+}
+
+.nozzle-pump-photo {
+  margin-top: 0.15rem;
+}
+
+.nozzle-pump-photo .fuel-camera {
+  width: 100%;
+  max-width: min(100%, 720px);
+}
+
+.nozzle-pump-photo .fuel-camera__viewport {
+  width: 100%;
+  max-width: none;
+  min-height: 220px;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+}
+
+.nozzle-pump-photo .fuel-photo__preview {
+  width: 100%;
+  max-width: min(100%, 720px);
+  max-height: min(70vh, 640px);
+  object-fit: contain;
+  background: #0b1220;
+}
+
+.nozzle-pump-photo--detail {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.nozzle-pump-photo--detail .photo-open-btn,
+.nozzle-evidence--detail .photo-open-btn {
+  width: 100%;
+}
+
+.nozzle-pump-photo--detail h3,
+.nozzle-evidence--detail h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
 .nozzle-photo-preview p,
 .nozzle-inline-error {
   margin: 0.4rem 0 0;

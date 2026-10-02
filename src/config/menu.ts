@@ -33,7 +33,7 @@ export const MENU_ITEMS: MenuItem[] = [
   },
   {
     id: 'analises-combustiveis',
-    label: 'Análises de Combustíveis',
+    label: 'Análises dos Combustíveis',
     description: 'Laudos, amostras e histórico de análises de combustíveis.',
   },
   {

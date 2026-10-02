@@ -447,19 +447,48 @@ export async function generateMetrologyPrintPdf(
     formatCoords(verification.photo_latitude, verification.photo_longitude),
   )
 
-  const [photo, signature] = await Promise.all([
+  const [photo, pumpPhoto, signature] = await Promise.all([
     embedRasterImage(doc, await fetchImageBytes(verification.photo_storage_path)),
+    verification.pump_photo_storage_path
+      ? embedRasterImage(doc, await fetchImageBytes(verification.pump_photo_storage_path))
+      : Promise.resolve(null),
     embedRasterImage(doc, await fetchImageBytes(verification.signature_storage_path)),
   ])
 
   if (photo) {
     ctx.y -= 2
-    drawEmbeddedImage(ctx, photo, CONTENT_WIDTH, 220)
+    drawEmbeddedImage(ctx, photo, CONTENT_WIDTH, 320)
   } else {
     drawKeyValue(ctx, 'Foto', 'Nao disponivel')
   }
 
-  drawHeading(ctx, '4. Assinatura')
+  let signatureSection = 4
+  if (verification.pump_photo_storage_path) {
+    drawHeading(ctx, '4. Foto da bomba')
+    drawKeyValue(
+      ctx,
+      'Foto capturada em',
+      verification.pump_photo_captured_at
+        ? formatDateTimePtBr(verification.pump_photo_captured_at)
+        : '-',
+    )
+    drawKeyValue(
+      ctx,
+      'Coordenadas',
+      verification.pump_photo_latitude != null && verification.pump_photo_longitude != null
+        ? formatCoords(verification.pump_photo_latitude, verification.pump_photo_longitude)
+        : '-',
+    )
+    if (pumpPhoto) {
+      ctx.y -= 2
+      drawEmbeddedImage(ctx, pumpPhoto, CONTENT_WIDTH, 420)
+    } else {
+      drawKeyValue(ctx, 'Foto da bomba', 'Nao disponivel')
+    }
+    signatureSection = 5
+  }
+
+  drawHeading(ctx, `${signatureSection}. Assinatura`)
   drawKeyValue(ctx, 'Assinado por', verification.employee_full_name)
   if (signature) {
     drawEmbeddedImage(ctx, signature, Math.min(CONTENT_WIDTH, 240), 80)

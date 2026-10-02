@@ -19,6 +19,7 @@ import {
   type ResidueCollection,
 } from '../lib/residue-collection'
 import { describeOperationalSaveError } from '../lib/storage-errors'
+import PhotoLightbox from '../components/PhotoLightbox'
 import '../pages/RegulatoryDocumentsPage.css'
 import '../pages/FuelAnalysesPage.css'
 import './CompressorInspectionPage.css'
@@ -381,6 +382,7 @@ function ResidueCollectionDetailsModal({
   onClose: () => void
 }) {
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -435,7 +437,14 @@ function ResidueCollectionDetailsModal({
           <div className="compressor-page__modal-photo">
             <h3>Foto do recolhimento</h3>
             {photoUrl ? (
-              <img src={photoUrl} alt="Foto do recolhimento" className="compressor-page__photo-preview" />
+              <button
+                type="button"
+                className="photo-open-btn"
+                onClick={() => setLightboxOpen(true)}
+                aria-label="Ampliar foto do recolhimento"
+              >
+                <img src={photoUrl} alt="Foto do recolhimento" className="compressor-page__photo-preview" />
+              </button>
             ) : (
               <p className="compressor-page__empty">Foto indisponível.</p>
             )}
@@ -459,6 +468,9 @@ function ResidueCollectionDetailsModal({
           </div>
         )}
       </div>
+      {lightboxOpen && photoUrl && (
+        <PhotoLightbox url={photoUrl} alt="Foto do recolhimento" onClose={() => setLightboxOpen(false)} />
+      )}
     </div>
   )
 }

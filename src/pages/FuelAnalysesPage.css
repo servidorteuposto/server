@@ -430,7 +430,8 @@
 
 .fuel-camera__viewport {
   position: relative;
-  width: min(100%, 420px);
+  width: 100%;
+  max-width: 720px;
   aspect-ratio: 4 / 3;
   overflow: hidden;
   border-radius: 12px;
@@ -515,10 +516,13 @@
 }
 
 .fuel-photo__preview {
-  width: min(100%, 360px);
+  width: 100%;
+  max-width: 720px;
+  max-height: min(70vh, 640px);
   border-radius: 10px;
   border: 1px solid var(--gray-300);
-  object-fit: cover;
+  object-fit: contain;
+  background: #0b1220;
 }
 
 .fuel-photo__meta {

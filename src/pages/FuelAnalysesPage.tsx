@@ -530,7 +530,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
       setTransporters(partners.filter((partner) => partner.partner_type === 'transporter'))
       setDistributors(partners.filter((partner) => partner.partner_type === 'distributor'))
     } catch {
-      setPageError('Não foi possível carregar Análises de Combustíveis.')
+      setPageError('Não foi possível carregar Análises dos Combustíveis.')
     } finally {
       setLoading(false)
     }
@@ -1031,7 +1031,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
   }
 
   if (loading) {
-    return <p className="reg-docs-page__loading">Carregando Análises de Combustíveis...</p>
+    return <p className="reg-docs-page__loading">Carregando Análises dos Combustíveis...</p>
   }
 
   if (!posto) {
@@ -1042,7 +1042,7 @@ export default function FuelAnalysesPage({ isReadOnly }: FuelAnalysesPageProps) 
     <div className="fuel-page">
       <header className="reg-docs-page__header">
         <div className="reg-docs-page__header-text">
-          <h1>Análises de Combustíveis</h1>
+          <h1>Análises dos Combustíveis</h1>
           <p>
             Lançamentos são imutáveis. Em cada RAQ, marque só os combustíveis que chegaram. Na página
             pública, cada produto mostra sempre o RAQ mais recente.

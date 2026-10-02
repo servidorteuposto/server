@@ -43,6 +43,11 @@ export type NozzleMetrologyVerification = {
   photo_latitude: number
   photo_longitude: number
   photo_captured_at: string
+  pump_photo_storage_path: string | null
+  pump_photo_file_name: string | null
+  pump_photo_latitude: number | null
+  pump_photo_longitude: number | null
+  pump_photo_captured_at: string | null
   created_at: string
   items?: NozzleMetrologyItem[]
 }
@@ -73,6 +78,10 @@ export type SaveNozzleMetrologyInput = {
   photoLatitude: number
   photoLongitude: number
   photoCapturedAt: string
+  pumpPhotoFile?: File | null
+  pumpPhotoLatitude?: number | null
+  pumpPhotoLongitude?: number | null
+  pumpPhotoCapturedAt?: string | null
   items: SaveNozzleMetrologyItemInput[]
 }
 
@@ -89,6 +98,11 @@ export async function listNozzleMetrologyVerifications(postoId: string) {
 
   return ((data ?? []) as NozzleMetrologyVerification[]).map((row) => ({
     ...row,
+    pump_photo_storage_path: row.pump_photo_storage_path ?? null,
+    pump_photo_file_name: row.pump_photo_file_name ?? null,
+    pump_photo_latitude: row.pump_photo_latitude ?? null,
+    pump_photo_longitude: row.pump_photo_longitude ?? null,
+    pump_photo_captured_at: row.pump_photo_captured_at ?? null,
     items: [...(row.items ?? [])].sort((a, b) => a.nozzle_number - b.nozzle_number),
   }))
 }
@@ -111,6 +125,17 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
   const photoPrepared = await prepareImageUpload(input.photoFile, input.photoFile.name || 'photo.jpg')
   const signaturePath = `${input.postoId}/${verificationId}/signature.${signaturePrepared.extension}`
   const photoPath = `${input.postoId}/${verificationId}/photo.${photoPrepared.extension}`
+  const hasPumpPhoto =
+    Boolean(input.pumpPhotoFile) &&
+    input.pumpPhotoLatitude != null &&
+    input.pumpPhotoLongitude != null &&
+    Boolean(input.pumpPhotoCapturedAt)
+  const pumpPrepared = hasPumpPhoto
+    ? await prepareImageUpload(input.pumpPhotoFile!, input.pumpPhotoFile!.name || 'pump-photo.jpg')
+    : null
+  const pumpPhotoPath = pumpPrepared
+    ? `${input.postoId}/${verificationId}/pump-photo.${pumpPrepared.extension}`
+    : null
   const uploadedPaths = [signaturePath]
   let saved: NozzleMetrologyVerification | undefined
 
@@ -130,6 +155,16 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
     )
     uploadedPaths.push(photoPath)
 
+    if (pumpPrepared && pumpPhotoPath) {
+      await uploadObject(
+        NOZZLE_METROLOGY_STORAGE_BUCKET,
+        pumpPhotoPath,
+        pumpPrepared.file,
+        pumpPrepared.contentType,
+      )
+      uploadedPaths.push(pumpPhotoPath)
+    }
+
     const { error: headerError } = await supabase.from('nozzle_metrology_verifications').insert({
       id: verificationId,
       posto_id: input.postoId,
@@ -143,6 +178,11 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
       photo_latitude: input.photoLatitude,
       photo_longitude: input.photoLongitude,
       photo_captured_at: input.photoCapturedAt,
+      pump_photo_storage_path: pumpPhotoPath,
+      pump_photo_file_name: pumpPrepared?.file.name ?? null,
+      pump_photo_latitude: hasPumpPhoto ? input.pumpPhotoLatitude : null,
+      pump_photo_longitude: hasPumpPhoto ? input.pumpPhotoLongitude : null,
+      pump_photo_captured_at: hasPumpPhoto ? input.pumpPhotoCapturedAt : null,
     })
 
     if (headerError) throw headerError

@@ -19,6 +19,7 @@ import {
   type PumpMaintenance,
 } from '../lib/pump-maintenance'
 import { describeOperationalSaveError } from '../lib/storage-errors'
+import PhotoLightbox from '../components/PhotoLightbox'
 import '../pages/RegulatoryDocumentsPage.css'
 import '../pages/FuelAnalysesPage.css'
 import './CompressorInspectionPage.css'
@@ -394,6 +395,7 @@ function PumpMaintenanceDetailsModal({
   onClose: () => void
 }) {
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -448,7 +450,14 @@ function PumpMaintenanceDetailsModal({
           <div className="compressor-page__modal-photo">
             <h3>Foto da manutenção</h3>
             {photoUrl ? (
-              <img src={photoUrl} alt="Foto da manutenção" className="compressor-page__photo-preview" />
+              <button
+                type="button"
+                className="photo-open-btn"
+                onClick={() => setLightboxOpen(true)}
+                aria-label="Ampliar foto da manutenção"
+              >
+                <img src={photoUrl} alt="Foto da manutenção" className="compressor-page__photo-preview" />
+              </button>
             ) : (
               <p className="compressor-page__empty">Foto indisponível.</p>
             )}
@@ -474,6 +483,9 @@ function PumpMaintenanceDetailsModal({
           </div>
         )}
       </div>
+      {lightboxOpen && photoUrl && (
+        <PhotoLightbox url={photoUrl} alt="Foto da manutenção" onClose={() => setLightboxOpen(false)} />
+      )}
     </div>
   )
 }

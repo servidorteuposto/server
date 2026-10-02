@@ -23,6 +23,7 @@ import {
   saveSeparatorBoxInspection,
   type SeparatorBoxInspection,
 } from '../lib/separator-box-inspection'
+import PhotoLightbox from '../components/PhotoLightbox'
 import '../pages/RegulatoryDocumentsPage.css'
 import '../pages/FuelAnalysesPage.css'
 import './DieselDrainagesPage.css'
@@ -581,6 +582,7 @@ function SeparatorBoxDetailsModal({
   onExport: () => void
 }) {
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
+  const [lightbox, setLightbox] = useState<{ url: string; alt: string } | null>(null)
   const busy = exportingId === inspection.id
   const printing = busy && exportingMode === 'print'
   const downloading = busy && exportingMode === 'download'
@@ -659,7 +661,14 @@ function SeparatorBoxDetailsModal({
             <div key={photo.label} className="compressor-page__modal-photo">
               <h3>{photo.label}</h3>
               {photo.url ? (
-                <img src={photo.url} alt={photo.label} className="compressor-page__photo-preview" />
+                <button
+                  type="button"
+                  className="photo-open-btn"
+                  onClick={() => setLightbox({ url: photo.url!, alt: photo.label })}
+                  aria-label={`Ampliar ${photo.label}`}
+                >
+                  <img src={photo.url} alt={photo.label} className="compressor-page__photo-preview" />
+                </button>
               ) : (
                 <p className="compressor-page__empty">Foto indisponível.</p>
               )}
@@ -693,6 +702,9 @@ function SeparatorBoxDetailsModal({
           </button>
         </footer>
       </div>
+      {lightbox && (
+        <PhotoLightbox url={lightbox.url} alt={lightbox.alt} onClose={() => setLightbox(null)} />
+      )}
     </div>
   )
 }

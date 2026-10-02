@@ -13,6 +13,7 @@ import {
   type MandatoryPlate,
 } from '../../lib/mandatory-plates'
 import { describeOperationalSaveError } from '../../lib/storage-errors'
+import PhotoLightbox from '../PhotoLightbox'
 
 type PlateCardProps = {
   title: string
@@ -81,15 +82,6 @@ export default function PlateCard({
   const [lightbox, setLightbox] = useState<{ url: string; alt: string } | null>(null)
 
   const status = hasPhoto ? 'registrada' : 'pendente'
-
-  useEffect(() => {
-    if (!lightbox) return
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setLightbox(null)
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [lightbox])
 
   useEffect(() => {
     setPhoto((current) => {
@@ -310,25 +302,7 @@ export default function PlateCard({
       {error && <p className="reg-doc-form__error">{error}</p>}
 
       {lightbox && (
-        <div className="equip-photo-lightbox" onClick={() => setLightbox(null)} role="presentation">
-          <div
-            className="equip-photo-lightbox__dialog"
-            onClick={(event) => event.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label={lightbox.alt}
-          >
-            <button
-              type="button"
-              className="equip-photo-lightbox__close"
-              onClick={() => setLightbox(null)}
-              aria-label="Fechar"
-            >
-              ×
-            </button>
-            <img src={lightbox.url} alt={lightbox.alt} className="equip-photo-lightbox__img" />
-          </div>
-        </div>
+        <PhotoLightbox url={lightbox.url} alt={lightbox.alt} onClose={() => setLightbox(null)} />
       )}
     </article>
   )
