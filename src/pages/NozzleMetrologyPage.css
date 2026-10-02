@@ -269,7 +269,7 @@
   display: grid;
   gap: 0.35rem;
   width: 100%;
-  max-width: 260px;
+  max-width: min(100%, 720px);
   min-width: 0;
 }
 

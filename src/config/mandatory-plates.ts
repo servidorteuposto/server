@@ -18,13 +18,13 @@ export const STANDARD_PLATE_TEMPLATES: StandardPlateTemplate[] = [
   {
     key: 'orgao-ambiental',
     title: 'Placa do órgão ambiental',
-    description: 'Foto ao vivo da placa, com horário e localização.',
+    description: '',
     sortOrder: 0,
   },
   {
     key: 'anp',
     title: 'Placa da ANP',
-    description: 'Foto ao vivo da placa, com horário e localização.',
+    description: '',
     sortOrder: 1,
   },
 ]

@@ -130,7 +130,6 @@ export default function MandatoryPlatesPage({ isReadOnly }: MandatoryPlatesPageP
             <PlateCard
               key={template.key}
               title={template.title}
-              description={template.description}
               plate={plate}
               isStandard
               isReadOnly={isReadOnly}
@@ -161,7 +160,6 @@ export default function MandatoryPlatesPage({ isReadOnly }: MandatoryPlatesPageP
           <PlateCard
             key={plate.id}
             title={plate.title}
-            description="Foto ao vivo da placa, com horário e localização."
             plate={plate}
             isStandard={false}
             isReadOnly={isReadOnly}
@@ -200,15 +198,15 @@ export default function MandatoryPlatesPage({ isReadOnly }: MandatoryPlatesPageP
       {!isReadOnly && (
         <form className="plates-page__add" onSubmit={(event) => void handleAddCustom(event)}>
           <h2>Adicionar outra placa</h2>
-          <p>Informe o título e depois tire a foto ao vivo com horário e localização.</p>
+          <p>Escreva o nome da placa, por exemplo Bomba 01, e depois tire a foto ao vivo.</p>
           <div className="plates-page__add-row">
-            <label className="reg-doc-form__field">
-              <span>Título da placa</span>
+            <label className="reg-doc-form__field plates-page__title-field">
+              <span>Nome da placa</span>
               <input
                 type="text"
                 value={newTitle}
                 maxLength={MANDATORY_PLATES_TITLE_MAX_LENGTH}
-                placeholder="Ex.: Placa do Corpo de Bombeiros"
+                placeholder="Ex.: Bomba 01"
                 onChange={(event) => setNewTitle(event.target.value)}
                 disabled={adding}
               />

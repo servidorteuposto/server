@@ -202,32 +202,39 @@ export default function PlateCard({
   const showForm = replacing || !hasPhoto
 
   return (
-    <article className="reg-doc-card equip-card">
-      <header className="reg-doc-card__header">
-        <div>
+    <article className="reg-doc-card equip-card plates-card">
+      <header className="plates-card__header">
+        <div className="plates-card__title-row">
           <h3>{title}</h3>
-          {description ? <p className="equip-card__desc">{description}</p> : null}
-        </div>
-        <div className="reg-doc-card__header-actions">
           <span className={`reg-doc-card__badge equip-card__badge--${hasPhoto ? 'de_acordo' : 'pendente'}`}>
             {status === 'registrada' ? 'REGISTRADA' : 'PENDENTE'}
           </span>
-          {hasPhoto && !replacing && !isReadOnly && (
-            <button
-              type="button"
-              className="btn btn--secondary"
-              disabled={busy}
-              onClick={() => setReplacing(true)}
-            >
-              Trocar foto
-            </button>
-          )}
-          {!isStandard && !isReadOnly && (
-            <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => void handleDelete()}>
-              Remover
-            </button>
-          )}
         </div>
+        {description ? <p className="plates-card__desc">{description}</p> : null}
+        {(hasPhoto && !replacing && !isReadOnly) || (!isStandard && !isReadOnly) ? (
+          <div className="plates-card__header-actions">
+            {hasPhoto && !replacing && !isReadOnly && (
+              <button
+                type="button"
+                className="btn btn--secondary"
+                disabled={busy}
+                onClick={() => setReplacing(true)}
+              >
+                Trocar foto
+              </button>
+            )}
+            {!isStandard && !isReadOnly && (
+              <button
+                type="button"
+                className="btn btn--secondary"
+                disabled={busy}
+                onClick={() => void handleDelete()}
+              >
+                Remover
+              </button>
+            )}
+          </div>
+        ) : null}
       </header>
 
       {!showForm && plate?.photo_path ? (

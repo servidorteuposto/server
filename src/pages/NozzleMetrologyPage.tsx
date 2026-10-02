@@ -109,7 +109,7 @@ function isMeaningfulDraft(input: {
   return false
 }
 
-function readGeolocation(): Promise<GeolocationPosition> {
+function readGeolocation(options?: PositionOptions): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error('Geolocalização não disponível neste dispositivo.'))
@@ -119,8 +119,48 @@ function readGeolocation(): Promise<GeolocationPosition> {
       enableHighAccuracy: true,
       timeout: 15000,
       maximumAge: 0,
+      ...options,
     })
   })
+}
+
+function hasCoords(lat: number | null | undefined, lng: number | null | undefined) {
+  return lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng)
+}
+
+type ResolvedLivePhoto = {
+  file: File
+  latitude: number
+  longitude: number
+  capturedAt: string
+}
+
+async function resolveCapturedPhoto(
+  file: File | null,
+  latitude: number | null,
+  longitude: number | null,
+  capturedAt: string | null,
+): Promise<ResolvedLivePhoto | null> {
+  if (!file) return null
+  if (hasCoords(latitude, longitude)) {
+    return {
+      file,
+      latitude: latitude as number,
+      longitude: longitude as number,
+      capturedAt: capturedAt || new Date().toISOString(),
+    }
+  }
+  try {
+    const position = await readGeolocation({ maximumAge: 60_000 })
+    return {
+      file,
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      capturedAt: capturedAt || new Date().toISOString(),
+    }
+  } catch {
+    return null
+  }
 }
 
 function parseLiters(raw: string): number | null {
@@ -554,14 +594,6 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
       setFormError('Informe o nome do funcionário que fez o lançamento.')
       return
     }
-    if (!photoFile || photoLatitude == null || photoLongitude == null || !photoCapturedAt) {
-      setFormError('Tire a foto e aguarde as coordenadas GPS antes de salvar.')
-      return
-    }
-    if (pumpPhotoFile && (pumpPhotoLatitude == null || pumpPhotoLongitude == null || !pumpPhotoCapturedAt)) {
-      setFormError('Aguarde o GPS da foto da bomba, ou remova essa foto extra antes de salvar.')
-      return
-    }
     if (!signatureBlob) {
       setFormError('Assine no campo em branco antes de salvar.')
       return
@@ -569,23 +601,78 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
 
     setBusy(true)
     setFormError(null)
-    const verifiedAt = new Date().toISOString()
 
     try {
+      const pumpResolved = await resolveCapturedPhoto(
+        pumpPhotoFile,
+        pumpPhotoLatitude,
+        pumpPhotoLongitude,
+        pumpPhotoCapturedAt,
+      )
+      let mainResolved = await resolveCapturedPhoto(
+        photoFile,
+        photoLatitude,
+        photoLongitude,
+        photoCapturedAt,
+      )
+
+      if (!mainResolved && photoFile && pumpResolved) {
+        mainResolved = {
+          file: photoFile,
+          latitude: pumpResolved.latitude,
+          longitude: pumpResolved.longitude,
+          capturedAt: photoCapturedAt || pumpResolved.capturedAt,
+        }
+      }
+      if (!mainResolved && pumpResolved) {
+        mainResolved = pumpResolved
+      }
+      if (!mainResolved) {
+        setFormError('Tire a foto e aguarde as coordenadas GPS antes de salvar.')
+        setBusy(false)
+        return
+      }
+      if (pumpPhotoFile && !pumpResolved && !hasCoords(mainResolved.latitude, mainResolved.longitude)) {
+        setFormError('Aguarde o GPS da foto da bomba, ou remova essa foto extra antes de salvar.')
+        setBusy(false)
+        return
+      }
+
+      if (photoFile) {
+        setPhotoLatitude(mainResolved.latitude)
+        setPhotoLongitude(mainResolved.longitude)
+        setPhotoCapturedAt(mainResolved.capturedAt)
+        setPhotoError(null)
+      }
+      if (pumpResolved) {
+        setPumpPhotoLatitude(pumpResolved.latitude)
+        setPumpPhotoLongitude(pumpResolved.longitude)
+        setPumpPhotoCapturedAt(pumpResolved.capturedAt)
+        setPumpPhotoError(null)
+      }
+
+      const verifiedAt = new Date().toISOString()
+      const extraPump =
+        pumpResolved && pumpResolved.file !== mainResolved.file
+          ? pumpResolved
+          : pumpPhotoFile && pumpPhotoFile === mainResolved.file
+            ? mainResolved
+            : pumpResolved
+
       const saved = await saveNozzleMetrologyVerification({
         postoId,
         verifiedAt,
         employeeFullName: employeeName,
         overallStatus: overallStatus as MetrologyStatus,
         signatureBlob,
-        photoFile,
-        photoLatitude,
-        photoLongitude,
-        photoCapturedAt,
-        pumpPhotoFile,
-        pumpPhotoLatitude,
-        pumpPhotoLongitude,
-        pumpPhotoCapturedAt,
+        photoFile: mainResolved.file,
+        photoLatitude: mainResolved.latitude,
+        photoLongitude: mainResolved.longitude,
+        photoCapturedAt: mainResolved.capturedAt,
+        pumpPhotoFile: extraPump?.file ?? null,
+        pumpPhotoLatitude: extraPump?.latitude ?? null,
+        pumpPhotoLongitude: extraPump?.longitude ?? null,
+        pumpPhotoCapturedAt: extraPump?.capturedAt ?? null,
         items: nozzles.map((nozzle, index) => {
           const evaluation = nozzleEvaluations[index]
           return {
@@ -1020,6 +1107,18 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
                   />
                   {photoPreviewUrl && (
                     <div className="nozzle-photo-preview">
+                      <button
+                        type="button"
+                        className="btn btn--secondary"
+                        onClick={() =>
+                          setComposerLightbox({
+                            url: photoPreviewUrl,
+                            alt: 'Foto da verificação',
+                          })
+                        }
+                      >
+                        Ver foto grande
+                      </button>
                       <p>
                         {photoCapturedAt
                           ? formatDateTimePtBr(photoCapturedAt)
