@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { deleteR2Object, isR2Configured, objectKey } from '../_shared/r2.ts'
 import {
   isMetaWhatsAppConfigured,
   normalizeWaPhone,
@@ -500,6 +501,131 @@ Deno.serve(async (req) => {
         ok: true,
         message: `Conta de ${posto.nome} excluída com sucesso.`,
         posto_id: postoId,
+      })
+    }
+
+    if (action === 'list_raqs') {
+      const { data, error } = await admin
+        .from('fuel_analysis_reports')
+        .select(
+          `
+          id,
+          posto_id,
+          razao_social,
+          cnpj,
+          endereco,
+          author_full_name,
+          submitted_at,
+          created_at,
+          posto:postos ( id, nome, cnpj ),
+          raq_items:fuel_analysis_raq_items ( product_key, invoice_number ),
+          analysis_items:fuel_analysis_items ( product_key, densidade_status )
+        `,
+        )
+        .order('submitted_at', { ascending: false })
+
+      if (error) {
+        return jsonResponse({ ok: false, message: error.message }, 500)
+      }
+
+      const reports = (data ?? []).map((row) => {
+        const posto = Array.isArray(row.posto) ? row.posto[0] : row.posto
+        const raqItems = Array.isArray(row.raq_items) ? row.raq_items : []
+        const analysisItems = Array.isArray(row.analysis_items) ? row.analysis_items : []
+        const products = [
+          ...new Set(
+            [
+              ...raqItems.map((item: { product_key?: string }) => item.product_key),
+              ...analysisItems.map((item: { product_key?: string }) => item.product_key),
+            ].filter((key): key is string => Boolean(key)),
+          ),
+        ]
+        const invoiceNumbers = [
+          ...new Set(
+            raqItems
+              .map((item: { invoice_number?: string | null }) => String(item.invoice_number ?? '').trim())
+              .filter(Boolean),
+          ),
+        ]
+
+        return {
+          id: row.id,
+          posto_id: row.posto_id,
+          posto_nome: String(posto?.nome ?? row.razao_social ?? 'Posto'),
+          posto_cnpj: String(posto?.cnpj ?? row.cnpj ?? ''),
+          razao_social: row.razao_social,
+          cnpj: row.cnpj,
+          endereco: row.endereco,
+          author_full_name: row.author_full_name,
+          submitted_at: row.submitted_at,
+          created_at: row.created_at,
+          products,
+          invoice_numbers: invoiceNumbers,
+          has_inapto: analysisItems.some(
+            (item: { densidade_status?: string | null }) => item.densidade_status === 'inapto',
+          ),
+        }
+      })
+
+      return jsonResponse({ ok: true, reports })
+    }
+
+    if (action === 'delete_raq') {
+      const reportId = body?.report_id
+      if (!reportId || typeof reportId !== 'string') {
+        return jsonResponse({ ok: false, message: 'Informe o RAQ.' }, 400)
+      }
+
+      const { data: report, error: reportError } = await admin
+        .from('fuel_analysis_reports')
+        .select(
+          `
+          id,
+          posto_id,
+          razao_social,
+          signature_storage_path,
+          raq_items:fuel_analysis_raq_items ( invoice_storage_path ),
+          analysis_items:fuel_analysis_items ( photo_storage_path )
+        `,
+        )
+        .eq('id', reportId)
+        .maybeSingle()
+
+      if (reportError || !report) {
+        return jsonResponse({ ok: false, message: 'RAQ não encontrado.' }, 404)
+      }
+
+      const paths = new Set<string>()
+      if (report.signature_storage_path) paths.add(String(report.signature_storage_path))
+      for (const item of Array.isArray(report.raq_items) ? report.raq_items : []) {
+        if (item?.invoice_storage_path) paths.add(String(item.invoice_storage_path))
+      }
+      for (const item of Array.isArray(report.analysis_items) ? report.analysis_items : []) {
+        if (item?.photo_storage_path) paths.add(String(item.photo_storage_path))
+      }
+
+      if (isR2Configured()) {
+        for (const path of paths) {
+          try {
+            await deleteR2Object(objectKey('fuel-analyses', path))
+          } catch (error) {
+            console.error('r2 delete raq file failed', path, error)
+          }
+        }
+      }
+
+      const { error: deleteError } = await admin.from('fuel_analysis_reports').delete().eq('id', reportId)
+      if (deleteError) {
+        return jsonResponse(
+          { ok: false, message: deleteError.message || 'Não foi possível excluir o RAQ.' },
+          500,
+        )
+      }
+
+      return jsonResponse({
+        ok: true,
+        message: `RAQ de ${report.razao_social} excluído.`,
+        report_id: reportId,
       })
     }
 

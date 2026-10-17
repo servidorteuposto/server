@@ -1,0 +1,38 @@
+.admin-raqs-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(140px, 0.7fr) minmax(140px, 0.7fr) auto;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 0.75rem;
+}
+
+.admin-raqs-toolbar .reg-doc-form__field {
+  margin: 0;
+}
+
+.admin-raqs-clear {
+  height: 2.5rem;
+  white-space: nowrap;
+}
+
+.admin-raqs-count {
+  margin: 0 0 0.85rem;
+  font-size: 0.84rem;
+  color: var(--gray-600, #4b5563);
+}
+
+@media (max-width: 1100px) {
+  .admin-raqs-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .admin-raqs-clear {
+    width: 100%;
+  }
+}
+
+@media (max-width: 700px) {
+  .admin-raqs-toolbar {
+    grid-template-columns: 1fr;
+  }
+}

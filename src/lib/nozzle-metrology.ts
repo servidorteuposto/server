@@ -38,11 +38,11 @@ export type NozzleMetrologyVerification = {
   nozzle_count: number
   overall_status: MetrologyStatus
   signature_storage_path: string
-  photo_storage_path: string
+  photo_storage_path: string | null
   photo_file_name: string | null
-  photo_latitude: number
-  photo_longitude: number
-  photo_captured_at: string
+  photo_latitude: number | null
+  photo_longitude: number | null
+  photo_captured_at: string | null
   pump_photo_storage_path: string | null
   pump_photo_file_name: string | null
   pump_photo_latitude: number | null
@@ -74,10 +74,10 @@ export type SaveNozzleMetrologyInput = {
   employeeFullName: string
   overallStatus: MetrologyStatus
   signatureBlob: Blob
-  photoFile: File
-  photoLatitude: number
-  photoLongitude: number
-  photoCapturedAt: string
+  photoFile?: File | null
+  photoLatitude?: number | null
+  photoLongitude?: number | null
+  photoCapturedAt?: string | null
   pumpPhotoFile?: File | null
   pumpPhotoLatitude?: number | null
   pumpPhotoLongitude?: number | null
@@ -98,6 +98,11 @@ export async function listNozzleMetrologyVerifications(postoId: string) {
 
   return ((data ?? []) as NozzleMetrologyVerification[]).map((row) => ({
     ...row,
+    photo_storage_path: row.photo_storage_path ?? null,
+    photo_file_name: row.photo_file_name ?? null,
+    photo_latitude: row.photo_latitude ?? null,
+    photo_longitude: row.photo_longitude ?? null,
+    photo_captured_at: row.photo_captured_at ?? null,
     pump_photo_storage_path: row.pump_photo_storage_path ?? null,
     pump_photo_file_name: row.pump_photo_file_name ?? null,
     pump_photo_latitude: row.pump_photo_latitude ?? null,
@@ -122,9 +127,18 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
 
   const verificationId = crypto.randomUUID()
   const signaturePrepared = await prepareImageUpload(input.signatureBlob, 'signature.png')
-  const photoPrepared = await prepareImageUpload(input.photoFile, input.photoFile.name || 'photo.jpg')
+  const hasPhoto =
+    Boolean(input.photoFile) &&
+    input.photoLatitude != null &&
+    input.photoLongitude != null &&
+    Boolean(input.photoCapturedAt)
+  const photoPrepared = hasPhoto
+    ? await prepareImageUpload(input.photoFile!, input.photoFile!.name || 'photo.jpg')
+    : null
   const signaturePath = `${input.postoId}/${verificationId}/signature.${signaturePrepared.extension}`
-  const photoPath = `${input.postoId}/${verificationId}/photo.${photoPrepared.extension}`
+  const photoPath = photoPrepared
+    ? `${input.postoId}/${verificationId}/photo.${photoPrepared.extension}`
+    : null
   const hasPumpPhoto =
     Boolean(input.pumpPhotoFile) &&
     input.pumpPhotoLatitude != null &&
@@ -147,13 +161,15 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
       signaturePrepared.contentType,
     )
 
-    await uploadObject(
-      NOZZLE_METROLOGY_STORAGE_BUCKET,
-      photoPath,
-      photoPrepared.file,
-      photoPrepared.contentType,
-    )
-    uploadedPaths.push(photoPath)
+    if (photoPrepared && photoPath) {
+      await uploadObject(
+        NOZZLE_METROLOGY_STORAGE_BUCKET,
+        photoPath,
+        photoPrepared.file,
+        photoPrepared.contentType,
+      )
+      uploadedPaths.push(photoPath)
+    }
 
     if (pumpPrepared && pumpPhotoPath) {
       await uploadObject(
@@ -174,10 +190,10 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
       overall_status: input.overallStatus,
       signature_storage_path: signaturePath,
       photo_storage_path: photoPath,
-      photo_file_name: photoPrepared.file.name,
-      photo_latitude: input.photoLatitude,
-      photo_longitude: input.photoLongitude,
-      photo_captured_at: input.photoCapturedAt,
+      photo_file_name: photoPrepared?.file.name ?? null,
+      photo_latitude: hasPhoto ? input.photoLatitude : null,
+      photo_longitude: hasPhoto ? input.photoLongitude : null,
+      photo_captured_at: hasPhoto ? input.photoCapturedAt : null,
       pump_photo_storage_path: pumpPhotoPath,
       pump_photo_file_name: pumpPrepared?.file.name ?? null,
       pump_photo_latitude: hasPumpPhoto ? input.pumpPhotoLatitude : null,

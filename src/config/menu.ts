@@ -15,6 +15,7 @@ export type MenuId =
   | 'painel-suporte'
   | 'contas-usuarios'
   | 'gerenciamento'
+  | 'raqs-lancados'
   | 'configuracoes'
 
 export type MenuItem = {
@@ -107,6 +108,12 @@ export const MENU_ITEMS: MenuItem[] = [
     id: 'gerenciamento',
     label: 'Gerenciamento',
     description: 'Monitoramento Supabase, Vercel, domínio e postos em tempo real.',
+    adminOnly: true,
+  },
+  {
+    id: 'raqs-lancados',
+    label: 'RAQs Lançados',
+    description: 'Consultar e excluir RAQs de qualquer posto.',
     adminOnly: true,
   },
   {

@@ -440,15 +440,27 @@ export async function generateMetrologyPrintPdf(
   ctx.y -= 4
 
   drawHeading(ctx, '3. Foto do local')
-  drawKeyValue(ctx, 'Foto capturada em', formatDateTimePtBr(verification.photo_captured_at))
-  drawKeyValue(
-    ctx,
-    'Coordenadas',
-    formatCoords(verification.photo_latitude, verification.photo_longitude),
-  )
+  if (verification.photo_storage_path) {
+    drawKeyValue(
+      ctx,
+      'Foto capturada em',
+      verification.photo_captured_at ? formatDateTimePtBr(verification.photo_captured_at) : '-',
+    )
+    drawKeyValue(
+      ctx,
+      'Coordenadas',
+      verification.photo_latitude != null && verification.photo_longitude != null
+        ? formatCoords(verification.photo_latitude, verification.photo_longitude)
+        : '-',
+    )
+  } else {
+    drawKeyValue(ctx, 'Foto', 'Nao enviada')
+  }
 
   const [photo, pumpPhoto, signature] = await Promise.all([
-    embedRasterImage(doc, await fetchImageBytes(verification.photo_storage_path)),
+    verification.photo_storage_path
+      ? embedRasterImage(doc, await fetchImageBytes(verification.photo_storage_path))
+      : Promise.resolve(null),
     verification.pump_photo_storage_path
       ? embedRasterImage(doc, await fetchImageBytes(verification.pump_photo_storage_path))
       : Promise.resolve(null),
@@ -458,8 +470,6 @@ export async function generateMetrologyPrintPdf(
   if (photo) {
     ctx.y -= 2
     drawEmbeddedImage(ctx, photo, CONTENT_WIDTH, 320)
-  } else {
-    drawKeyValue(ctx, 'Foto', 'Nao disponivel')
   }
 
   let signatureSection = 4

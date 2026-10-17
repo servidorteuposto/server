@@ -142,6 +142,50 @@ export async function setAdminAccountPassword(postoId: string, password: string)
   return payload
 }
 
+export type AdminRaqReport = {
+  id: string
+  posto_id: string
+  posto_nome: string
+  posto_cnpj: string
+  razao_social: string
+  cnpj: string
+  endereco: string | null
+  author_full_name: string
+  submitted_at: string
+  created_at: string
+  products: string[]
+  invoice_numbers: string[]
+  has_inapto: boolean
+}
+
+export async function listAdminRaqReports(): Promise<AdminRaqReport[]> {
+  const { payload, invokeFailed } = await invokeAdminOps<{
+    ok: boolean
+    message?: string
+    reports?: AdminRaqReport[]
+  }>({ action: 'list_raqs' })
+
+  if (invokeFailed || !payload?.ok) {
+    throw new Error(payload?.message || 'Não foi possível carregar os RAQs.')
+  }
+
+  return payload.reports ?? []
+}
+
+export async function deleteAdminRaqReport(reportId: string) {
+  const { payload, invokeFailed } = await invokeAdminOps<{
+    ok: boolean
+    message?: string
+    report_id?: string
+  }>({ action: 'delete_raq', report_id: reportId })
+
+  if (invokeFailed || !payload?.ok) {
+    throw new Error(payload?.message || 'Não foi possível excluir o RAQ.')
+  }
+
+  return payload
+}
+
 export function subscriptionStatusLabel(status: AdminAccount['subscription_status']) {
   if (status === 'active') return 'Ativo'
   if (status === 'expired') return 'Inativo'

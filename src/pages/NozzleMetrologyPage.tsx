@@ -603,42 +603,31 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
     setFormError(null)
 
     try {
+      const mainResolved = await resolveCapturedPhoto(
+        photoFile,
+        photoLatitude,
+        photoLongitude,
+        photoCapturedAt,
+      )
       const pumpResolved = await resolveCapturedPhoto(
         pumpPhotoFile,
         pumpPhotoLatitude,
         pumpPhotoLongitude,
         pumpPhotoCapturedAt,
       )
-      let mainResolved = await resolveCapturedPhoto(
-        photoFile,
-        photoLatitude,
-        photoLongitude,
-        photoCapturedAt,
-      )
 
-      if (!mainResolved && photoFile && pumpResolved) {
-        mainResolved = {
-          file: photoFile,
-          latitude: pumpResolved.latitude,
-          longitude: pumpResolved.longitude,
-          capturedAt: photoCapturedAt || pumpResolved.capturedAt,
-        }
-      }
-      if (!mainResolved && pumpResolved) {
-        mainResolved = pumpResolved
-      }
-      if (!mainResolved) {
-        setFormError('Tire a foto e aguarde as coordenadas GPS antes de salvar.')
+      if (photoFile && !mainResolved) {
+        setFormError('Aguarde o GPS da foto, ou remova a foto antes de salvar.')
         setBusy(false)
         return
       }
-      if (pumpPhotoFile && !pumpResolved && !hasCoords(mainResolved.latitude, mainResolved.longitude)) {
+      if (pumpPhotoFile && !pumpResolved) {
         setFormError('Aguarde o GPS da foto da bomba, ou remova essa foto extra antes de salvar.')
         setBusy(false)
         return
       }
 
-      if (photoFile) {
+      if (mainResolved) {
         setPhotoLatitude(mainResolved.latitude)
         setPhotoLongitude(mainResolved.longitude)
         setPhotoCapturedAt(mainResolved.capturedAt)
@@ -652,27 +641,20 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
       }
 
       const verifiedAt = new Date().toISOString()
-      const extraPump =
-        pumpResolved && pumpResolved.file !== mainResolved.file
-          ? pumpResolved
-          : pumpPhotoFile && pumpPhotoFile === mainResolved.file
-            ? mainResolved
-            : pumpResolved
-
       const saved = await saveNozzleMetrologyVerification({
         postoId,
         verifiedAt,
         employeeFullName: employeeName,
         overallStatus: overallStatus as MetrologyStatus,
         signatureBlob,
-        photoFile: mainResolved.file,
-        photoLatitude: mainResolved.latitude,
-        photoLongitude: mainResolved.longitude,
-        photoCapturedAt: mainResolved.capturedAt,
-        pumpPhotoFile: extraPump?.file ?? null,
-        pumpPhotoLatitude: extraPump?.latitude ?? null,
-        pumpPhotoLongitude: extraPump?.longitude ?? null,
-        pumpPhotoCapturedAt: extraPump?.capturedAt ?? null,
+        photoFile: mainResolved?.file ?? null,
+        photoLatitude: mainResolved?.latitude ?? null,
+        photoLongitude: mainResolved?.longitude ?? null,
+        photoCapturedAt: mainResolved?.capturedAt ?? null,
+        pumpPhotoFile: pumpResolved?.file ?? null,
+        pumpPhotoLatitude: pumpResolved?.latitude ?? null,
+        pumpPhotoLongitude: pumpResolved?.longitude ?? null,
+        pumpPhotoCapturedAt: pumpResolved?.capturedAt ?? null,
         items: nozzles.map((nozzle, index) => {
           const evaluation = nozzleEvaluations[index]
           return {
@@ -738,7 +720,7 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
         <p className="nozzle-draft-banner" role="status">
           Há um rascunho salvo neste posto
           {draftSavedAt ? ` (${formatDateTimePtBr(draftSavedAt)})` : ''}. Você pode continuar no
-          computador ou no celular — foto e assinatura precisam ser feitas de novo na hora de salvar.
+          computador ou no celular — se for incluir foto ou assinatura, faça de novo na hora de salvar.
         </p>
       )}
 
@@ -1098,8 +1080,10 @@ export default function NozzleMetrologyPage({ isReadOnly }: NozzleMetrologyPageP
 
               <div className="nozzle-evidence">
                 <div className="reg-doc-form__field">
-                  <span>Foto com data/hora e GPS</span>
+                  <span>Foto com data/hora e GPS (opcional)</span>
                   <LiveCameraCapture
+                    label="Câmera ao vivo"
+                    hint="Opcional. Se tirar, a foto precisa ser agora, com horário e localização."
                     disabled={isReadOnly || busy}
                     previewUrl={photoPreviewUrl}
                     onCapture={(file) => void handleLivePhotoCapture(file)}
@@ -1333,7 +1317,9 @@ function VerificationDetailModal({
   useEffect(() => {
     let cancelled = false
     void Promise.all([
-      getNozzleMetrologyPhotoUrl(verification.photo_storage_path),
+      verification.photo_storage_path
+        ? getNozzleMetrologyPhotoUrl(verification.photo_storage_path)
+        : Promise.resolve(null),
       verification.pump_photo_storage_path
         ? getNozzleMetrologyPhotoUrl(verification.pump_photo_storage_path)
         : Promise.resolve(null),
@@ -1450,10 +1436,14 @@ function VerificationDetailModal({
               >
                 <img className="nozzle-photo-preview__img" src={photoUrl} alt="Foto da verificação" />
               </button>
-              <p className="fuel-panel__hint">
-                {formatDateTimePtBr(verification.photo_captured_at)} ·{' '}
-                {formatCoords(verification.photo_latitude, verification.photo_longitude)}
-              </p>
+              {verification.photo_captured_at &&
+                verification.photo_latitude != null &&
+                verification.photo_longitude != null && (
+                  <p className="fuel-panel__hint">
+                    {formatDateTimePtBr(verification.photo_captured_at)} ·{' '}
+                    {formatCoords(verification.photo_latitude, verification.photo_longitude)}
+                  </p>
+                )}
             </div>
           )}
           {signatureUrl && (
