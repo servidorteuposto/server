@@ -102,7 +102,7 @@
 }
 
 .product-landing__hero-scroll {
-  display: inline-flex;
+  display: none;
   flex-direction: column;
   align-items: center;
   gap: 0.35rem;
@@ -111,6 +111,13 @@
   color: rgba(255, 255, 255, 0.92);
   text-decoration: none;
   transition: color 0.15s ease, transform 0.15s ease;
+}
+
+/* Celular: a foto do fundador já aparece abaixo do hero; seta só em telas maiores */
+@media (min-width: 768px) {
+  .product-landing__hero-scroll {
+    display: inline-flex;
+  }
 }
 
 .product-landing__hero-scroll:hover {
