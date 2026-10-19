@@ -73,7 +73,7 @@ export function normalizeFuelAspectoForStorage(value: string): string {
 }
 
 /** Opções de cor no ensaio do combustível (RAQ). */
-export const FUEL_COR_OPTIONS = ['Verde', 'Vermelho', 'Amarelo', 'Incolor'] as const
+export const FUEL_COR_OPTIONS = ['Verde', 'Vermelho', 'Amarelo', 'Roxo', 'Incolor'] as const
 
 export type FuelCorOption = (typeof FUEL_COR_OPTIONS)[number]
 

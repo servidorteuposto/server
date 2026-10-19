@@ -723,6 +723,10 @@ export default function LoginPage() {
                   Simular grátis
                 </a>
 
+                <a href="/conheca-produto" className="btn btn--secondary login-about-btn">
+                  Conheça melhor nosso produto
+                </a>
+
                 <p className="login-card__footer">
                   Não tem uma conta?{' '}
                   <button type="button" className="login-card__link" onClick={() => switchView('register')}>

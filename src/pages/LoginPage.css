@@ -476,6 +476,12 @@
   background: #1ebe5a;
 }
 
+.login-about-btn {
+  margin-top: 0.65rem;
+  text-decoration: none;
+  justify-content: center;
+}
+
 .login-card__footer {
   margin-top: 1.5rem;
   text-align: center;

@@ -6,6 +6,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import PublicPostoPage from './pages/PublicPostoPage'
 import ImpersonatePage from './pages/ImpersonatePage'
 import LegalPage from './pages/LegalPage'
+import ProductAboutPage from './pages/ProductAboutPage'
 import { getLegalDocument, type LegalDocId } from './config/legal'
 
 function getPublicSlugFromPath() {
@@ -22,6 +23,10 @@ function getLegalDocIdFromPath(): LegalDocId | null {
   if (!match) return null
   const doc = getLegalDocument(match[1])
   return doc?.id ?? null
+}
+
+function isProductAboutPath() {
+  return /^\/conheca-produto\/?$/.test(window.location.pathname)
 }
 
 function App() {
@@ -44,6 +49,15 @@ function App() {
     return (
       <>
         <LegalPage docId={legalDocId} />
+        <CookieConsent />
+      </>
+    )
+  }
+
+  if (isProductAboutPath()) {
+    return (
+      <>
+        <ProductAboutPage />
         <CookieConsent />
       </>
     )
