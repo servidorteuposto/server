@@ -724,7 +724,7 @@ export default function LoginPage() {
                 </a>
 
                 <a href="/conheca-produto" className="btn btn--secondary login-about-btn">
-                  Conheça melhor nosso produto
+                  Conheça nossa plataforma
                 </a>
 
                 <p className="login-card__footer">

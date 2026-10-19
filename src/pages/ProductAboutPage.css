@@ -101,6 +101,60 @@
   gap: 0.65rem;
 }
 
+.product-landing__hero-scroll {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin: clamp(1.5rem, 4vw, 2rem) auto 0;
+  padding: 0.35rem 0.75rem;
+  color: rgba(255, 255, 255, 0.92);
+  text-decoration: none;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.product-landing__hero-scroll:hover {
+  color: #fff;
+}
+
+.product-landing__hero-scroll:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.75);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.product-landing__hero-scroll-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.88;
+}
+
+.product-landing__hero-scroll-icon {
+  display: block;
+  animation: product-landing-scroll-hint 2.2s ease-in-out infinite;
+}
+
+@keyframes product-landing-scroll-hint {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translateY(6px);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-landing__hero-scroll-icon {
+    animation: none;
+    opacity: 0.9;
+  }
+}
+
 .product-landing__btn {
   display: inline-flex;
   align-items: center;
@@ -419,12 +473,112 @@
   background: linear-gradient(180deg, var(--landing-surface) 0%, #fff 100%);
 }
 
+.product-landing__platform-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(1.25rem, 3.5vw, 2.25rem);
+  margin-bottom: 1.5rem;
+  padding: clamp(1.25rem, 3vw, 1.85rem);
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid var(--landing-line);
+  box-shadow: 0 14px 36px rgba(12, 59, 122, 0.07);
+}
+
+.product-landing__platform-copy h2 {
+  margin: 0 0 0.65rem;
+}
+
+.product-landing__platform-offer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.product-landing__platform-price {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: clamp(7.5rem, 22vw, 9.25rem);
+  height: clamp(7.5rem, 22vw, 9.25rem);
+  border-radius: 50%;
+  background: linear-gradient(155deg, var(--landing-ink) 0%, #1a5fad 52%, #3d8fd4 100%);
+  color: #fff;
+  box-shadow:
+    0 12px 28px rgba(12, 59, 122, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+}
+
+.product-landing__platform-price-value {
+  font-size: clamp(1.35rem, 3.2vw, 1.72rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.product-landing__platform-price-period {
+  margin-top: 0.12rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.product-landing__platform-price-note {
+  margin: 0;
+  max-width: 11.5rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  font-weight: 600;
+  color: var(--landing-muted);
+}
+
 .product-landing__platform-intro {
-  margin: -0.5rem 0 1.5rem;
-  max-width: 42rem;
+  margin: 0;
+  max-width: 40rem;
   font-size: 1rem;
   line-height: 1.65;
   color: var(--landing-muted);
+}
+
+@media (max-width: 760px) {
+  .product-landing__platform-hero {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .product-landing__platform-copy {
+    text-align: left;
+  }
+
+  .product-landing__platform-offer {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 1rem;
+    text-align: left;
+    padding-top: 0.35rem;
+    border-top: 1px solid var(--landing-line);
+  }
+
+  .product-landing__platform-price {
+    width: 6.75rem;
+    height: 6.75rem;
+    flex-shrink: 0;
+  }
+
+  .product-landing__platform-price-note {
+    max-width: none;
+    flex: 1;
+    font-size: 0.85rem;
+  }
 }
 
 .product-landing__modules {

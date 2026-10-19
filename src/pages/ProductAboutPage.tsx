@@ -1,4 +1,5 @@
 import { buildSimularGratisWhatsAppUrl } from '../config/sales'
+import { SUBSCRIPTION_PRICE_LABEL } from '../lib/payment'
 import { useRevealClasses } from '../hooks/useInView'
 import { ProductAboutStats } from './product-about-stats'
 import './ProductAboutPage.css'
@@ -16,7 +17,8 @@ const EXPERIENCE = [
   },
   {
     title: 'BR Distribuidora',
-    text: 'Atuação técnica de referência e suporte à rede revendedora em todo o país.',
+    text:
+      'Atuação técnica de referência e suporte à rede revendedora de postos na região Sul do país.',
   },
   {
     title: 'Atuação internacional',
@@ -131,7 +133,7 @@ export default function ProductAboutPage() {
             <img src="/imagens/logo_teuposto_white.png" alt="Teu Posto" />
           </a>
           <p className="product-landing__eyebrow">Menos papel, mais eficiência</p>
-          <h1>Gestão completa para postos de combustível, com conformidade e transparência</h1>
+          <h1>Gestão completa para postos de combustíveis, com conformidade e transparência</h1>
           <p className="product-landing__hero-lead">
             O <strong>Teu Posto</strong> simplifica processos regulatórios, operacionais e de
             conformidade, do RAQ à metrologia, da segurança do trabalho ao controle ambiental.
@@ -145,6 +147,26 @@ export default function ProductAboutPage() {
               Acessar o sistema
             </a>
           </div>
+          <a href="#quem-esta-por-tras" className="product-landing__hero-scroll">
+            <span className="product-landing__hero-scroll-label">Role para ver mais</span>
+            <svg
+              className="product-landing__hero-scroll-icon"
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <path
+                d="M6 9l6 6 6-6"
+                stroke="currentColor"
+                strokeWidth="2.25"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </a>
         </div>
       </section>
 
@@ -218,13 +240,31 @@ export default function ProductAboutPage() {
 
       <section id="plataforma" className="product-landing__platform">
         <div className="product-landing__container">
-          <div ref={platformHeader.ref} className={platformHeader.className} style={platformHeader.style}>
-            <p className="product-landing__section-label">A plataforma</p>
-            <h2>Teu Posto: módulos integrados para o dia a dia do posto</h2>
-            <p className="product-landing__platform-intro">
-              Desenvolvida para revolucionar a gestão de postos revendedores, reunindo em um só ambiente
-              o que antes dependia de planilhas, pastas e controles paralelos.
-            </p>
+          <div
+            ref={platformHeader.ref}
+            className={`product-landing__platform-hero ${platformHeader.className}`}
+            style={platformHeader.style}
+          >
+            <div className="product-landing__platform-copy">
+              <p className="product-landing__section-label">A plataforma</p>
+              <h2>Teu Posto: módulos integrados para o dia a dia do posto</h2>
+              <p className="product-landing__platform-intro">
+                Desenvolvida para revolucionar a gestão de postos revendedores, reunindo em um só ambiente
+                o que antes dependia de planilhas, pastas e controles paralelos.
+              </p>
+            </div>
+            <aside className="product-landing__platform-offer" aria-label="Valor do plano">
+              <div
+                className="product-landing__platform-price"
+                aria-hidden="true"
+              >
+                <span className="product-landing__platform-price-value">{SUBSCRIPTION_PRICE_LABEL}</span>
+                <span className="product-landing__platform-price-period">/ mês</span>
+              </div>
+              <p className="product-landing__platform-price-note">
+                Plano mensal com todos os módulos. Valor acessível para o dia a dia do posto.
+              </p>
+            </aside>
           </div>
           <div className="product-landing__modules">
             {PLATFORM_MODULES.map((module, index) => (
