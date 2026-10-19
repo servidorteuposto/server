@@ -1,5 +1,7 @@
 import {
   hitsVolumetryTechWarn,
+  VOLUMETRY_TOLERANCE_MAX,
+  VOLUMETRY_TOLERANCE_MIN,
   NOZZLE_METROLOGY_STORAGE_BUCKET,
   type MetrologyItemStatus,
   type MetrologyStatus,
@@ -242,11 +244,19 @@ export async function saveNozzleMetrologyVerification(input: SaveNozzleMetrology
   return saved
 }
 
+function isVolumetryOutOfTolerance(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return false
+  return value < VOLUMETRY_TOLERANCE_MIN || value > VOLUMETRY_TOLERANCE_MAX
+}
+
 function shouldNotifyMetrologyAlert(input: SaveNozzleMetrologyInput) {
-  if (input.overallStatus === 'reprovado') return true
-  return input.items.some(
-    (item) => hitsVolumetryTechWarn(item.volumetryMin) || hitsVolumetryTechWarn(item.volumetryMax),
-  )
+  return input.items.some((item) => {
+    if (item.itemStatus === 'manutencao') return false
+    if (isVolumetryOutOfTolerance(item.volumetryMin) || isVolumetryOutOfTolerance(item.volumetryMax)) {
+      return true
+    }
+    return hitsVolumetryTechWarn(item.volumetryMin) || hitsVolumetryTechWarn(item.volumetryMax)
+  })
 }
 
 async function notifyMetrologyAlert(verificationId: string) {

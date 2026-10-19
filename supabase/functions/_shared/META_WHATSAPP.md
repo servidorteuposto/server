@@ -394,7 +394,7 @@ Valores enviados no bico:
 
 Botão URL estático: **Acesse Teu Posto** → `https://www.appteuposto.com.br`
 
-Enviado ao **salvar** a verificação metrológica com resultado **REPROVADO** (um aviso por bico reprovado). Rascunho não dispara.
+Enviado ao **salvar** quando a volumetria mínima ou máxima estiver **fora de −100 a +100** (um aviso por bico). Outros motivos de reprovação (vazão, lacres, spread entre min/max, etc.) **não** disparam este template. Rascunho não dispara.
 
 ## Modelo posto — Manutenção preventiva (volumetria ±80)
 

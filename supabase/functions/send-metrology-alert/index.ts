@@ -20,7 +20,39 @@ const CATEGORY_FAILED = 'metrology_failed'
 const CATEGORY_TECNICO = 'metrology_tecnico_warning'
 const SEND_DELAY_MS = 800
 const MAX_SENDS = 12
+const VOLUMETRY_TOLERANCE_MIN = -100
+const VOLUMETRY_TOLERANCE_MAX = 100
 const VOLUMETRY_WARN_ABS = 80
+
+function isVolumetryOutOfTolerance(value: number) {
+  return value < VOLUMETRY_TOLERANCE_MIN || value > VOLUMETRY_TOLERANCE_MAX
+}
+
+function hitsVolumetryTechWarn(value: number) {
+  return value >= VOLUMETRY_WARN_ABS || value <= -VOLUMETRY_WARN_ABS
+}
+
+/** aviso_metrologia_fora: volumetria mínima ou máxima fora de ±100 (Portaria 227/2022). */
+function itemNeedsMetrologiaForaAlert(item: MetrologyOutOfSpecItem) {
+  if (item.item_status === 'manutencao') return false
+  const vmin = Number(item.volumetry_min)
+  const vmax = Number(item.volumetry_max)
+  const minOut = Number.isFinite(vmin) && isVolumetryOutOfTolerance(vmin)
+  const maxOut = Number.isFinite(vmax) && isVolumetryOutOfTolerance(vmax)
+  return minOut || maxOut
+}
+
+/** aviso_tecnico: volumetria em ±80 ou mais extrema, ainda dentro de ±100. */
+function itemNeedsTecnicoAlert(item: MetrologyOutOfSpecItem) {
+  if (item.item_status === 'manutencao') return false
+  const vmin = Number(item.volumetry_min)
+  const vmax = Number(item.volumetry_max)
+  if (Number.isFinite(vmin) && isVolumetryOutOfTolerance(vmin)) return false
+  if (Number.isFinite(vmax) && isVolumetryOutOfTolerance(vmax)) return false
+  const minHit = Number.isFinite(vmin) && hitsVolumetryTechWarn(vmin)
+  const maxHit = Number.isFinite(vmax) && hitsVolumetryTechWarn(vmax)
+  return minHit || maxHit
+}
 
 type PostoRow = {
   id: string
@@ -202,15 +234,8 @@ Deno.serve(async (req) => {
     if (itemsError) throw itemsError
 
     const allItems = (itemRows ?? []) as MetrologyOutOfSpecItem[]
-    const failed = allItems.filter((it) => it.item_status === 'reprovado')
-    const tecnicoWarning = allItems.filter((it) => {
-      if (it.item_status === 'manutencao') return false
-      const vmin = Number(it.volumetry_min)
-      const vmax = Number(it.volumetry_max)
-      const minHit = Number.isFinite(vmin) && (vmin >= VOLUMETRY_WARN_ABS || vmin <= -VOLUMETRY_WARN_ABS)
-      const maxHit = Number.isFinite(vmax) && (vmax >= VOLUMETRY_WARN_ABS || vmax <= -VOLUMETRY_WARN_ABS)
-      return minHit || maxHit
-    })
+    const failed = allItems.filter(itemNeedsMetrologiaForaAlert)
+    const tecnicoWarning = allItems.filter(itemNeedsTecnicoAlert)
 
     if (!failed.length && !tecnicoWarning.length) {
       return jsonResponse({
