@@ -128,6 +128,10 @@ const KNOWN_TEMPLATE_SHAPES: Record<string, TemplateShape> = {
     ],
     bodyPositional: 0,
   },
+  aviso_fechado: {
+    bodyNames: ['bico', 'volmin', 'volmax', 'razao', 'cnpj', 'end'],
+    bodyPositional: 0,
+  },
   aviso_tecnico: {
     bodyNames: ['bico', 'volmin', 'volmax', 'razao', 'cnpj', 'end'],
     bodyPositional: 0,

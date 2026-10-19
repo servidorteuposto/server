@@ -5,8 +5,8 @@ import {
   sendWhatsAppTemplateDetailed,
 } from '../_shared/meta-whatsapp.ts'
 import {
+  avisoFechadoTemplate,
   avisoTecnicoTemplate,
-  metrologiaForaTemplate,
   type MetrologyOutOfSpecItem,
 } from '../_shared/whatsapp-templates.ts'
 
@@ -16,30 +16,30 @@ const corsHeaders = {
 }
 
 const TIME_ZONE = 'America/Sao_Paulo'
-const CATEGORY_FAILED = 'metrology_failed'
+const CATEGORY_FECHADO = 'metrology_failed'
 const CATEGORY_TECNICO = 'metrology_tecnico_warning'
 const SEND_DELAY_MS = 800
 const MAX_SENDS = 12
-const VOLUMETRY_TOLERANCE_MIN = -100
-const VOLUMETRY_TOLERANCE_MAX = 100
+const VOLUMETRY_LIMIT_ABS = 100
 const VOLUMETRY_WARN_ABS = 80
 
-function isVolumetryOutOfTolerance(value: number) {
-  return value < VOLUMETRY_TOLERANCE_MIN || value > VOLUMETRY_TOLERANCE_MAX
+/** Limite legal da Portaria 227/2022: ±100 (inclusive). */
+function hitsVolumetryFechadoLimit(value: number) {
+  return value <= -VOLUMETRY_LIMIT_ABS || value >= VOLUMETRY_LIMIT_ABS
 }
 
 function hitsVolumetryTechWarn(value: number) {
   return value >= VOLUMETRY_WARN_ABS || value <= -VOLUMETRY_WARN_ABS
 }
 
-/** aviso_metrologia_fora: volumetria mínima ou máxima fora de ±100 (Portaria 227/2022). */
-function itemNeedsMetrologiaForaAlert(item: MetrologyOutOfSpecItem) {
+/** aviso_fechado: volumetria mínima ou máxima em ±100 ou além. */
+function itemNeedsFechadoAlert(item: MetrologyOutOfSpecItem) {
   if (item.item_status === 'manutencao') return false
   const vmin = Number(item.volumetry_min)
   const vmax = Number(item.volumetry_max)
-  const minOut = Number.isFinite(vmin) && isVolumetryOutOfTolerance(vmin)
-  const maxOut = Number.isFinite(vmax) && isVolumetryOutOfTolerance(vmax)
-  return minOut || maxOut
+  const minHit = Number.isFinite(vmin) && hitsVolumetryFechadoLimit(vmin)
+  const maxHit = Number.isFinite(vmax) && hitsVolumetryFechadoLimit(vmax)
+  return minHit || maxHit
 }
 
 /** aviso_tecnico: volumetria em ±80 ou mais extrema, ainda dentro de ±100. */
@@ -47,8 +47,8 @@ function itemNeedsTecnicoAlert(item: MetrologyOutOfSpecItem) {
   if (item.item_status === 'manutencao') return false
   const vmin = Number(item.volumetry_min)
   const vmax = Number(item.volumetry_max)
-  if (Number.isFinite(vmin) && isVolumetryOutOfTolerance(vmin)) return false
-  if (Number.isFinite(vmax) && isVolumetryOutOfTolerance(vmax)) return false
+  if (Number.isFinite(vmin) && hitsVolumetryFechadoLimit(vmin)) return false
+  if (Number.isFinite(vmax) && hitsVolumetryFechadoLimit(vmax)) return false
   const minHit = Number.isFinite(vmin) && hitsVolumetryTechWarn(vmin)
   const maxHit = Number.isFinite(vmax) && hitsVolumetryTechWarn(vmax)
   return minHit || maxHit
@@ -97,20 +97,6 @@ function saoPauloTodayKey() {
   const day = parts.find((part) => part.type === 'day')?.value
   if (!year || !month || !day) return new Date().toISOString().slice(0, 10)
   return `${year}-${month}-${day}`
-}
-
-function formatSaoPauloDate(iso: string) {
-  const parts = new Intl.DateTimeFormat('pt-BR', {
-    timeZone: TIME_ZONE,
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).formatToParts(new Date(iso))
-  const day = parts.find((part) => part.type === 'day')?.value
-  const month = parts.find((part) => part.type === 'month')?.value
-  const year = parts.find((part) => part.type === 'year')?.value
-  if (!day || !month || !year) return iso.slice(0, 10)
-  return `${day}/${month}/${year}`
 }
 
 function formatPostoAddress(posto: PostoRow) {
@@ -212,7 +198,7 @@ Deno.serve(async (req) => {
 
     const { data: verification, error: verificationError } = await admin
       .from('nozzle_metrology_verifications')
-      .select('id, posto_id, overall_status, verified_at, photo_captured_at')
+      .select('id, posto_id')
       .eq('id', verificationId)
       .eq('posto_id', posto.id)
       .maybeSingle()
@@ -234,14 +220,14 @@ Deno.serve(async (req) => {
     if (itemsError) throw itemsError
 
     const allItems = (itemRows ?? []) as MetrologyOutOfSpecItem[]
-    const failed = allItems.filter(itemNeedsMetrologiaForaAlert)
+    const fechado = allItems.filter(itemNeedsFechadoAlert)
     const tecnicoWarning = allItems.filter(itemNeedsTecnicoAlert)
 
-    if (!failed.length && !tecnicoWarning.length) {
+    if (!fechado.length && !tecnicoWarning.length) {
       return jsonResponse({
         ok: true,
         skipped: 'no_items',
-        failed_nozzles: 0,
+        fechado_nozzles: 0,
         tecnico_nozzles: 0,
       })
     }
@@ -251,14 +237,11 @@ Deno.serve(async (req) => {
       return jsonResponse({
         ok: true,
         skipped: 'no_phones',
-        templates: ['aviso_metrologia_fora', 'aviso_tecnico'],
+        templates: ['aviso_fechado', 'aviso_tecnico'],
       })
     }
 
     const todayKey = saoPauloTodayKey()
-    const dataVerificacao = formatSaoPauloDate(
-      String(verification.photo_captured_at || verification.verified_at || new Date().toISOString()),
-    )
     const endereco = formatPostoAddress(posto)
     const metaConfigured = isMetaWhatsAppConfigured()
     let apiCalls = 0
@@ -268,21 +251,24 @@ Deno.serve(async (req) => {
     type SendJob = {
       category: string
       milestone: string
-      tpl: ReturnType<typeof metrologiaForaTemplate> | ReturnType<typeof avisoTecnicoTemplate>
+      tpl: ReturnType<typeof avisoFechadoTemplate> | ReturnType<typeof avisoTecnicoTemplate>
     }
 
     const jobs: SendJob[] = []
 
-    for (const item of failed) {
-      const tpl = metrologiaForaTemplate({
+    for (const item of fechado) {
+      const tpl = avisoFechadoTemplate({
         nome: posto.nome,
         cnpj: posto.cnpj,
         endereco,
-        data: dataVerificacao,
-        item,
+        item: {
+          nozzle_number: item.nozzle_number,
+          volumetry_min: item.volumetry_min,
+          volumetry_max: item.volumetry_max,
+        },
       })
       jobs.push({
-        category: CATEGORY_FAILED,
+        category: CATEGORY_FECHADO,
         milestone: milestoneFor(item.nozzle_number),
         tpl,
       })
@@ -390,8 +376,8 @@ Deno.serve(async (req) => {
 
     return jsonResponse({
       ok: true,
-      templates: ['aviso_metrologia_fora', 'aviso_tecnico'],
-      failed_nozzles: failed.length,
+      templates: ['aviso_fechado', 'aviso_tecnico'],
+      fechado_nozzles: fechado.length,
       tecnico_nozzles: tecnicoWarning.length,
       targets: phones.length,
       delivered_jobs: deliveredJobs,

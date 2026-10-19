@@ -19,8 +19,8 @@ Edge Function que envia avisos WhatsApp (templates) para os números `aviso_what
 | Assinatura vencida | `aviso_assinatura_vencida` | quando o admin pausa o acesso ou o plano expira |
 | Metrologia | `aviso_metrologia` | só depois da primeira verificação; 15 dias depois do último lançamento |
 | RAQ fora das especificações | `aviso_raq_fora` | no lançamento inapto (envia na hora; se a Meta falhar, fica na fila) |
-| Metrologia fora de ±100 | `aviso_metrologia_fora` | volumetria mín. ou máx. &lt; −100 ou &gt; +100 (envia na hora; se a Meta falhar, fica na fila) |
-| Volumetria em ±80 (dentro de ±100) | `aviso_tecnico` | aviso de manutenção preventiva no lançamento |
+| Metrologia em ±100 | `aviso_fechado` | volumetria mín. ou máx. ≤ −100 ou ≥ +100 (envia na hora; se a Meta falhar, fica na fila) |
+| Volumetria em ±80 (ainda dentro de ±100) | `aviso_tecnico` | aviso de manutenção preventiva no lançamento (|valor| ≥ 80 e &lt; 100) |
 | Drenagem de tanques | `aviso_drenagem_diesel` | só depois da primeira drenagem; 7 dias depois do último lançamento |
 | RAQ | `aviso_raq1` | só depois do primeiro RAQ; 7 dias após o último lançamento (a contagem reinicia se lançar de novo) |
 

@@ -354,47 +354,35 @@ Faça uma nova metrologia dos bicos e registre no Teu Posto.
 
 Variáveis (3): `razao`, `cnpj`, `endereco`
 
-## Modelo posto — Metrologia reprovada
+## Modelo posto — Metrologia no limite ±100 (bomba fechada)
 
-Nome na WABA: `aviso_metrologia_fora` (Utilidade / Portuguese (BR)), params **nomeados**.
+Nome na WABA: `aviso_fechado` (Utilidade / Portuguese (BR)), params **nomeados**.
 
 Corpo:
 
 ```
-A metrologia do bico número {{number}} lançado em sistema hoje {{data}} está fora dos padrões de conformidade.
+Sua Verificação Metrológica merece atenção urgente!
+
+A Verificação Metrológica realizada hoje do {{bico}} está com volumetria mínima de {{volmin}} e volumetria máxima de {{volmax}}.
+Esse aviso é para instrução de manutenção, devido os limites permitidos pela Portaria Nº 227/2022 que são de (-100) ou (+100). Sua bomba está entre os limites permitidos.
 
 Razão Social: {{razao}}
 CNPJ: {{cnpj}}
-Endereço: {{endereco}}
+Endereço: {{end}}
 
-Dados observados:
-Volumetria mínima: {{volmin}}
-Vazão: {{vazaomin}}
-Volumetria máxima: {{volmax}}
-Vazão: {{vazaomax}}
-Lacres: {{lacre}}
-Vazamento: {{vaz}}
-Mangueira: {{mang}}
-Display: {{display}}
-
-Verifique no sistema os dados lançados!
+Verifique com a inspeção e tranque a bomba até que resolvam essa instabilidade.
 ```
 
-Variáveis (13): `number`, `data`, `razao`, `cnpj`, `endereco`, `volmin`, `vazaomin`, `volmax`, `vazaomax`, `lacre`, `vaz`, `mang`, `display`
+Variáveis (6): `bico`, `volmin`, `volmax`, `razao`, `cnpj`, `end`
 
-Valores enviados no bico:
+Valores enviados:
 
-- **Número (`number`):** `01`
-- **Volumetria (`volmin` / `volmax`):** `+20`, `-100`, `0`
-- **Vazão (`vazaomin` / `vazaomax`):** `5 L`
-- **Lacres (`lacre`):** `OK` ou `FALTANDO`
-- **Vazamento (`vaz`):** `POSSUI` ou `NAO POSSUI`
-- **Mangueira (`mang`):** `OK` ou `DANIFICADA`
-- **Display (`display`):** `OK` ou `QUEIMADO`
+- **Bico (`bico`):** `1`
+- **Volumetria (`volmin` / `volmax`):** `+100`, `-100`
 
 Botão URL estático: **Acesse Teu Posto** → `https://www.appteuposto.com.br`
 
-Enviado ao **salvar** quando a volumetria mínima ou máxima estiver **fora de −100 a +100** (um aviso por bico). Outros motivos de reprovação (vazão, lacres, spread entre min/max, etc.) **não** disparam este template. Rascunho não dispara.
+Enviado ao **salvar** quando a volumetria mínima ou máxima for **≤ −100 ou ≥ +100** (um aviso por bico). Substitui o uso de `aviso_metrologia_fora` nesse fluxo. Outros motivos de reprovação (vazão, lacres, etc.) **não** disparam este template. Rascunho não dispara.
 
 ## Modelo posto — Manutenção preventiva (volumetria ±80)
 
@@ -422,6 +410,6 @@ Valores enviados:
 - **Bico (`bico`):** `1`
 - **Volumetria (`volmin` / `volmax`):** `+80`, `-80`
 
-Enviado ao salvar a metrologia quando a volumetria mínima ou máxima for **+80, −80 ou mais extrema** (mesmo se o bico ainda estiver aprovado). Um aviso por bico.
+Enviado ao salvar a metrologia quando a volumetria mínima ou máxima for **|valor| ≥ 80 e &lt; 100** (ainda dentro do limite legal). Um aviso por bico. Em ±100 ou além, usa `aviso_fechado`.
 
 

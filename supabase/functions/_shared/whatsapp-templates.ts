@@ -32,6 +32,7 @@ export const POSTO_TEMPLATES = {
   metrologia: 'aviso_metrologia',
   raqFora: 'aviso_raq_fora',
   metrologiaFora: 'aviso_metrologia_fora',
+  fechado: 'aviso_fechado',
   tecnico: 'aviso_tecnico',
   docPrazo: 'aviso_doc_prazo',
   docVencido: 'aviso_doc_vencido',
@@ -489,27 +490,27 @@ export function metrologiaForaTemplate(input: {
   }
 }
 
-/**
- * aviso_tecnico — 6 variáveis nomeadas do modelo na WABA:
- * {{bico}} {{volmin}} {{volmax}} {{razao}} {{cnpj}} {{end}}
- */
-export function avisoTecnicoTemplate(input: {
+type MetrologyVolumetryAlertItem = {
+  nozzle_number: number
+  volumetry_min?: number | null
+  volumetry_max?: number | null
+}
+
+function metrologyVolumetryAlertParams(input: {
   nome: string
   cnpj?: string | null
   endereco?: string | null
-  item: {
-    nozzle_number: number
-    volumetry_min?: number | null
-    volumetry_max?: number | null
-  }
-}): TemplatePayload {
+  item: MetrologyVolumetryAlertItem
+}) {
   const razao = input.nome.trim() || 'Posto'
   const bico = formatNozzleNumberWa(input.item.nozzle_number)
   const volmin = formatVolumetryWa(input.item.volumetry_min)
   const volmax = formatVolumetryWa(input.item.volumetry_max)
   return {
-    name: POSTO_TEMPLATES.tecnico,
-    language: WA_LANG,
+    razao,
+    bico,
+    volmin,
+    volmax,
     bodyParams: [
       p('bico', bico),
       p('volmin', volmin),
@@ -518,7 +519,44 @@ export function avisoTecnicoTemplate(input: {
       p('cnpj', formatCnpj(input.cnpj)),
       p('end', formatEndereco(input.endereco)),
     ],
-    summary: `aviso_tecnico: ${razao} · BICO ${bico} · ${volmin}/${volmax}`,
+  }
+}
+
+/**
+ * aviso_fechado — volumetria em ±100 (Portaria 227/2022).
+ * Variáveis: {{bico}} {{volmin}} {{volmax}} {{razao}} {{cnpj}} {{end}}
+ */
+export function avisoFechadoTemplate(input: {
+  nome: string
+  cnpj?: string | null
+  endereco?: string | null
+  item: MetrologyVolumetryAlertItem
+}): TemplatePayload {
+  const params = metrologyVolumetryAlertParams(input)
+  return {
+    name: POSTO_TEMPLATES.fechado,
+    language: WA_LANG,
+    bodyParams: params.bodyParams,
+    summary: `aviso_fechado: ${params.razao} · BICO ${params.bico} · ${params.volmin}/${params.volmax}`,
+  }
+}
+
+/**
+ * aviso_tecnico — 6 variáveis nomeadas do modelo na WABA:
+ * {{bico}} {{volmin}} {{volmax}} {{razao}} {{cnpj}} {{end}}
+ */
+export function avisoTecnicoTemplate(input: {
+  nome: string
+  cnpj?: string | null
+  endereco?: string | null
+  item: MetrologyVolumetryAlertItem
+}): TemplatePayload {
+  const params = metrologyVolumetryAlertParams(input)
+  return {
+    name: POSTO_TEMPLATES.tecnico,
+    language: WA_LANG,
+    bodyParams: params.bodyParams,
+    summary: `aviso_tecnico: ${params.razao} · BICO ${params.bico} · ${params.volmin}/${params.volmax}`,
   }
 }
 
