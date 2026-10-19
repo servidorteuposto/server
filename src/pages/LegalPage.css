@@ -5,8 +5,12 @@
     radial-gradient(1200px 500px at 10% -10%, rgba(61, 143, 212, 0.18), transparent 60%),
     radial-gradient(900px 420px at 100% 0%, rgba(12, 59, 122, 0.12), transparent 55%),
     #f3f6fb;
-  padding: 1rem 1rem 2.5rem;
   box-sizing: border-box;
+  padding:
+    calc(1rem + env(safe-area-inset-top, 0px))
+    max(1rem, env(safe-area-inset-right, 0px))
+    calc(2.5rem + env(safe-area-inset-bottom, 0px))
+    max(1rem, env(safe-area-inset-left, 0px));
 }
 
 .legal-page__top {
@@ -142,25 +146,49 @@
 
 @media (max-width: 640px) {
   .legal-page {
-    padding: 0.75rem 0.75rem 2rem;
+    padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+    padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
   }
 
   .legal-page__top {
-    align-items: flex-start;
-    gap: 0.65rem;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.1rem;
+  }
+
+  .legal-page__brand {
+    justify-content: center;
   }
 
   .legal-page__logo {
-    width: min(200px, 44vw);
-    max-height: 72px;
+    width: min(220px, 62vw);
+    max-height: 68px;
   }
 
   .legal-page__nav {
-    justify-content: flex-end;
+    justify-content: center;
+    width: 100%;
   }
 
   .legal-page__nav-link {
-    padding: 0.3rem 0.55rem;
+    padding: 0.35rem 0.6rem;
     font-size: 0.72rem;
+  }
+}
+
+/* PWA instalado: status bar sobrepõe o topo se não houver safe-area explícita */
+@media (max-width: 640px) and (display-mode: standalone),
+  (max-width: 640px) and (display-mode: fullscreen),
+  (max-width: 640px) and (display-mode: minimal-ui) {
+  .legal-page {
+    /* fallback ~44px quando o PWA não reporta safe-area (comum no Android) */
+    padding-top: max(calc(0.85rem + env(safe-area-inset-top, 0px)), 2.75rem);
+  }
+
+  .legal-page__top {
+    padding-top: 0.15rem;
   }
 }
