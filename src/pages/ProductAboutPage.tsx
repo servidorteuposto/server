@@ -188,7 +188,7 @@ export default function ProductAboutPage() {
             className={`product-landing__founder-copy ${founderCopy.className}`}
             style={founderCopy.style}
           >
-            <p className="product-landing__section-label">Quem está por trás</p>
+            <p className="product-landing__section-label">Idealizador</p>
             <h2>Ilto Filho</h2>
             <p className="product-landing__founder-role">
               Especialista em Petróleo, Gás e Biocombustíveis. Engenharia e Gestão.
