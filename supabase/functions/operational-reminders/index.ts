@@ -8,6 +8,7 @@ import {
 import {
   assinaturaTemplate,
   assinaturaVencidaTemplate,
+  caixaSeparadoraTemplate,
   cursosFuncionariosTemplate,
   docTemplate,
   drenagemTemplate,
@@ -28,6 +29,7 @@ const TIME_ZONE = 'America/Sao_Paulo'
 const DOC_MILESTONES = [30, 15, 7, 1, 0] as const
 const SUBSCRIPTION_MILESTONES = [7, 2] as const
 const METROLOGY_INTERVAL_DAYS = 15
+const SEPARATOR_BOX_INTERVAL_DAYS = 15
 const DRAINAGE_INTERVAL_DAYS = 7
 const RAQ_INTERVAL_DAYS = 7
 /** ~6 msgs/min — lote curto para caber no wall-clock da Edge Function */
@@ -282,6 +284,22 @@ async function untriggeredSkipReason(
       .limit(1)
       .maybeSingle()
     if (!data?.id) return 'metrology_never_submitted'
+    return null
+  }
+
+  if (row.category === 'separator_box') {
+    const { data: lastInspection } = await admin
+      .from('separator_box_inspections')
+      .select('inspected_at')
+      .eq('posto_id', row.posto_id)
+      .order('inspected_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (!lastInspection?.inspected_at) return 'separator_box_never_submitted'
+    const lastKey = toSaoPauloDateKey(lastInspection.inspected_at)
+    if (lastKey && daysBetweenKeys(lastKey, todayKey) < SEPARATOR_BOX_INTERVAL_DAYS) {
+      return 'separator_box_interval_reset'
+    }
     return null
   }
 
@@ -851,6 +869,67 @@ Deno.serve(async (req) => {
         ),
       )
       if (ok) enqueued += 1
+    }
+
+    // --- Caixa separadora (aviso_caixa_separadora): 15 dias após a última inspeção ---
+    const { data: separatorRows } = await admin
+      .from('separator_box_inspections')
+      .select('posto_id, inspected_at')
+      .in('posto_id', postoIds)
+      .order('inspected_at', { ascending: false })
+
+    const lastSeparator = new Map<string, string>()
+    for (const row of separatorRows ?? []) {
+      if (!lastSeparator.has(row.posto_id)) lastSeparator.set(row.posto_id, row.inspected_at)
+    }
+
+    const resetSeparatorPostoIds: string[] = []
+    for (const posto of activePostos) {
+      const lastAt = lastSeparator.get(posto.id)
+      if (!lastAt) {
+        resetSeparatorPostoIds.push(posto.id)
+        continue
+      }
+      const lastKey = toSaoPauloDateKey(lastAt)
+      if (!lastKey) continue
+      const dueKey = addDaysToDateKey(lastKey, SEPARATOR_BOX_INTERVAL_DAYS)
+      if (dueKey > todayKey) {
+        resetSeparatorPostoIds.push(posto.id)
+        continue
+      }
+
+      const milestone = `due:${dueKey}`
+      const phones = collectAvisoPhones(posto as PostoRow)
+      const tpl = caixaSeparadoraTemplate({
+        nome: (posto as PostoRow).nome,
+        cnpj: (posto as PostoRow).cnpj,
+        endereco: formatPostoAddress(posto as PostoRow),
+        dueKey,
+      })
+      const ok = await enqueueReminder(
+        admin,
+        jobFromTemplate(
+          {
+            posto_id: posto.id,
+            category: 'separator_box',
+            reference_id: 'posto',
+            milestone,
+            phones,
+            due_on: dueKey,
+          },
+          tpl,
+        ),
+      )
+      if (ok) enqueued += 1
+    }
+
+    if (resetSeparatorPostoIds.length) {
+      await admin
+        .from('whatsapp_reminder_queue')
+        .delete()
+        .eq('category', 'separator_box')
+        .eq('reference_id', 'posto')
+        .in('posto_id', resetSeparatorPostoIds)
     }
 
     // --- Drenagem ---

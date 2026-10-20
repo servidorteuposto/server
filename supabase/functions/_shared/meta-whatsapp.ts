@@ -164,6 +164,10 @@ const KNOWN_TEMPLATE_SHAPES: Record<string, TemplateShape> = {
     bodyNames: ['razao', 'cnpj', 'endereco'],
     bodyPositional: 0,
   },
+  aviso_caixa_separadora: {
+    bodyNames: ['razao', 'cnpj', 'end'],
+    bodyPositional: 0,
+  },
   aviso_doc_vencido: {
     bodyNames: ['razao', 'cnpj', 'endereco', 'documento'],
     bodyPositional: 0,

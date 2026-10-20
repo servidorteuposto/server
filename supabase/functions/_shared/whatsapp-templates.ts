@@ -30,6 +30,7 @@ export const POSTO_TEMPLATES = {
   assinaturaVencida: 'aviso_assinatura_vencida',
   drenagem: 'aviso_drenagem_diesel',
   metrologia: 'aviso_metrologia',
+  caixaSeparadora: 'aviso_caixa_separadora',
   raqFora: 'aviso_raq_fora',
   metrologiaFora: 'aviso_metrologia_fora',
   fechado: 'aviso_fechado',
@@ -317,6 +318,26 @@ export function metrologiaTemplate(input: {
       p('endereco', formatEndereco(input.endereco)),
     ],
     summary: `aviso_metrologia: ${razao} · ${formatDateKeyPtBr(input.dueKey)}`,
+  }
+}
+
+/** aviso_caixa_separadora: {{razao}} {{cnpj}} {{end}} */
+export function caixaSeparadoraTemplate(input: {
+  nome: string
+  cnpj?: string | null
+  endereco?: string | null
+  dueKey: string
+}): TemplatePayload {
+  const razao = input.nome.trim() || 'Posto'
+  return {
+    name: POSTO_TEMPLATES.caixaSeparadora,
+    language: WA_LANG,
+    bodyParams: [
+      p('razao', razao),
+      p('cnpj', formatCnpj(input.cnpj)),
+      p('end', formatEndereco(input.endereco)),
+    ],
+    summary: `aviso_caixa_separadora: ${razao} · ${formatDateKeyPtBr(input.dueKey)}`,
   }
 }
 

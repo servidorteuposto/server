@@ -196,6 +196,30 @@ Variáveis (3): `razao`, `cnpj`, `endereco`
 
 Só depois do primeiro RAQ; 7 dias após o último lançamento (a contagem reinicia se lançar de novo).
 
+## Modelo posto — Caixa separadora
+
+Nome na WABA: `aviso_caixa_separadora` (Utilidade / Portuguese (BR)), params **nomeados**.
+
+Corpo:
+
+```
+Aviso: Caixa Separadora
+
+Sua caixa separadora não foi verificada dentro do prazo de 15 dias corridos. Não esqueça de fazer a inspeção de acordo com resolução Nº 273/2020 da CONAM.
+
+Razão Social: {{razao}}
+CNPJ: {{cnpj}}
+Endereço: {{end}}
+
+Verifique com o responsável da manutenção!
+```
+
+Variáveis (3): `razao`, `cnpj`, `end`
+
+Botão URL estático: **Acesse Teu Posto** → `https://www.appteuposto.com.br`
+
+Só depois da primeira inspeção em Caixa Separadora; **15 dias corridos** após o último lançamento. Se lançar de novo antes do prazo, o contador zera e o aviso não é enviado.
+
 ## Modelo posto — Drenagem de diesel
 
 Nome na WABA: `aviso_drenagem_diesel` (Utilidade / Portuguese (BR)), params **nomeados**.
