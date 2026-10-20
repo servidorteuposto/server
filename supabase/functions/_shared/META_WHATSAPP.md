@@ -220,6 +220,30 @@ Botão URL estático: **Acesse Teu Posto** → `https://www.appteuposto.com.br`
 
 Só depois da primeira inspeção em Caixa Separadora; **15 dias corridos** após o último lançamento. Se lançar de novo antes do prazo, o contador zera e o aviso não é enviado.
 
+## Modelo posto — Compressor
+
+Nome na WABA: `aviso_compressor` (Utilidade / Portuguese (BR)), params **nomeados**.
+
+Corpo:
+
+```
+Aviso: Compressor
+
+Seu compressor não foi verificado dentro do prazo de 7 dias corridos. Não esqueça de fazer a inspeção de acordo com a NR13.
+
+Razão Social: {{razao}}
+CNPJ: {{cnpj}}
+Endereço: {{end}}
+
+Verifique com o responsável da manutenção!
+```
+
+Variáveis (3): `razao`, `cnpj`, `end`
+
+Botão URL estático: **Acesse Teu Posto** → `https://www.appteuposto.com.br`
+
+Só depois da primeira inspeção em Inspeção do Compressor; **7 dias corridos** após o último lançamento. Se lançar de novo antes do prazo, o contador zera e o aviso não é enviado.
+
 ## Modelo posto — Drenagem de diesel
 
 Nome na WABA: `aviso_drenagem_diesel` (Utilidade / Portuguese (BR)), params **nomeados**.

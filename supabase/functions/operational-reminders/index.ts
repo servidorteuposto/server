@@ -9,6 +9,7 @@ import {
   assinaturaTemplate,
   assinaturaVencidaTemplate,
   caixaSeparadoraTemplate,
+  compressorTemplate,
   cursosFuncionariosTemplate,
   docTemplate,
   drenagemTemplate,
@@ -30,6 +31,7 @@ const DOC_MILESTONES = [30, 15, 7, 1, 0] as const
 const SUBSCRIPTION_MILESTONES = [7, 2] as const
 const METROLOGY_INTERVAL_DAYS = 15
 const SEPARATOR_BOX_INTERVAL_DAYS = 15
+const COMPRESSOR_INTERVAL_DAYS = 7
 const DRAINAGE_INTERVAL_DAYS = 7
 const RAQ_INTERVAL_DAYS = 7
 /** ~6 msgs/min — lote curto para caber no wall-clock da Edge Function */
@@ -299,6 +301,22 @@ async function untriggeredSkipReason(
     const lastKey = toSaoPauloDateKey(lastInspection.inspected_at)
     if (lastKey && daysBetweenKeys(lastKey, todayKey) < SEPARATOR_BOX_INTERVAL_DAYS) {
       return 'separator_box_interval_reset'
+    }
+    return null
+  }
+
+  if (row.category === 'compressor') {
+    const { data: lastInspection } = await admin
+      .from('compressor_inspections')
+      .select('inspected_at')
+      .eq('posto_id', row.posto_id)
+      .order('inspected_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (!lastInspection?.inspected_at) return 'compressor_never_submitted'
+    const lastKey = toSaoPauloDateKey(lastInspection.inspected_at)
+    if (lastKey && daysBetweenKeys(lastKey, todayKey) < COMPRESSOR_INTERVAL_DAYS) {
+      return 'compressor_interval_reset'
     }
     return null
   }
@@ -930,6 +948,67 @@ Deno.serve(async (req) => {
         .eq('category', 'separator_box')
         .eq('reference_id', 'posto')
         .in('posto_id', resetSeparatorPostoIds)
+    }
+
+    // --- Compressor (aviso_compressor): 7 dias após a última inspeção ---
+    const { data: compressorRows } = await admin
+      .from('compressor_inspections')
+      .select('posto_id, inspected_at')
+      .in('posto_id', postoIds)
+      .order('inspected_at', { ascending: false })
+
+    const lastCompressor = new Map<string, string>()
+    for (const row of compressorRows ?? []) {
+      if (!lastCompressor.has(row.posto_id)) lastCompressor.set(row.posto_id, row.inspected_at)
+    }
+
+    const resetCompressorPostoIds: string[] = []
+    for (const posto of activePostos) {
+      const lastAt = lastCompressor.get(posto.id)
+      if (!lastAt) {
+        resetCompressorPostoIds.push(posto.id)
+        continue
+      }
+      const lastKey = toSaoPauloDateKey(lastAt)
+      if (!lastKey) continue
+      const dueKey = addDaysToDateKey(lastKey, COMPRESSOR_INTERVAL_DAYS)
+      if (dueKey > todayKey) {
+        resetCompressorPostoIds.push(posto.id)
+        continue
+      }
+
+      const milestone = `due:${dueKey}`
+      const phones = collectAvisoPhones(posto as PostoRow)
+      const tpl = compressorTemplate({
+        nome: (posto as PostoRow).nome,
+        cnpj: (posto as PostoRow).cnpj,
+        endereco: formatPostoAddress(posto as PostoRow),
+        dueKey,
+      })
+      const ok = await enqueueReminder(
+        admin,
+        jobFromTemplate(
+          {
+            posto_id: posto.id,
+            category: 'compressor',
+            reference_id: 'posto',
+            milestone,
+            phones,
+            due_on: dueKey,
+          },
+          tpl,
+        ),
+      )
+      if (ok) enqueued += 1
+    }
+
+    if (resetCompressorPostoIds.length) {
+      await admin
+        .from('whatsapp_reminder_queue')
+        .delete()
+        .eq('category', 'compressor')
+        .eq('reference_id', 'posto')
+        .in('posto_id', resetCompressorPostoIds)
     }
 
     // --- Drenagem ---
