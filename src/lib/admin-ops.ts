@@ -186,6 +186,86 @@ export async function deleteAdminRaqReport(reportId: string) {
   return payload
 }
 
+export type AdminMetrologyVerification = {
+  id: string
+  posto_id: string
+  posto_nome: string
+  posto_cnpj: string
+  verified_at: string
+  employee_full_name: string
+  nozzle_count: number
+  overall_status: 'aprovado' | 'reprovado'
+}
+
+export async function listAdminMetrologyVerifications(): Promise<AdminMetrologyVerification[]> {
+  const { payload, invokeFailed } = await invokeAdminOps<{
+    ok: boolean
+    message?: string
+    verifications?: AdminMetrologyVerification[]
+  }>({ action: 'list_metrology' })
+
+  if (invokeFailed || !payload?.ok) {
+    throw new Error(payload?.message || 'Não foi possível carregar as metrologias.')
+  }
+
+  return payload.verifications ?? []
+}
+
+export async function deleteAdminMetrologyVerification(verificationId: string) {
+  const { payload, invokeFailed } = await invokeAdminOps<{
+    ok: boolean
+    message?: string
+    verification_id?: string
+  }>({ action: 'delete_metrology', verification_id: verificationId })
+
+  if (invokeFailed || !payload?.ok) {
+    throw new Error(payload?.message || 'Não foi possível excluir a metrologia.')
+  }
+
+  return payload
+}
+
+export type AdminDrainageReport = {
+  id: string
+  posto_id: string
+  posto_nome: string
+  posto_cnpj: string
+  drained_at: string
+  operator_full_name: string
+  tank_name: string
+  drained_volume_liters: number | null
+  water_present: boolean | null
+  impurities_present: boolean | null
+}
+
+export async function listAdminDrainageReports(): Promise<AdminDrainageReport[]> {
+  const { payload, invokeFailed } = await invokeAdminOps<{
+    ok: boolean
+    message?: string
+    reports?: AdminDrainageReport[]
+  }>({ action: 'list_drainages' })
+
+  if (invokeFailed || !payload?.ok) {
+    throw new Error(payload?.message || 'Não foi possível carregar as drenagens.')
+  }
+
+  return payload.reports ?? []
+}
+
+export async function deleteAdminDrainageReport(reportId: string) {
+  const { payload, invokeFailed } = await invokeAdminOps<{
+    ok: boolean
+    message?: string
+    report_id?: string
+  }>({ action: 'delete_drainage', report_id: reportId })
+
+  if (invokeFailed || !payload?.ok) {
+    throw new Error(payload?.message || 'Não foi possível excluir a drenagem.')
+  }
+
+  return payload
+}
+
 export function subscriptionStatusLabel(status: AdminAccount['subscription_status']) {
   if (status === 'active') return 'Ativo'
   if (status === 'expired') return 'Inativo'

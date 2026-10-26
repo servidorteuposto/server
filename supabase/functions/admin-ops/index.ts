@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
-import { deleteR2Object, isR2Configured, objectKey } from '../_shared/r2.ts'
+import { deleteR2Object, isR2Configured, objectKey, type LogicalBucket } from '../_shared/r2.ts'
 import {
   isMetaWhatsAppConfigured,
   normalizeWaPhone,
@@ -107,6 +107,19 @@ function collectAvisoPhones(posto: {
     if (normalized.length >= 12 && normalized.length <= 15) unique.add(normalized)
   }
   return [...unique]
+}
+
+async function deleteR2Paths(bucket: LogicalBucket, paths: Iterable<string | null | undefined>) {
+  if (!isR2Configured()) return
+  for (const path of paths) {
+    const key = typeof path === 'string' ? path.trim() : ''
+    if (!key) continue
+    try {
+      await deleteR2Object(objectKey(bucket, key))
+    } catch (error) {
+      console.error('r2 delete failed', bucket, key, error)
+    }
+  }
 }
 
 async function cancelMercadoPagoPreapproval(preapprovalId: string) {
@@ -604,15 +617,7 @@ Deno.serve(async (req) => {
         if (item?.photo_storage_path) paths.add(String(item.photo_storage_path))
       }
 
-      if (isR2Configured()) {
-        for (const path of paths) {
-          try {
-            await deleteR2Object(objectKey('fuel-analyses', path))
-          } catch (error) {
-            console.error('r2 delete raq file failed', path, error)
-          }
-        }
-      }
+      await deleteR2Paths('fuel-analyses', paths)
 
       const { error: deleteError } = await admin.from('fuel_analysis_reports').delete().eq('id', reportId)
       if (deleteError) {
@@ -625,6 +630,164 @@ Deno.serve(async (req) => {
       return jsonResponse({
         ok: true,
         message: `RAQ de ${report.razao_social} excluído.`,
+        report_id: reportId,
+      })
+    }
+
+    if (action === 'list_metrology') {
+      const { data, error } = await admin
+        .from('nozzle_metrology_verifications')
+        .select(
+          `
+          id,
+          posto_id,
+          verified_at,
+          employee_full_name,
+          nozzle_count,
+          overall_status,
+          posto:postos ( id, nome, cnpj )
+        `,
+        )
+        .order('verified_at', { ascending: false })
+
+      if (error) {
+        return jsonResponse({ ok: false, message: error.message }, 500)
+      }
+
+      const verifications = (data ?? []).map((row) => {
+        const posto = Array.isArray(row.posto) ? row.posto[0] : row.posto
+        return {
+          id: row.id,
+          posto_id: row.posto_id,
+          posto_nome: String(posto?.nome ?? 'Posto'),
+          posto_cnpj: String(posto?.cnpj ?? ''),
+          verified_at: row.verified_at,
+          employee_full_name: row.employee_full_name,
+          nozzle_count: row.nozzle_count,
+          overall_status: row.overall_status,
+        }
+      })
+
+      return jsonResponse({ ok: true, verifications })
+    }
+
+    if (action === 'delete_metrology') {
+      const verificationId = body?.verification_id
+      if (!verificationId || typeof verificationId !== 'string') {
+        return jsonResponse({ ok: false, message: 'Informe a verificação.' }, 400)
+      }
+
+      const { data: verification, error: verificationError } = await admin
+        .from('nozzle_metrology_verifications')
+        .select(
+          'id, posto_id, signature_storage_path, photo_storage_path, pump_photo_storage_path, posto:postos ( nome )',
+        )
+        .eq('id', verificationId)
+        .maybeSingle()
+
+      if (verificationError || !verification) {
+        return jsonResponse({ ok: false, message: 'Verificação não encontrada.' }, 404)
+      }
+
+      await deleteR2Paths('nozzle-metrology', [
+        verification.signature_storage_path,
+        verification.photo_storage_path,
+        verification.pump_photo_storage_path,
+      ])
+
+      const { error: deleteError } = await admin
+        .from('nozzle_metrology_verifications')
+        .delete()
+        .eq('id', verificationId)
+      if (deleteError) {
+        return jsonResponse(
+          { ok: false, message: deleteError.message || 'Não foi possível excluir a metrologia.' },
+          500,
+        )
+      }
+
+      const posto = Array.isArray(verification.posto) ? verification.posto[0] : verification.posto
+      return jsonResponse({
+        ok: true,
+        message: `Metrologia de ${String(posto?.nome ?? 'posto')} excluída.`,
+        verification_id: verificationId,
+      })
+    }
+
+    if (action === 'list_drainages') {
+      const { data, error } = await admin
+        .from('diesel_drainage_reports')
+        .select(
+          `
+          id,
+          posto_id,
+          drained_at,
+          operator_full_name,
+          drained_volume_liters,
+          water_present,
+          impurities_present,
+          tank:diesel_tanks ( name ),
+          posto:postos ( id, nome, cnpj )
+        `,
+        )
+        .order('drained_at', { ascending: false })
+
+      if (error) {
+        return jsonResponse({ ok: false, message: error.message }, 500)
+      }
+
+      const reports = (data ?? []).map((row) => {
+        const posto = Array.isArray(row.posto) ? row.posto[0] : row.posto
+        const tank = Array.isArray(row.tank) ? row.tank[0] : row.tank
+        return {
+          id: row.id,
+          posto_id: row.posto_id,
+          posto_nome: String(posto?.nome ?? 'Posto'),
+          posto_cnpj: String(posto?.cnpj ?? ''),
+          drained_at: row.drained_at,
+          operator_full_name: row.operator_full_name,
+          tank_name: String(tank?.name ?? 'Tanque removido'),
+          drained_volume_liters: row.drained_volume_liters,
+          water_present: row.water_present,
+          impurities_present: row.impurities_present,
+        }
+      })
+
+      return jsonResponse({ ok: true, reports })
+    }
+
+    if (action === 'delete_drainage') {
+      const reportId = body?.report_id
+      if (!reportId || typeof reportId !== 'string') {
+        return jsonResponse({ ok: false, message: 'Informe a drenagem.' }, 400)
+      }
+
+      const { data: report, error: reportError } = await admin
+        .from('diesel_drainage_reports')
+        .select(
+          'id, posto_id, signature_storage_path, photo_storage_path, posto:postos ( nome )',
+        )
+        .eq('id', reportId)
+        .maybeSingle()
+
+      if (reportError || !report) {
+        return jsonResponse({ ok: false, message: 'Drenagem não encontrada.' }, 404)
+      }
+
+      await deleteR2Paths('diesel-drainages', [report.signature_storage_path, report.photo_storage_path])
+
+      const { error: deleteError } = await admin.from('diesel_drainage_reports').delete().eq('id', reportId)
+      if (deleteError) {
+        return jsonResponse(
+          { ok: false, message: deleteError.message || 'Não foi possível excluir a drenagem.' },
+          500,
+        )
+      }
+
+      const posto = Array.isArray(report.posto) ? report.posto[0] : report.posto
+      return jsonResponse({
+        ok: true,
+        message: `Drenagem de ${String(posto?.nome ?? 'posto')} excluída.`,
         report_id: reportId,
       })
     }

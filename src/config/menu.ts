@@ -16,6 +16,8 @@ export type MenuId =
   | 'contas-usuarios'
   | 'gerenciamento'
   | 'raqs-lancados'
+  | 'metrologias-lancadas'
+  | 'drenagens-lancadas'
   | 'configuracoes'
 
 export type MenuItem = {
@@ -114,6 +116,18 @@ export const MENU_ITEMS: MenuItem[] = [
     id: 'raqs-lancados',
     label: 'RAQs Lançados',
     description: 'Consultar e excluir RAQs de qualquer posto.',
+    adminOnly: true,
+  },
+  {
+    id: 'metrologias-lancadas',
+    label: 'Metrologias lançadas',
+    description: 'Consultar e excluir verificações metrológicas de qualquer posto.',
+    adminOnly: true,
+  },
+  {
+    id: 'drenagens-lancadas',
+    label: 'Drenagens lançadas',
+    description: 'Consultar e excluir drenagens de tanques de qualquer posto.',
     adminOnly: true,
   },
   {

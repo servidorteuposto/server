@@ -25,6 +25,8 @@ import RegulatoryDocumentsPage from '../pages/RegulatoryDocumentsPage'
 import SettingsPage from '../pages/SettingsPage'
 import AdminAccountsPage from '../pages/AdminAccountsPage'
 import AdminManagementPage from '../pages/AdminManagementPage'
+import AdminDrainagesPage from '../pages/AdminDrainagesPage'
+import AdminMetrologyPage from '../pages/AdminMetrologyPage'
 import AdminRaqsPage from '../pages/AdminRaqsPage'
 import AdminSupportPage from '../pages/AdminSupportPage'
 import SupportPage from '../pages/SupportPage'
@@ -357,6 +359,12 @@ export default function AppShell({
     }
     if (activeMenuId === 'raqs-lancados' && isAdmin) {
       return <AdminRaqsPage />
+    }
+    if (activeMenuId === 'metrologias-lancadas' && isAdmin) {
+      return <AdminMetrologyPage />
+    }
+    if (activeMenuId === 'drenagens-lancadas' && isAdmin) {
+      return <AdminDrainagesPage />
     }
     if (activeMenuId === 'configuracoes') {
       return <SettingsPage isReadOnly={isReadOnly} />
